@@ -61,26 +61,6 @@
         "destination": "/profile.html"
       },
       {
-        "source": "/developer",
-        "destination": "/developer.html"
-      },
-      {
-        "source": "/credentials",
-        "destination": "/accounts-credentials-a4.html"
-      },
-      {
-        "source": "/a4",
-        "destination": "/accounts-credentials-a4.html"
-      },
-      {
-        "source": "/sharek",
-        "destination": "/sharek-pitch.html"
-      },
-      {
-        "source": "/sharek-pitch",
-        "destination": "/sharek-pitch.html"
-      },
-      {
         "source": "/executive_report",
         "destination": "/executive_report.html"
       }
