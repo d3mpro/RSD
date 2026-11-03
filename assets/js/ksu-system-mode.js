@@ -342,20 +342,8 @@
      */
     getMode: function() {
       try {
-        const stored = localStorage.getItem(STORAGE_KEY_MODE);
-        const urlParams = new URLSearchParams(window.location.search);
-        const modeParam = urlParams.get('mode');
-
-        if (modeParam === 'demo') {
-          return MODE_DEMO;
-        }
-        if (modeParam === 'prod' || modeParam === 'production') {
-          return MODE_PRODUCTION;
-        }
-        if (stored === MODE_DEMO) {
-          return MODE_DEMO;
-        }
-        return MODE_PRODUCTION; // الافتراضي للتشغيل الفعلي المعتمد
+        localStorage.setItem(STORAGE_KEY_MODE, MODE_PRODUCTION);
+        return MODE_PRODUCTION;
       } catch (e) {
         return MODE_PRODUCTION;
       }
@@ -365,14 +353,14 @@
      * هل النظام في وضع العرض والتجربة السريعة؟
      */
     isDemo: function() {
-      return this.getMode() === MODE_DEMO;
+      return false;
     },
 
     /**
      * هل النظام في وضع الإنتاج الفعلي المعتمد؟
      */
     isProduction: function() {
-      return this.getMode() === MODE_PRODUCTION;
+      return true;
     },
 
     /**
