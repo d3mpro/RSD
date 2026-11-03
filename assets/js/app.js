@@ -9235,7 +9235,7 @@ function renderPortalQRCards() {
   const isHosted = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com');
   const baseOrigin = isHosted 
     ? (window.location.origin + window.location.pathname).replace(/\/+$/, '') 
-    : 'https://rsd-go-demo.web.app';
+    : 'https://rsd-ksu.web.app';
 
   portals.forEach(portalKey => {
     const targetUrl = `${baseOrigin}/?portal=${portalKey}`;
@@ -9273,7 +9273,7 @@ function renderPortalQRCards() {
 
 function copyPortalLink(portalKey) {
   const urlEl = document.getElementById(`qr-url-${portalKey}`);
-  const url = urlEl ? urlEl.textContent.trim() : `https://rsd-go-demo.web.app/?portal=${portalKey}`;
+  const url = urlEl ? urlEl.textContent.trim() : `https://rsd-ksu.web.app/?portal=${portalKey}`;
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(url).then(() => {
       showToast('تم نسخ الرابط المباشر إلى الحافظة بنجاح ✓', 'success');
@@ -9312,7 +9312,7 @@ function printSinglePortalCard(portalKey) {
   const qrImg = qrContainer ? qrContainer.querySelector('img') || qrContainer.querySelector('canvas') : null;
   const qrSrc = qrImg ? (qrImg.tagName.toLowerCase() === 'img' ? qrImg.src : qrImg.toDataURL()) : '';
   const urlEl = document.getElementById(`qr-url-${portalKey}`);
-  const url = urlEl ? urlEl.textContent.trim() : `https://rsd-go-demo.web.app/?portal=${portalKey}`;
+  const url = urlEl ? urlEl.textContent.trim() : `https://rsd-ksu.web.app/?portal=${portalKey}`;
   
   const html = `
     <!DOCTYPE html>
@@ -9387,7 +9387,7 @@ function printAllPortalCards() {
     const qrImg = qrContainer ? qrContainer.querySelector('img') || qrContainer.querySelector('canvas') : null;
     const qrSrc = qrImg ? (qrImg.tagName.toLowerCase() === 'img' ? qrImg.src : qrImg.toDataURL()) : '';
     const urlEl = document.getElementById(`qr-url-${p.key}`);
-    const url = urlEl ? urlEl.textContent.trim() : `https://rsd-go-demo.web.app/?portal=${p.key}`;
+    const url = urlEl ? urlEl.textContent.trim() : `https://rsd-ksu.web.app/?portal=${p.key}`;
 
     cardsHtml += `
       <div class="card" style="border-top: 4px solid ${p.color};">

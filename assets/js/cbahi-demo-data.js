@@ -575,7 +575,7 @@
       }
 
       // 7. مزامنة REST إضافية مباشرة مع السحابة لضمان التواجد الفوري
-      const rtdbBase = 'https://rsd-go-demo-default-rtdb.firebaseio.com';
+      const rtdbBase = window.KSU_FIREBASE_RTDB_URL || localStorage.getItem('ksumc_rtdb_url') || 'https://rsd-ksu-default-rtdb.firebaseio.com';
       try {
         const toPatch = [
           { node: 'rounds', items: DEMO_ROUNDS },

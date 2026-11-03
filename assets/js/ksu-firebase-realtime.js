@@ -18,17 +18,17 @@
     'use strict';
 
     const FIREBASE_CONFIG = {
-        apiKey: "AIzaSyAfK_m1az407rQZOoqbSnGZ1D6nn11Rn6A",
-        authDomain: "rsd-go-demo.firebaseapp.com",
-        projectId: "rsd-go-demo",
-        storageBucket: "rsd-go-demo.firebasestorage.app",
-        messagingSenderId: "145211723666",
-        appId: "1:145211723666:web:9d9de10cfd803f2f2e3b4b",
-        measurementId: "G-5K43RBNLXZ",
-        databaseURL: "https://rsd-go-demo-default-rtdb.firebaseio.com"
+        apiKey: "AIzaSyBXKoswq5Eq7JdenprjUPQkgereD2fcv7s",
+        authDomain: "rsd-ksu.firebaseapp.com",
+        projectId: "rsd-ksu",
+        storageBucket: "rsd-ksu.firebasestorage.app",
+        messagingSenderId: "343264080935",
+        appId: "1:343264080935:web:72ca9a5f6b14c4ab484a02",
+        measurementId: "G-HW9W0W6NFH",
+        databaseURL: window.KSU_FIREBASE_RTDB_URL || localStorage.getItem('ksumc_rtdb_url') || "https://rsd-ksu-default-rtdb.firebaseio.com"
     };
 
-    const PROD_CLEANUP_VERSION = 'ksumc_prod_clean_v5_8_2026';
+    const PROD_CLEANUP_VERSION = 'ksumc_prod_clean_v6_0_rsd_ksu';
 
     class KSUFirebaseRealtimeSync {
         constructor() {

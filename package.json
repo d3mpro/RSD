@@ -1,8 +1,8 @@
 {
-  "name": "rsd-go-demo",
+  "name": "rsd-ksu",
   "version": "1.0.0",
   "private": true,
-  "description": "RSD GO DEMO - External Showcase",
+  "description": "KSUMC Safety & Occupational Health System - Production",
   "scripts": {
     "start": "node server.js"
   }
