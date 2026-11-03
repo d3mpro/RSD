@@ -1,0 +1,149 @@
+{
+  "database": {
+    "rules": "database.rules.json"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "node-v20.18.0-win-x64/**",
+      "tools/**",
+      "*.bat",
+      "*.sh",
+      "*.cmd",
+      "*.exe",
+      "*.bak",
+      "*.zip",
+      "*.log",
+      "*.txt",
+      "firepit-log.txt",
+      "server.js",
+      "nginx.conf",
+      "web.config",
+      "start-local.*",
+      "backend/**",
+      "oracle_backup/**",
+      "**/*.db",
+      "**/*.sqlite*",
+      "specs/**",
+      ".specify/**",
+      "ARCHITECTURE.md",
+      "CHANGELOG.md",
+      "skills-lock.json",
+      "test-*.js"
+    ],
+    "cleanUrls": false,
+    "rewrites": [
+      {
+        "source": "/field",
+        "destination": "/field.html"
+      },
+      {
+        "source": "/admin",
+        "destination": "/admin.html"
+      },
+      {
+        "source": "/quality",
+        "destination": "/quality.html"
+      },
+      {
+        "source": "/dashboard",
+        "destination": "/dashboard.html"
+      },
+      {
+        "source": "/head",
+        "destination": "/head.html"
+      },
+      {
+        "source": "/profile",
+        "destination": "/profile.html"
+      },
+      {
+        "source": "/developer",
+        "destination": "/developer.html"
+      },
+      {
+        "source": "/credentials",
+        "destination": "/accounts-credentials-a4.html"
+      },
+      {
+        "source": "/a4",
+        "destination": "/accounts-credentials-a4.html"
+      },
+      {
+        "source": "/sharek",
+        "destination": "/sharek-pitch.html"
+      },
+      {
+        "source": "/sharek-pitch",
+        "destination": "/sharek-pitch.html"
+      },
+      {
+        "source": "/executive_report",
+        "destination": "/executive_report.html"
+      }
+    ],
+    "headers": [
+      {
+        "source": "sw.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "manifest.json",
+        "headers": [
+          {
+            "key": "Content-Type",
+            "value": "application/manifest+json; charset=utf-8"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "assets/js/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(jpg|jpeg|gif|png|svg|webp|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=604800"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(html)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
+    ]
+  }
+}

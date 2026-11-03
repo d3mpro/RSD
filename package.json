@@ -1,0 +1,9 @@
+{
+  "name": "rsd-go-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RSD GO DEMO - External Showcase",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

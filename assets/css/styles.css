@@ -1,0 +1,624 @@
+@charset "UTF-8";
+/* KSUMC Safety & Inspection System Custom Styles */
+
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+
+:root {
+  --primary: #082B49;
+  --primary-container: #00162B;
+  --secondary: #1E667F;
+  --secondary-container: #0D5C75;
+  --error: #D32F2F;
+  --warning: #E65100;
+  --success: #1E7E34;
+  --background: #F6F8FA;
+  --surface: #FFFFFF;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: 'Cairo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--background);
+  color: #181C20;
+  direction: rtl;
+  text-align: right;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Header & Top Navbar (Modern Sleek KSUMC Bar 58px + Full iOS Safe Area Support) */
+:root {
+  --ksu-safe-top: env(safe-area-inset-top, 0px);
+  --ksu-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --ksu-safe-left: env(safe-area-inset-left, 0px);
+  --ksu-safe-right: env(safe-area-inset-right, 0px);
+  --ksu-header-h: 58px;
+}
+
+#ksu-global-header,
+.ksu-top-header,
+header.ksu-top-header,
+body > header.fixed.top-0 {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: calc(58px + env(safe-area-inset-top, 0px)) !important;
+  min-height: calc(58px + env(safe-area-inset-top, 0px)) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(224, 227, 232, 0.9) !important;
+  box-shadow: 0 1px 6px rgba(0, 22, 43, 0.04) !important;
+  z-index: 50 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  padding-bottom: 0 !important;
+  padding-left: max(0.85rem, env(safe-area-inset-left, 0px)) !important;
+  padding-right: max(0.85rem, env(safe-area-inset-right, 0px)) !important;
+  gap: 0.75rem !important;
+  flex-wrap: nowrap !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+}
+
+/* Safe area content offset for main containers below fixed top header */
+body:has(#ksu-global-header) main,
+body:has(.ksu-top-header) main,
+body:has(header.fixed) main,
+main.pt-16,
+main[class*="pt-\[58px\]"],
+.ksu-page-container {
+  padding-top: calc(4.25rem + env(safe-area-inset-top, 0px)) !important;
+}
+
+/* Bottom safe clearance for pages with mobile bottom nav */
+body:has(.ksu-mobile-nav) main,
+body:has(nav.ksu-mobile-nav) main,
+main.pb-24 {
+  padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+@media (max-width: 640px) {
+  body:has(#ksu-global-header) main,
+  body:has(.ksu-top-header) main,
+  body:has(header.fixed) main,
+  main.pt-16,
+  main[class*="pt-\[58px\]"],
+  .ksu-page-container {
+    padding-top: calc(4.25rem + env(safe-area-inset-top, 0px)) !important;
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px)) !important;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F1F4F9;
+}
+::-webkit-scrollbar-thumb {
+  background: #C3C6CE;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #73777E;
+}
+
+
+/* Material Symbols Adjustments */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.material-symbols-outlined.fill-1 {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Pulse & Alerts */
+@keyframes alertPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(211, 47, 47, 0);
+  }
+}
+
+.animate-alert-pulse {
+  animation: alertPulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+/* Inspection Tri-state Radio Buttons - Modern High-Precision Design */
+.inspection-opt-btn {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  min-height: 52px !important;
+  width: 100% !important;
+  padding: 8px 4px !important;
+  border-radius: 12px !important;
+  border: 1.5px solid #E2E8F0 !important;
+  background-color: #FFFFFF !important;
+  cursor: pointer !important;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  text-align: center !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  box-sizing: border-box !important;
+}
+
+.inspection-opt-btn:hover {
+  border-color: #CBD5E1 !important;
+  background-color: #F8FAFC !important;
+}
+
+.inspection-opt-btn:active {
+  transform: scale(0.96) !important;
+}
+
+/* Checked States - Compliant (Emerald) */
+.check-opt-compliant:checked + label.inspection-opt-btn,
+.check-opt-compliant:checked + label {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+  border-color: #059669 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.32) !important;
+  transform: translateY(-1.5px) !important;
+}
+
+.check-opt-compliant:checked + label * {
+  color: #FFFFFF !important;
+  opacity: 1 !important;
+}
+
+/* Checked States - Violation (Crimson) */
+.check-opt-violation:checked + label.inspection-opt-btn,
+.check-opt-violation:checked + label {
+  background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%) !important;
+  border-color: #DC2626 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.32) !important;
+  transform: translateY(-1.5px) !important;
+}
+
+.check-opt-violation:checked + label * {
+  color: #FFFFFF !important;
+  opacity: 1 !important;
+}
+
+/* Checked States - Observation / N/A (Amber) */
+.check-opt-observation:checked + label.inspection-opt-btn,
+.check-opt-observation:checked + label {
+  background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%) !important;
+  border-color: #D97706 !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 14px rgba(217, 119, 6, 0.32) !important;
+  transform: translateY(-1.5px) !important;
+}
+
+.check-opt-observation:checked + label * {
+  color: #FFFFFF !important;
+  opacity: 1 !important;
+}
+
+/* Modal Transitions */
+.modal-backdrop {
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+/* Smooth Tab Transitions */
+.tab-pane {
+  display: none;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.tab-pane.active {
+  display: block;
+  opacity: 1;
+}
+
+/* Digital Badge & Barcode styling */
+.barcode-sim {
+  font-family: monospace;
+  letter-spacing: 4px;
+  background: repeating-linear-gradient(
+    90deg,
+    #000,
+    #000 2px,
+    #fff 2px,
+    #fff 4px,
+    #000 4px,
+    #000 5px,
+    #fff 5px,
+    #fff 8px
+  );
+  height: 38px;
+  width: 140px;
+}
+
+/* QR Sticker Card Specific Styling */
+.official-qr-sticker {
+  width: 100%;
+  max-width: 440px;
+  background: #ffffff;
+  border: 2px solid #1E667F;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(8, 43, 73, 0.08);
+}
+
+/* Print Stylesheet for Official Reports & Stickers */
+@media print {
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+  }
+
+  header, aside, .no-print, button, .mobile-bottom-nav {
+    display: none !important;
+  }
+
+  body:not(.printing-sticker) .modal-backdrop-bg {
+    display: none !important;
+  }
+
+  .main-content-wrapper {
+    padding-right: 0 !important;
+    padding-top: 0 !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .report-printable-area {
+    border: none !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* When printing single QR sticker from in-page modal */
+  body.printing-sticker {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.printing-sticker * {
+    visibility: hidden;
+  }
+
+  body.printing-sticker #modal-asset-qr-sticker,
+  body.printing-sticker #modal-asset-qr-sticker *,
+  body.printing-sticker #print-sticker-container,
+  body.printing-sticker #print-sticker-container * {
+    visibility: visible;
+  }
+
+  body.printing-sticker #modal-asset-qr-sticker {
+    display: flex !important;
+    position: static !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  body.printing-sticker #modal-asset-qr-sticker > div {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  body.printing-sticker #print-sticker-container {
+    display: flex !important;
+    justify-content: center !important;
+    margin: 10mm auto !important;
+    width: 90mm !important;
+    max-width: 90mm !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* When printing monthly schedule sheet */
+  body.printing-schedule * {
+    visibility: hidden;
+  }
+
+  body.printing-schedule #schedule-printable-sheet,
+  body.printing-schedule #schedule-printable-sheet * {
+    visibility: visible;
+  }
+
+  body.printing-schedule #schedule-printable-sheet {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* When printing AI Inspection Card / Executive / CBAHI cards */
+  body.printing-ai-card {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.printing-ai-card > *:not(#ksu-ai-print-zone) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.printing-ai-card #ksu-ai-print-zone {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    visibility: visible !important;
+    background: #ffffff !important;
+  }
+
+  body.printing-ai-card #ksu-ai-print-zone * {
+    visibility: visible !important;
+  }
+
+  .ksu-print-topbar,
+  .ksu-floating-close-btn,
+  .ksu-no-print-bar {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* When printing official executive report area */
+  .report-printable-area {
+    page-break-inside: avoid;
+  }
+
+  .page-break {
+    page-break-after: always;
+  }
+}
+
+/* ============================================================== */
+/* KSUMC MASTER PLAN INTERACTIVE CAMPUS MAP STYLES                */
+/* ============================================================== */
+.ksumc-map-viewport {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  background-color: #f1f5f9;
+  user-select: none;
+  touch-action: pan-x pan-y;
+  cursor: grab;
+}
+
+.ksumc-map-viewport.is-panning {
+  cursor: grabbing;
+}
+
+.ksumc-map-canvas {
+  position: relative;
+  transform-origin: center center;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ksumc-hotspot-rect {
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+.ksumc-hotspot-rect:hover {
+  filter: drop-shadow(0 0 8px rgba(14, 165, 233, 0.6));
+  stroke-width: 3.5;
+  stroke: #0284c7;
+}
+
+.ksumc-hotspot-rect.is-selected {
+  stroke-width: 4;
+  stroke: #f59e0b !important;
+  filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.8));
+  animation: hotspot-pulse 2s infinite ease-in-out;
+}
+
+@keyframes hotspot-pulse {
+  0%, 100% {
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-opacity: 0.4;
+  }
+}
+
+.ksumc-map-badge {
+  font-family: 'Cairo', sans-serif;
+  font-weight: 800;
+  pointer-events: none;
+  user-select: none;
+}
+
+.ksumc-alarm-ping {
+  animation: alarm-ring-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes alarm-ring-ping {
+  75%, 100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* Fullscreen mode for Map */
+.ksumc-map-fullscreen {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 99999 !important;
+  border-radius: 0 !important;
+  background-color: #001326 !important;
+  padding: 1.5rem !important;
+}
+
+/* Digital Signature Canvas & Touch Pad */
+.sig-pad-box {
+  position: relative;
+  background: #ffffff;
+  border: 1.5px dashed #0284c7;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.04);
+}
+
+.sig-pad-box.has-signature {
+  border-style: solid;
+  border-color: #10b981;
+}
+
+.sig-canvas {
+  width: 100%;
+  height: 120px;
+  display: block;
+  cursor: crosshair;
+  touch-action: none;
+  background-color: #ffffff;
+}
+
+.sig-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+
+/* ======================================================== */
+/* KSUMC 4 SPECIALIZED ACCESS PORTALS STYLES               */
+/* ======================================================== */
+.ksu-portal-card {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.ksu-portal-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px -6px rgba(0, 43, 73, 0.15);
+}
+
+.ksu-portal-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 4px;
+  background: currentColor;
+  opacity: 0.8;
+  transition: width 0.2s ease;
+}
+
+.ksu-portal-card:hover::before {
+  width: 6px;
+}
+
+.portal-badge-glow {
+  box-shadow: 0 0 15px rgba(26, 115, 232, 0.15);
+}
+
+/* ==========================================================================
+   KSUMC User Profile Dropdown Menu - 100% Solid Opaque High-Contrast Styling
+   Fixes transparency issues across mobile & desktop viewports
+   ========================================================================== */
+#field-user-menu,
+#ksu-user-dropdown-menu,
+.ksu-user-dropdown-menu,
+.user-profile-dropdown {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 75, 135, 0.18) !important;
+  border: 1.5px solid #cbd5e1 !important;
+  z-index: 99999 !important;
+}
+
+#field-user-menu .menu-item-row,
+#ksu-user-dropdown-menu .menu-item-row {
+  background-color: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+#field-user-menu .menu-item-row:hover,
+#ksu-user-dropdown-menu .menu-item-row:hover {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #004b87 !important;
+}
+
+/* Modern Floating Bottom Navigation Bar (Rock-solid iOS PWA Pinning) */
+.ksu-mobile-nav {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(195, 198, 206, 0.5) !important;
+  z-index: 50 !important;
+  padding: 0.35rem 0.5rem !important;
+  padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px)) !important;
+  box-shadow: 0 -4px 20px rgba(0, 22, 43, 0.08) !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  box-sizing: border-box !important;
+  touch-action: manipulation !important;
+}
+
+
+

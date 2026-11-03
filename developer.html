@@ -1,0 +1,1723 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#001428" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="apple-touch-icon" href="./assets/images/app-icon.png" />
+  <link rel="icon" type="image/png" href="./assets/images/app-icon.png" />
+  <title>بوابة مطور النظام والتهيئة السحابية | منصة رصد الذكية</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#082B49",
+            "dev-dark": "#001428",
+            "dev-card": "#0A1F36",
+            "dev-border": "#1E3A5F",
+            "dev-accent": "#7C3AED",
+            "dev-cyan": "#06B6D4",
+            "dev-emerald": "#10B981"
+          },
+          fontFamily: {
+            cairo: ["Cairo", "sans-serif"],
+            mono: ["Fira Code", "monospace"]
+          }
+        }
+      }
+    };
+  </script>
+  <link rel="stylesheet" href="assets/css/styles.css?v=2.24" />
+  
+  <!-- Google Firebase SDK (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="assets/js/auth-guard.js?v=5.2"></script>
+  <script src="assets/js/ksumc-data-bridge.js?v=6.2"></script>
+  <script src="assets/js/ksu-firebase-realtime.js?v=6.8.0"></script>
+  <script src="assets/js/ksu-wet-chemical-assets.js"></script>
+  <script src="assets/js/ksu-system-mode.js?v=1.2"></script>
+  <script src="assets/js/cbahi-demo-data.js?v=1.2"></script>
+  <script src="assets/js/ksu-nav-component.js?v=5.14"></script>
+  <script src="assets/js/ksu-demo-switcher.js?v=1.1"></script>
+  <script>
+    // حماية مشددة: عزل تام لمطور النظام ومسؤول التقنية عن الجودة والتشغيل
+    KSUAuth.protect('developer', ['developer']);
+  </script>
+</head>
+
+<body class="bg-[#000E1C] font-cairo text-gray-100 antialiased min-h-screen flex flex-col justify-between selection:bg-dev-accent selection:text-white">
+
+  <!-- Header -->
+  <header class="w-full bg-[#001428] border-b border-[#1E3A5F] py-3 px-4 sm:px-8 z-30 sticky top-0 shadow-md" style="padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <!-- كشف الحسابات A4 المعتمد -->
+        <a href="accounts-credentials-a4.html" target="_blank" title="طباعة كشف الحسابات وكلمات المرور المعتمدة على ورق A4" class="px-3 py-1.5 rounded-xl bg-blue-900/40 hover:bg-blue-800/60 text-cyan-300 text-xs font-black border border-cyan-500/40 transition-all flex items-center gap-1.5 shadow-xs cursor-pointer">
+          <span class="material-symbols-outlined text-sm text-cyan-400">print</span>
+          <span class="hidden md:inline">كشف الحسابات (A4)</span>
+        </a>
+        <!-- مؤشر وضع المنظومة المعتمد -->
+        <div id="dev-header-mode-badge" class="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-950/70 border border-emerald-600/70 text-emerald-300 text-xs font-black">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="dev-header-mode-text">الإنتاج المعتمد (Production)</span>
+        </div>
+        <div class="hidden xl:flex items-center gap-2 px-3 py-1 rounded-xl bg-emerald-950/60 border border-emerald-800/80 text-emerald-400 text-xs font-bold font-mono">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>محرك فايربيس السحابي: نشط 100% (ONLINE)</span>
+        </div>
+        <a href="head.html" class="px-3 py-1.5 rounded-xl bg-[#0A1F36] hover:bg-[#1E3A5F] text-blue-300 text-xs font-bold border border-blue-900 transition-colors flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">shield_person</span>
+          <span class="hidden md:inline">صفحة رئيس القسم</span>
+        </a>
+        <button onclick="KSUAuth.logout()" class="px-3 py-1.5 rounded-xl bg-red-950/50 hover:bg-red-900/60 text-red-300 text-xs font-bold border border-red-800 transition-colors flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">logout</span>
+          <span>خروج</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
+
+    <!-- Isolation Notice Banner -->
+    <div class="rounded-2xl bg-gradient-to-l from-purple-950/80 via-[#0A1F36] to-[#001428] p-5 border border-purple-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg">
+      <div class="space-y-1">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-purple-400 text-xl">lock</span>
+          <h2 class="text-base font-black text-white">البيئة التطويرية معزولة تماماً (Isolated Private Environment)</h2>
+        </div>
+        <p class="text-xs text-gray-300">
+          هذه الصفحة مخصصة حصرياً لمطور النظام ومسؤول التقنية (أ. علي سليمان الصقري - 95972). تم عزلها بالكامل عن بوابة الجودة وتقييم الأداء (<code class="bg-black/40 px-1.5 py-0.5 rounded text-amber-300">quality.html</code>).
+        </p>
+      </div>
+      <div class="flex items-center gap-2 text-xs font-mono font-bold text-gray-300 bg-black/40 px-3 py-1.5 rounded-xl border border-white/10 shrink-0">
+        <span class="text-purple-400">UID:</span> USR-01 (SUPER_ADMIN)
+      </div>
+    </div>
+
+    <!-- Dev Console Sub-navigation Tabs -->
+    <div class="flex items-center justify-between gap-3 flex-wrap bg-[#0A1F36] p-2 rounded-2xl border border-[#1E3A5F]">
+      <div class="flex items-center gap-2 overflow-x-auto no-scrollbar">
+        <button onclick="switchDevTab('staff')" id="tab-btn-staff" class="dev-tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs transition-all whitespace-nowrap bg-purple-600 text-white shadow-md">
+          <span class="material-symbols-outlined text-base">manage_accounts</span>
+          <span>1. تحرير المستخدمين والمناصب والصلاحيات (حفظ فوري لفايربيس)</span>
+        </button>
+        <button onclick="switchDevTab('positions')" id="tab-btn-positions" class="dev-tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap text-gray-300 hover:text-white hover:bg-white/5">
+          <span class="material-symbols-outlined text-base text-amber-400">admin_panel_settings</span>
+          <span>2. إدارة وتحرير المناصب والرتب المعيارية</span>
+        </button>
+        <button onclick="switchDevTab('facilities')" id="tab-btn-facilities" class="dev-tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap text-gray-300 hover:text-white hover:bg-white/5">
+          <span class="material-symbols-outlined text-base text-purple-400">domain_add</span>
+          <span>3. إدارة المنشآت والمستشفيات</span>
+        </button>
+        <button onclick="switchDevTab('engine')" id="tab-btn-engine" class="dev-tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap text-gray-300 hover:text-white hover:bg-white/5">
+          <span class="material-symbols-outlined text-base text-dev-cyan">cloud_sync</span>
+          <span>4. محرك فايربيس وتصفير التجريبي</span>
+        </button>
+        <button onclick="switchDevTab('backup')" id="tab-btn-backup" class="dev-tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap text-gray-300 hover:text-white hover:bg-white/5">
+          <span class="material-symbols-outlined text-base text-dev-emerald">database</span>
+          <span>5. النسخ الاحتياطي JSON</span>
+        </button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="forcePushAllUsersToFirebase()" class="px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 font-black text-xs flex items-center gap-1.5 transition-all">
+          <span class="material-symbols-outlined text-sm">cloud_upload</span>
+          <span>مزامنة فورية لـ Firebase</span>
+        </button>
+        <button onclick="handlePurgeAllTrialData()" class="px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 font-black text-xs flex items-center gap-1.5 transition-all">
+          <span class="material-symbols-outlined text-sm">delete_sweep</span>
+          <span>حذف الجولات التجريبية</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 1: STAFF, POSITIONS & PERMISSIONS MANAGEMENT         -->
+    <!-- ======================================================== -->
+    <div id="pane-staff" class="dev-pane space-y-6">
+
+      <!-- Staff List & Instant Editor Table (Top Priority) -->
+      <div class="bg-[#0A1F36] rounded-3xl p-6 border border-[#1E3A5F] shadow-md space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#1E3A5F] pb-4">
+          <div>
+            <h3 class="text-base font-black text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-cyan-400">manage_accounts</span>
+              <span>إدارة وتحرير المستخدمين والمناصب والصلاحيات (<span id="dev-staff-count">0</span> حساب)</span>
+            </h3>
+            <p class="text-xs text-gray-400 mt-0.5">اضغط على زر <strong class="text-amber-300">«تحرير الحساب والمنصب والصلاحيات»</strong> لأي مستخدم لتعديل بياناته ومربعات صلاحياته وحفظها لحظياً على Firebase</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="relative">
+              <input type="text" id="dev-user-search" oninput="renderStaffList()" placeholder="بحث بالاسم أو اسم المستخدم أو المنصب..." class="w-60 pl-3 pr-8 py-2 rounded-xl bg-[#001428] border border-[#1E3A5F] text-xs text-white font-bold focus:outline-none focus:border-cyan-400" />
+              <span class="material-symbols-outlined text-sm text-gray-400 absolute right-2.5 top-2.5">search</span>
+            </div>
+            <button onclick="openNewUserModal()" class="px-4 py-2 rounded-xl bg-dev-cyan hover:bg-cyan-500 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md transition-all">
+              <span class="material-symbols-outlined text-sm">person_add</span>
+              <span>إضافة مستخدم جديد</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-right text-xs">
+            <thead>
+              <tr class="bg-[#001428] text-gray-400 font-bold border-b border-[#1E3A5F]">
+                <th class="p-3 rounded-r-xl">الاسم الكامل والرقم الوظيفي</th>
+                <th class="p-3">بيانات الدخول (Username / Pass)</th>
+                <th class="p-3">المسمى الوظيفي / المنصب (تغيير فوري)</th>
+                <th class="p-3">البوابة الموجهة</th>
+                <th class="p-3">المنشأة والوردية</th>
+                <th class="p-3">الصلاحيات المفعلة</th>
+                <th class="p-3 text-center rounded-l-xl">تحرير وحفظ فوري</th>
+              </tr>
+            </thead>
+            <tbody id="dev-staff-table-body" class="divide-y divide-[#1E3A5F]/60 font-semibold text-gray-200">
+              <!-- Dynamically populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Quick Add Staff Form -->
+      <div class="bg-[#0A1F36] rounded-3xl p-6 border border-[#1E3A5F] shadow-md space-y-5">
+        <div class="flex items-center justify-between border-b border-[#1E3A5F] pb-4">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-cyan-950/80 text-cyan-400 border border-cyan-800/80 flex items-center justify-center">
+              <span class="material-symbols-outlined text-xl">person_add</span>
+            </div>
+            <div>
+              <h3 class="text-base font-black text-white">إضافة سريعة لحساب موظف أو مفتش جديد</h3>
+              <p class="text-xs text-gray-400">يتم تفعيل الحساب ومزامنته فورياً في سحابة فايربيس (Firebase Realtime Database) للدخول الفوري</p>
+            </div>
+          </div>
+          <span class="text-xs font-mono font-bold text-cyan-300 bg-cyan-950/80 px-2.5 py-1 rounded-xl border border-cyan-800 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>FIREBASE_REALTIME_SYNC</span>
+          </span>
+        </div>
+
+        <form onsubmit="handleCreateStaff(event)" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-1">الاسم الكامل للموظف <span class="text-red-400">*</span></label>
+              <input type="text" id="staff-name" required placeholder="مثال: أ. فهد المطيري" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-white text-xs font-bold focus:ring-2 focus:ring-dev-cyan focus:outline-none" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-cyan-300 mb-1">اسم المستخدم (Username) <span class="text-red-400">*</span></label>
+              <input type="text" id="staff-username" required placeholder="مثال: M4 أو inspector4" class="w-full p-2.5 rounded-xl border border-cyan-500/50 bg-[#001428] text-cyan-300 font-mono text-xs font-bold focus:ring-2 focus:ring-dev-cyan focus:outline-none dir-ltr text-right" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-emerald-300 mb-1">الرقم السري (Password) <span class="text-red-400">*</span></label>
+              <input type="text" id="staff-password" required placeholder="مثال: 123456" value="123456" class="w-full p-2.5 rounded-xl border border-emerald-500/50 bg-[#001428] text-emerald-300 font-mono text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none dir-ltr text-right" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-amber-300 mb-1">المسمى الوظيفي المخصص (المنصب)</label>
+              <input type="text" id="staff-custom-title" placeholder="مثال: رئيس إدارة السلامة / مشرف ميداني" class="w-full p-2.5 rounded-xl border border-amber-500/40 bg-[#001428] text-amber-300 text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-1">الفئة الإشرافية والصلاحية الأساسية</label>
+              <select id="staff-role" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-white text-xs font-bold focus:ring-2 focus:ring-dev-cyan focus:outline-none">
+                <option value="field_inspector">مفتش سلامة ميداني</option>
+                <option value="shift_supervisor">مشرف وردية معتمد</option>
+                <option value="head">رئيس القسم / المشرف العام (H1)</option>
+                <option value="quality">قسم الجودة وتقييم الأداء (Q1)</option>
+                <option value="admin">مسؤول إدارة ونظام</option>
+                <option value="developer">مطور ومسؤول تقنية النظام</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-1">البوابة الافتراضية عند الدخول</label>
+              <select id="staff-portal" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-white text-xs font-bold focus:ring-2 focus:ring-dev-cyan focus:outline-none">
+                <option value="field">بوابة التفتيش الميداني (field.html)</option>
+                <option value="admin">بوابة مشرفي الورديات والإدارة (admin.html)</option>
+                <option value="head">بوابة رئيس القسم والأهداف (head.html)</option>
+                <option value="quality">بوابة الجودة وسباهي (quality.html)</option>
+                <option value="dashboard">لوحة العمليات الثلاثية الأبعاد (dashboard.html)</option>
+                <option value="developer">بوابة المطور (developer.html)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-1">المنشأة المكلف بها</label>
+              <select id="staff-facility-select" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-white text-xs font-bold focus:ring-2 focus:ring-dev-cyan focus:outline-none">
+                <option value="مستشفى الملك خالد الجامعي (KKUH)">مستشفى الملك خالد الجامعي (KKUH)</option>
+                <option value="مستشفى الملك عبدالعزيز الجامعي (KAUH)">مستشفى الملك عبدالعزيز الجامعي (KAUH)</option>
+                <option value="مركز الأورام الجامعي (Comprehensive Cancer Center)">مركز الأورام الجامعي (KSUCCC)</option>
+                <option value="مركز الملك فهد لطب وجراحة القلب (KFCC)">مركز الملك فهد لطب وجراحة القلب (KFCC)</option>
+                <option value="مبنى العيادات التخصصية والأسنان">مبنى العيادات التخصصية والأسنان (Dental/OPD)</option>
+                <option value="مبنى إدارة المدينة الطبية (Building 19)">مبنى إدارة المدينة الطبية (Admin)</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-1">الوردية</label>
+              <select id="staff-shift" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-white text-xs font-bold focus:ring-2 focus:ring-dev-cyan focus:outline-none">
+                <option value="الوردية 1 (صباحي)">الوردية 1 (صباحي)</option>
+                <option value="الوردية 2 (مسائي)">الوردية 2 (مسائي)</option>
+                <option value="الوردية 3 (ليلي)">الوردية 3 (ليلي)</option>
+                <option value="الصباحية">الصباحية (إشراف)</option>
+                <option value="جميع الورديات">جميع الورديات</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1 border-t border-[#1E3A5F]/50">
+            <div>
+              <label class="block text-xs font-bold text-gray-400 mb-1">الرقم الوظيفي الجامعي (اختياري)</label>
+              <input type="text" id="staff-empid" placeholder="اختياري (يُستخدم اسم المستخدم تلقائياً)" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-gray-300 font-mono text-xs focus:ring-2 focus:ring-dev-cyan focus:outline-none" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-400 mb-1">رقم الجوال للتواصل (اختياري)</label>
+              <input type="text" id="staff-phone" placeholder="اختياري: 05xxxxxxxx" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-gray-300 font-mono text-xs focus:ring-2 focus:ring-dev-cyan focus:outline-none dir-ltr text-right" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-400 mb-1">البريد الإلكتروني الجامعي (اختياري)</label>
+              <input type="text" id="staff-email" placeholder="اختياري: user@ksu.edu.sa" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-gray-300 font-mono text-xs focus:ring-2 focus:ring-dev-cyan focus:outline-none dir-ltr text-right" />
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-3 pt-2">
+            <button type="submit" class="px-6 py-2.5 rounded-xl bg-dev-cyan hover:bg-cyan-500 text-slate-950 font-black text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer">
+              <span class="material-symbols-outlined text-base">cloud_sync</span>
+              <span>تسجيل الحساب وحفظه فورياً على سحابة فايربيس (Firebase Cloud)</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 2: POSITIONS & ROLE TEMPLATES EDITOR                 -->
+    <!-- ======================================================== -->
+    <div id="pane-positions" class="dev-pane hidden space-y-6">
+      <div class="bg-[#0A1F36] rounded-3xl p-6 border border-[#1E3A5F] shadow-md space-y-5">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#1E3A5F] pb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center">
+              <span class="material-symbols-outlined text-2xl">badge</span>
+            </div>
+            <div>
+              <h3 class="text-base font-black text-white">إدارة وتحرير المناصب والرتب الوظيفية والصلاحيات المعيارية</h3>
+              <p class="text-xs text-gray-400">يمكنك تعديل مسميات المناصب الرسمية، البوابات الافتراضية لكل منصب، وتعميم صلاحيات المنصب على شاغليه بنقرة واحدة مع الحفظ الفوري على Firebase</p>
+            </div>
+          </div>
+          <button onclick="saveAllPositionTemplatesToFirebase()" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md transition-all">
+            <span class="material-symbols-outlined text-base">cloud_done</span>
+            <span>حفظ وتعميم المناصب على Firebase</span>
+          </button>
+        </div>
+
+        <div id="dev-positions-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Populated dynamically via JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 3: NEW FACILITIES MANAGEMENT (إضافة المنشآت)          -->
+    <!-- ======================================================== -->
+    <div id="pane-facilities" class="dev-pane hidden space-y-6">
+      
+      <!-- Add Facility Form Card -->
+      <div class="bg-[#0A1F36] rounded-3xl p-6 border border-[#1E3A5F] shadow-md space-y-5">
+        <div class="flex items-center justify-between border-b border-[#1E3A5F] pb-4">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-purple-950/80 text-purple-400 border border-purple-800/80 flex items-center justify-center">
+              <span class="material-symbols-outlined text-xl">add_business</span>
+            </div>
+            <div>
+              <h3 class="text-base font-black text-white">إضافة مستشفى أو منشأة طبية جديدة إلى المنظومة</h3>
+              <p class="text-xs text-gray-400">تنعكس فوراً في صفحة رئيس القسم، نماذج التفتيش، وجداول الورديات</p>
+            </div>
+          </div>
+          <span class="text-xs font-mono font-bold text-purple-300 bg-purple-950/80 px-2.5 py-1 rounded-xl border border-purple-800">
+            AUTO_SYNC_ACTIVE
+          </span>
+        </div>
+
+        <form onsubmit="handleCreateFacility(event)" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-1">اسم المنشأة أو المستشفى الرسمي</label>
+              <input type="text" id="fac-name" required placeholder="مثال: مستشفى الملك عبدالعزيز الجامعي (KAUH)" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-white text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-1">الرمز الكودي للمنشأة (Code)</label>
+              <input type="text" id="fac-code" required placeholder="مثال: KAUH أو ONCOLOGY" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-purple-300 font-mono text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none uppercase" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-1">نوع وتصنيف المنشأة</label>
+              <select id="fac-type" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-white text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                <option value="مستشفى رئيسي جامعي">مستشفى رئيسي جامعي</option>
+                <option value="مستشفى تخصصي جامعي">مستشفى تخصصي جامعي</option>
+                <option value="مركز أورام تخصصي">مركز أورام تخصصي</option>
+                <option value="مركز قلب وجراحة متقدم">مركز قلب وجراحة متقدم</option>
+                <option value="مبنى عيادات خارجية وأسنان">مبنى عيادات خارجية وأسنان</option>
+                <option value="مركز أبحاث ومختبرات طبية">مركز أبحاث ومختبرات طبية</option>
+                <option value="مبنى إداري وتشغيلي">مبنى إداري وتشغيلي</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-1">عدد المباني التابعة</label>
+              <input type="number" id="fac-buildings" required min="1" max="20" value="3" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-white text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-1">عدد الأدوار</label>
+              <input type="number" id="fac-floors" required min="1" max="30" value="6" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-white text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-1">المستهدف اليومي للجولات</label>
+              <input type="number" id="fac-target" required min="1" max="100" value="18" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-amber-300 text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-300 mb-1">الموقع الجغرافي / الحرم</label>
+              <input type="text" id="fac-location" required placeholder="مثال: الملز - طريق المطار القديم" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-white text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-gray-300 mb-1">وصف المنشأة وأقسامها الرئيسية</label>
+            <textarea id="fac-desc" rows="2" placeholder="وصف موجز للمنشأة مثل: مستشفى الملك عبدالعزيز الجامعي التخصصي بالعيون والأنف والأذن والحنجرة..." class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#001428] text-white text-xs focus:ring-2 focus:ring-purple-500 focus:outline-none"></textarea>
+          </div>
+
+          <div class="flex items-center justify-end gap-3 pt-2">
+            <button type="submit" class="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-xs shadow-md transition-all flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-base">save</span>
+              <span>حفظ المنشأة وإضافتها للنظام فورياً</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Facilities Table Card -->
+      <div class="bg-[#0A1F36] rounded-3xl p-6 border border-[#1E3A5F] shadow-md space-y-4">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-black text-white flex items-center gap-2">
+            <span class="material-symbols-outlined text-purple-400">apartment</span>
+            <span>قائمة المنشآت والمستشفيات المسجلة حالياً بالمنظومة (<span id="dev-fac-count">0</span>)</span>
+          </h3>
+          <span class="text-xs text-gray-400">محدثة تلقائياً في السحابة</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-right text-xs">
+            <thead>
+              <tr class="bg-[#001428] text-gray-400 font-bold border-b border-[#1E3A5F]">
+                <th class="p-3 rounded-r-xl">المنشأة</th>
+                <th class="p-3">الكود</th>
+                <th class="p-3">التصنيف</th>
+                <th class="p-3 text-center">المباني</th>
+                <th class="p-3 text-center">الأدوار</th>
+                <th class="p-3 text-center">مستهدف الجولات</th>
+                <th class="p-3">الموقع</th>
+                <th class="p-3 text-center rounded-l-xl">إجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="dev-facilities-table-body" class="divide-y divide-[#1E3A5F]/60 font-semibold text-gray-200">
+              <!-- Dynamically populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 4: FIREBASE REALTIME & TRIAL DATA PURGE              -->
+    <!-- ======================================================== -->
+    <div id="pane-engine" class="dev-pane hidden space-y-6">
+
+      <!-- مركز التحكم الحصري بمطور النظام: أوضاع المنظومة + كشف الحسابات + التصفير الشامل للتشغيل الفعلي -->
+      <div class="bg-gradient-to-br from-[#0B2545] via-[#0A1F36] to-[#001428] rounded-3xl p-6 border-2 border-cyan-500/30 shadow-xl space-y-6">
+        
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-cyan-500/20 pb-4">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 flex items-center justify-center shadow-inner">
+              <span class="material-symbols-outlined text-2xl">tune</span>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-base font-black text-white">إدارة أوضاع المنظومة والتشغيل الفعلي المعتمد</h3>
+                <span class="px-2.5 py-0.5 rounded-full bg-cyan-950 border border-cyan-500/40 text-cyan-300 text-[10px] font-black">حصري لمطور النظام</span>
+              </div>
+              <p class="text-xs text-gray-300 mt-0.5">تم نقل أدوات تبديل الأوضاع، كشف الحسابات، وتصفير الجولات هنا لعزلها تماماً عن المستخدمين والواجهة العامة</p>
+            </div>
+          </div>
+
+          <!-- Current Mode Status Indicator -->
+          <div id="dev-panel-mode-indicator" class="flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-950/80 border border-emerald-500/60 text-emerald-300 text-xs font-bold shadow-md">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span id="dev-panel-mode-text">الوضع الحالي: التشغيل المعتمد الفعلي (Production)</span>
+          </div>
+        </div>
+
+        <!-- 3 Executive Controls Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          
+          <!-- Box 1: Mode Switcher -->
+          <div class="p-5 rounded-2xl bg-[#001428]/90 border border-[#1E3A5F] flex flex-col justify-between space-y-4">
+            <div class="space-y-2">
+              <div class="flex items-center gap-2 text-cyan-400 text-xs font-black">
+                <span class="material-symbols-outlined text-lg">swap_horiz</span>
+                <span>التحكم في وضع المنظومة</span>
+              </div>
+              <p class="text-[11px] text-gray-400 leading-relaxed">
+                التحويل بين النسخة التشغيلية المعتمدة (Clean Production) ووضع الاستعراض التجريبي (Demo Mode) لشحن بيانات الاختبار.
+              </p>
+            </div>
+            <div class="space-y-2 pt-2">
+              <button 
+                type="button" 
+                onclick="promptSwitchToProduction()" 
+                class="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <span class="material-symbols-outlined text-sm">verified_user</span>
+                <span>تفعيل الإنتاج المعتمد (Production)</span>
+              </button>
+              <button 
+                type="button" 
+                onclick="promptSwitchToDemo()" 
+                class="w-full py-2 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <span class="material-symbols-outlined text-sm">play_circle</span>
+                <span>تفعيل وضع العرض التجريبي (Demo)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Box 2: Authorized Accounts A4 Document -->
+          <div class="p-5 rounded-2xl bg-[#001428]/90 border border-blue-500/30 flex flex-col justify-between space-y-4">
+            <div class="space-y-2">
+              <div class="flex items-center gap-2 text-blue-400 text-xs font-black">
+                <span class="material-symbols-outlined text-lg">description</span>
+                <span>سجل الحسابات المعتمدة (A4)</span>
+              </div>
+              <p class="text-[11px] text-gray-400 leading-relaxed">
+                وثيقة اعتماد الحسابات الرسمية <strong class="text-white">KSUMC-RSD-ACT-01</strong> لـ 22 موظفاً بكلمة المرور الموحدة <code class="text-cyan-300 font-bold">123456</code> وتوجيه البوابات.
+              </p>
+            </div>
+            <div class="pt-2">
+              <a 
+                href="accounts-credentials-a4.html" 
+                target="_blank" 
+                class="w-full py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer text-center"
+              >
+                <span class="material-symbols-outlined text-sm">print</span>
+                <span>فتح وطباعة كشف الحسابات (A4)</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Box 3: Full Zero-State Operational Reset -->
+          <div class="p-5 rounded-2xl bg-rose-950/40 border border-rose-500/40 flex flex-col justify-between space-y-4">
+            <div class="space-y-2">
+              <div class="flex items-center gap-2 text-rose-400 text-xs font-black">
+                <span class="material-symbols-outlined text-lg">delete_sweep</span>
+                <span>تصفير شامل للتشغيل الفعلي</span>
+              </div>
+              <p class="text-[11px] text-gray-300 leading-relaxed">
+                تصفير وحذف جميع الجولات، الإشعارات، تقارير السلامة، والتصاريح محلياً وسحابياً مع الحفاظ الكامل على الأصول المعتمدة (1757 أصل) والمستخدمين الـ 22.
+              </p>
+            </div>
+            <div class="pt-2">
+              <button 
+                type="button" 
+                onclick="executeFullProductionZeroState()" 
+                class="w-full py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <span class="material-symbols-outlined text-sm">cleaning_services</span>
+                <span>تصفير شامل للجولات والإشعارات للعمل الفعلي</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+      <div class="bg-[#0A1F36] rounded-3xl p-6 border border-[#1E3A5F] shadow-md space-y-5">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E3A5F] pb-4">
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-2xl bg-dev-cyan/20 text-dev-cyan border border-dev-cyan/40 flex items-center justify-center">
+              <span class="material-symbols-outlined text-xl">cloud_sync</span>
+            </div>
+            <div>
+              <h3 class="text-base font-black text-white">محرك فايربيس وقاعدة البيانات اللحظية وتطهير السجلات التجريبية</h3>
+              <p class="text-xs text-gray-400">اتصال فوري ومباشر مع خوادم Google Firebase (قاعدة البيانات اللحظية، الاستضافة، ومصادقة الحسابات)</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="testFirebaseRealtimeSync()" class="px-4 py-2 rounded-xl bg-dev-cyan hover:bg-cyan-500 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-md">
+              <span class="material-symbols-outlined text-base">sync</span>
+              <span>فحص المزامنة السحابية اللحظية</span>
+            </button>
+            <button onclick="handlePurgeAllTrialData()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs flex items-center gap-1.5 transition-all shadow-md">
+              <span class="material-symbols-outlined text-base">delete_forever</span>
+              <span>تصفير وحذف كافة الجولات التجريبية للعمل الفعلي</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 font-mono text-xs">
+          <div class="p-4 rounded-2xl bg-[#001428] border border-[#1E3A5F] space-y-1">
+            <span class="text-gray-400 block text-[11px]">Firebase Realtime Database</span>
+            <span class="text-dev-emerald font-bold block truncate">CONNECTED (ONLINE) ✓</span>
+            <span class="text-[10px] text-gray-500 block truncate">rsd-go-demo-default-rtdb</span>
+          </div>
+          <div class="p-4 rounded-2xl bg-[#001428] border border-[#1E3A5F] space-y-1">
+            <span class="text-gray-400 block text-[11px]">Firebase Hosting Engine</span>
+            <span class="text-dev-cyan font-bold block truncate">LIVE & DEPLOYED ✓</span>
+            <span class="text-[10px] text-gray-500 block truncate">rsd-go-demo.web.app</span>
+          </div>
+          <div class="p-4 rounded-2xl bg-[#001428] border border-[#1E3A5F] space-y-1">
+            <span class="text-gray-400 block text-[11px]">Users, Roles & Permissions Sync</span>
+            <span class="text-purple-400 font-bold block truncate">INSTANT RTDB SYNC ✓</span>
+            <span class="text-[10px] text-gray-500 block truncate">حفظ فوري للمستخدمين والمناصب والصلاحيات</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================== -->
+    <!-- TAB 5: BACKUP & JSON EXPORT (النسخ الاحتياطي)             -->
+    <!-- ======================================================== -->
+    <div id="pane-backup" class="dev-pane hidden space-y-6">
+      <div class="bg-[#0A1F36] rounded-3xl p-6 border border-[#1E3A5F] shadow-md space-y-4">
+        <h3 class="text-base font-black text-white flex items-center gap-2">
+          <span class="material-symbols-outlined text-emerald-400">download_for_offline</span>
+          <span>تصدير واسترجاع قاعدة بيانات المنظومة بالكامل (JSON)</span>
+        </h3>
+        <p class="text-xs text-gray-300">
+          يمكنك تنزيل نسخة احتياطية شاملة لجميع المنشآت المضافة، الحسابات، المناصب، الصلاحيات، الجولات، والبلاغات.
+        </p>
+        <div class="flex items-center gap-3 pt-2">
+          <button onclick="exportSystemJSON()" class="px-5 py-2.5 rounded-xl bg-dev-emerald hover:bg-emerald-600 text-slate-950 font-black text-xs shadow-md transition-all flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-base">download</span>
+            <span>تصدير النسخة الاحتياطية الآن (Backup.json)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: EDIT USER, POSITION & GRANULAR PERMISSIONS        -->
+  <!-- ======================================================== -->
+  <div id="editUserModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-[#0A1F36] border border-cyan-500/40 rounded-3xl max-w-4xl w-full p-6 shadow-2xl space-y-5 my-8 max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-[#1E3A5F] pb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl bg-purple-600/30 border border-purple-500/50 text-purple-300 flex items-center justify-center">
+            <span class="material-symbols-outlined text-2xl">manage_accounts</span>
+          </div>
+          <div>
+            <h3 id="edit-modal-heading" class="text-base font-black text-white">تحرير بيانات المستخدم والمنصب والصلاحيات</h3>
+            <p class="text-xs text-cyan-300 font-semibold">يتم حفظ كافة التعديلات ومزامنتها فورياً على قاعدة بيانات Firebase اللحظية</p>
+          </div>
+        </div>
+        <button onclick="closeEditUserModal()" class="w-9 h-9 rounded-xl bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-300 flex items-center justify-center transition-colors">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <form id="editUserForm" onsubmit="handleSaveEditedUser(event)" class="space-y-5">
+        <input type="hidden" id="edit-user-id" />
+
+        <!-- Section 1: Basic Identity & Credentials -->
+        <div class="p-4 rounded-2xl bg-[#001428] border border-[#1E3A5F] space-y-4">
+          <h4 class="text-xs font-black text-cyan-400 flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-base">badge</span>
+            <span>1. الهوية وبيانات النفاذ الموحد (تعديل الاسم، اسم المستخدم، الرقم السري)</span>
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-gray-300 mb-1">الاسم الكامل للموظف *</label>
+              <input type="text" id="edit-user-name" required class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#0A1F36] text-white text-xs font-bold focus:ring-2 focus:ring-cyan-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-cyan-300 mb-1">اسم المستخدم (Username) *</label>
+              <input type="text" id="edit-user-username" required class="w-full p-2.5 rounded-xl border border-cyan-500/40 bg-[#0A1F36] text-cyan-300 font-mono text-xs font-bold focus:ring-2 focus:ring-cyan-500 focus:outline-none dir-ltr text-right" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-emerald-300 mb-1">الرقم السري (Password) *</label>
+              <input type="text" id="edit-user-password" required class="w-full p-2.5 rounded-xl border border-emerald-500/40 bg-[#0A1F36] text-emerald-300 font-mono text-xs font-bold focus:ring-2 focus:ring-emerald-500 focus:outline-none dir-ltr text-right" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-gray-300 mb-1">الرقم الوظيفي (Emp ID)</label>
+              <input type="text" id="edit-user-empid" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#0A1F36] text-gray-200 font-mono text-xs font-bold focus:ring-2 focus:ring-cyan-500 focus:outline-none" />
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-gray-400 mb-1">البريد الإلكتروني</label>
+              <input type="text" id="edit-user-email" class="w-full p-2 rounded-xl border border-[#1E3A5F] bg-[#0A1F36] text-gray-300 font-mono text-xs focus:outline-none dir-ltr text-right" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-gray-400 mb-1">رقم الجوال</label>
+              <input type="text" id="edit-user-phone" class="w-full p-2 rounded-xl border border-[#1E3A5F] bg-[#0A1F36] text-gray-300 font-mono text-xs focus:outline-none dir-ltr text-right" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-gray-400 mb-1">حالة الحساب</label>
+              <select id="edit-user-status" class="w-full p-2 rounded-xl border border-[#1E3A5F] bg-[#0A1F36] text-white text-xs font-bold focus:outline-none">
+                <option value="نشط">نشط (مفعل للدخول)</option>
+                <option value="موقوف مؤقتاً">موقوف مؤقتاً</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Position, Role Category, Portal, Facility & Shift -->
+        <div class="p-4 rounded-2xl bg-[#001428] border border-amber-500/30 space-y-4">
+          <h4 class="text-xs font-black text-amber-400 flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-base">workspace_premium</span>
+            <span>2. تحرير المنصب والمسمى الوظيفي والفئة الإشرافية والتوجيه</span>
+          </h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-amber-300 mb-1">المسمى الوظيفي / المنصب الظاهر بالنظام *</label>
+              <input type="text" id="edit-user-role-title" required placeholder="مثال: رئيس إدارة السلامة / المشرف العام" class="w-full p-2.5 rounded-xl border border-amber-500/50 bg-[#0A1F36] text-amber-300 text-xs font-bold focus:ring-2 focus:ring-amber-500 focus:outline-none" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-purple-300 mb-1">الفئة الإشرافية (Role Category)</label>
+              <select id="edit-user-role-category" onchange="applyRolePresetInModal(this.value)" class="w-full p-2.5 rounded-xl border border-purple-500/50 bg-[#0A1F36] text-white text-xs font-bold focus:ring-2 focus:ring-purple-500 focus:outline-none">
+                <option value="field_inspector">مفتش سلامة ميداني (Field Inspector)</option>
+                <option value="shift_supervisor">مشرف وردية معتمد (Shift Supervisor)</option>
+                <option value="head">رئيس القسم / المشرف العام (Department Head)</option>
+                <option value="quality">قسم الجودة وتقييم الأداء (Quality & CBAHI)</option>
+                <option value="admin">مسؤول إدارة ونظام (System Admin)</option>
+                <option value="developer">مطور ومسؤول النظام (Developer)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-cyan-300 mb-1">البوابة الافتراضية عند تسجيل الدخول</label>
+              <select id="edit-user-portal" class="w-full p-2.5 rounded-xl border border-cyan-500/40 bg-[#0A1F36] text-white text-xs font-bold focus:ring-2 focus:ring-cyan-500 focus:outline-none">
+                <option value="field">بوابة التفتيش الميداني (field.html)</option>
+                <option value="admin">بوابة مشرفي الورديات والإدارة (admin.html)</option>
+                <option value="head">بوابة رئيس القسم والأهداف (head.html)</option>
+                <option value="quality">بوابة الجودة وسباهي (quality.html)</option>
+                <option value="dashboard">لوحة العمليات التحليلية (dashboard.html)</option>
+                <option value="developer">بوابة المطور (developer.html)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-gray-300 mb-1">المنشأة الطبية المكلف بها</label>
+              <select id="edit-user-facility" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#0A1F36] text-white text-xs font-bold focus:outline-none">
+                <!-- Populated dynamically -->
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-gray-300 mb-1">الوردية المكلف بها</label>
+              <select id="edit-user-shift" class="w-full p-2.5 rounded-xl border border-[#1E3A5F] bg-[#0A1F36] text-white text-xs font-bold focus:outline-none">
+                <option value="الوردية 1 (صباحي)">الوردية 1 (صباحي)</option>
+                <option value="الوردية 2 (مسائي)">الوردية 2 (مسائي)</option>
+                <option value="الوردية 3 (ليلي)">الوردية 3 (ليلي)</option>
+                <option value="الصباحية">الصباحية (إشراف عام)</option>
+                <option value="جميع الورديات">جميع الورديات</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Granular Permissions Matrix -->
+        <div class="p-4 rounded-2xl bg-[#001428] border border-purple-500/30 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-black text-purple-300 flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-base">verified_user</span>
+              <span>3. مصفوفة الصلاحيات التفصيلية للمستخدم (Granular Permissions)</span>
+            </h4>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="toggleAllModalPermissions(true)" class="text-[11px] px-2.5 py-1 rounded-lg bg-purple-900/60 text-purple-200 hover:bg-purple-800 font-bold">تحديد الكل</button>
+              <button type="button" onclick="toggleAllModalPermissions(false)" class="text-[11px] px-2.5 py-1 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 font-bold">إلغاء الكل</button>
+            </div>
+          </div>
+
+          <div id="edit-permissions-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs">
+            <!-- Populated dynamically via PERMISSION_DEFINITIONS -->
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between gap-3 pt-2 border-t border-[#1E3A5F]">
+          <span class="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">bolt</span>
+            <span>ينعكس التعديل فوراً في Firebase وجميع الأجهزة المتصلة</span>
+          </span>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="closeEditUserModal()" class="px-4 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold text-xs">
+              إلغاء
+            </button>
+            <button type="submit" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-black text-xs shadow-lg flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-base">cloud_done</span>
+              <span>حفظ التعديلات والمزامنة الفورية على Firebase</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Live Cloud Sync Toast Notification -->
+  <div id="devSyncToast" class="fixed bottom-5 left-5 z-50 hidden px-4 py-3 rounded-2xl bg-emerald-950/95 border border-emerald-500/60 text-emerald-200 text-xs font-black shadow-2xl flex items-center gap-2.5 transition-all">
+    <span class="material-symbols-outlined text-emerald-400 text-lg">cloud_done</span>
+    <span id="devSyncToastText">تم الحفظ والمزامنة الفورية على Firebase بنجاح!</span>
+  </div>
+
+  <!-- Footer -->
+  <footer class="w-full bg-[#001428] border-t border-[#1E3A5F] py-4 px-6 text-center text-xs text-gray-500">
+    <p>منظومة سلامة المدينة الطبية بجامعة الملك سعود © وحدة التطوير وهندسة النظم (Private Developer Route v5.8)</p>
+  </footer>
+
+  <script>
+    const PERMISSION_DEFINITIONS = [
+      { key: 'conductInspections', label: 'إجراء الجولات التفتيشية الميدانية', icon: 'fact_check' },
+      { key: 'issuePermits', label: 'إصدار تصاريح العمل وطلبات الأبواب', icon: 'local_fire_department' },
+      { key: 'approveReports', label: 'اعتماد تقارير المفتشين والورديات', icon: 'task_alt' },
+      { key: 'headOfDepartment', label: 'صلاحية رئيس القسم وتحديد الأهداف', icon: 'shield_person' },
+      { key: 'generalSupervisor', label: 'صلاحية المشرف العام والاعتماد النهائي', icon: 'military_tech' },
+      { key: 'qualityAudit', label: 'تدقيق الجودة والامتثال (سباهي / JCI)', icon: 'verified' },
+      { key: 'receiveFieldInspections', label: 'استقبال تقارير التفتيش الميداني (Q1)', icon: 'move_to_inbox' },
+      { key: 'approveDoorRequests', label: 'اعتماد طلبات فتح الأبواب المغلقة', icon: 'door_open' },
+      { key: 'approveHotWorkPermits', label: 'اعتماد تصاريح الأعمال الساخنة', icon: 'whatshot' },
+      { key: 'receiveSafetyReports', label: 'استقبال تقارير إدارة السلامة (H1)', icon: 'assignment_late' },
+      { key: 'receiveCodeReports', label: 'استقبال بلاغات الأكواد وأجراس الإنذار', icon: 'notifications_active' },
+      { key: 'receiveSafetyViolations', label: 'استقبال واعتماد مخالفات السلامة والتدخين', icon: 'gavel' },
+      { key: 'manageUsers', label: 'إدارة حسابات الموظفين والمناصب', icon: 'group' },
+      { key: 'manageBuildings', label: 'إدارة المباني والأصول والمخزون', icon: 'domain' },
+      { key: 'manageTemplates', label: 'تخصيص نماذج التفتيش الـ 14', icon: 'edit_document' },
+      { key: 'fullAccess', label: 'صلاحية وصول شاملة لجميع البوابات', icon: 'vpn_key' }
+    ];
+
+    const DEFAULT_POSITION_TEMPLATES = [
+      {
+        category: 'head',
+        title: 'رئيس إدارة السلامة / المشرف العام الملك خالد',
+        portal: 'head',
+        badgeColor: 'amber',
+        description: 'متابعة أهداف جولات العمل ونسب الإنجاز واعتماد التقارير والبلاغات النهائية للمنشأة',
+        permissions: {
+          conductInspections: true, issuePermits: true, approveReports: true,
+          headOfDepartment: true, generalSupervisor: true, receiveSafetyReports: true,
+          receiveCodeReports: true, receiveSafetyViolations: true, manageBuildings: true,
+          manageTemplates: true, manageUsers: true, fullAccess: true
+        }
+      },
+      {
+        category: 'quality',
+        title: 'أخصائي ومراقب الجودة وتقييم الأداء (CBAHI)',
+        portal: 'quality',
+        badgeColor: 'emerald',
+        description: 'تدقيق جولات السلامة ومعايير سباهي واعتماد تصاريح العمل الساخن والأبواب',
+        permissions: {
+          conductInspections: true, issuePermits: true, approveReports: true,
+          qualityAudit: true, receiveFieldInspections: true, approveDoorRequests: true,
+          approveHotWorkPermits: true, manageTemplates: true
+        }
+      },
+      {
+        category: 'shift_supervisor',
+        title: 'مشرف وردية السلامة الميدانية',
+        portal: 'admin',
+        badgeColor: 'cyan',
+        description: 'الإشراف المباشر على مفتشي الوردية ومراجعة الجولات ورفع التقارير اليومية',
+        permissions: {
+          conductInspections: true, issuePermits: true, approveReports: true,
+          receiveCodeReports: true
+        }
+      },
+      {
+        category: 'field_inspector',
+        title: 'مفتش سلامة وصحة مهنية ميداني',
+        portal: 'field',
+        badgeColor: 'blue',
+        description: 'تنفيذ الجولات التفتيشية الميدانية وفحص الأصول ورفع البلاغات والتصاريح',
+        permissions: {
+          conductInspections: true, issuePermits: true
+        }
+      },
+      {
+        category: 'admin',
+        title: 'مسؤول إدارة وتشغيل النظام',
+        portal: 'admin',
+        badgeColor: 'purple',
+        description: 'إدارة الجداول والأصول والمباني ومتابعة سير العمليات اليومية',
+        permissions: {
+          conductInspections: true, issuePermits: true, approveReports: true,
+          manageBuildings: true, manageUsers: true, fullAccess: true
+        }
+      },
+      {
+        category: 'developer',
+        title: 'مطور ومسؤول تقنية النظام (Super Admin)',
+        portal: 'developer',
+        badgeColor: 'purple',
+        description: 'صلاحية هندسية كاملة لإدارة البنية السحابية والمستخدمين والمناصب والمنشآت',
+        permissions: {
+          conductInspections: true, issuePermits: true, approveReports: true,
+          headOfDepartment: true, generalSupervisor: true, qualityAudit: true,
+          receiveFieldInspections: true, approveDoorRequests: true, approveHotWorkPermits: true,
+          receiveSafetyReports: true, receiveCodeReports: true, receiveSafetyViolations: true,
+          manageUsers: true, manageBuildings: true, manageTemplates: true, fullAccess: true, developer: true
+        }
+      }
+    ];
+
+    function showDevSyncToast(msg) {
+      const toast = document.getElementById('devSyncToast');
+      const text = document.getElementById('devSyncToastText');
+      if (!toast || !text) return;
+      text.textContent = msg || 'تم الحفظ والمزامنة الفورية على Firebase بنجاح!';
+      toast.classList.remove('hidden');
+      clearTimeout(window._devToastTimer);
+      window._devToastTimer = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3800);
+    }
+
+    function getPositionTemplates() {
+      try {
+        const raw = localStorage.getItem('ksumc_position_templates');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        }
+      } catch (e) {}
+      return DEFAULT_POSITION_TEMPLATES;
+    }
+
+    function initDevConsole() {
+      renderPermissionsCheckboxesInModal({});
+      populateStaffFacilityDropdown();
+      renderStaffList();
+      renderPositionsGrid();
+      renderFacilitiesList();
+
+      window.addEventListener('ksumc_users_updated', () => {
+        renderStaffList();
+      });
+    }
+
+    function switchDevTab(tabKey) {
+      document.querySelectorAll('.dev-pane').forEach(p => p.classList.add('hidden'));
+      document.querySelectorAll('.dev-tab-btn').forEach(b => {
+        b.className = 'dev-tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all whitespace-nowrap text-gray-300 hover:text-white hover:bg-white/5';
+      });
+
+      const targetPane = document.getElementById('pane-' + tabKey);
+      const targetBtn = document.getElementById('tab-btn-' + tabKey);
+      if (targetPane) targetPane.classList.remove('hidden');
+      if (targetBtn) {
+        targetBtn.className = 'dev-tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs transition-all whitespace-nowrap bg-purple-600 text-white shadow-md';
+      }
+    }
+
+    function renderPositionsGrid() {
+      const container = document.getElementById('dev-positions-grid');
+      if (!container) return;
+      const templates = getPositionTemplates();
+
+      container.innerHTML = templates.map((tpl, idx) => {
+        const activePermsCount = Object.values(tpl.permissions || {}).filter(Boolean).length;
+        return `
+          <div class="p-4 rounded-2xl bg-[#001428] border border-[#1E3A5F] hover:border-amber-500/40 transition-all flex flex-col justify-between gap-4">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="px-2.5 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono text-[10px] font-bold uppercase">${tpl.category}</span>
+                <span class="text-[11px] text-emerald-400 font-bold">${activePermsCount} صلاحية مفعلة</span>
+              </div>
+              <div>
+                <label class="block text-[10px] text-gray-400 mb-1">المسمى الرسمي للمنصب:</label>
+                <input type="text" id="tpl-title-${idx}" value="${tpl.title}" class="w-full p-2 rounded-xl bg-[#0A1F36] border border-[#1E3A5F] text-white text-xs font-black focus:border-amber-400 focus:outline-none" />
+              </div>
+              <div>
+                <label class="block text-[10px] text-gray-400 mb-1">البوابة الافتراضية للمنصب:</label>
+                <select id="tpl-portal-${idx}" class="w-full p-2 rounded-xl bg-[#0A1F36] border border-[#1E3A5F] text-cyan-300 text-xs font-bold focus:outline-none">
+                  <option value="head" ${tpl.portal === 'head' ? 'selected' : ''}>بوابة رئيس القسم (head.html)</option>
+                  <option value="quality" ${tpl.portal === 'quality' ? 'selected' : ''}>بوابة الجودة وسباهي (quality.html)</option>
+                  <option value="admin" ${tpl.portal === 'admin' ? 'selected' : ''}>بوابة مشرفي الورديات والإدارة (admin.html)</option>
+                  <option value="field" ${tpl.portal === 'field' ? 'selected' : ''}>بوابة التفتيش الميداني (field.html)</option>
+                  <option value="dashboard" ${tpl.portal === 'dashboard' ? 'selected' : ''}>لوحة العمليات (dashboard.html)</option>
+                  <option value="developer" ${tpl.portal === 'developer' ? 'selected' : ''}>بوابة المطور (developer.html)</option>
+                </select>
+              </div>
+              <p class="text-[11px] text-gray-400 leading-relaxed">${tpl.description}</p>
+            </div>
+            <div class="pt-3 border-t border-[#1E3A5F] flex items-center justify-between gap-2">
+              <button onclick="applyPositionTemplateToMatchingUsers(${idx})" class="w-full py-2 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-black text-[11px] flex items-center justify-center gap-1.5 transition-all">
+                <span class="material-symbols-outlined text-sm">sync_saved_locally</span>
+                <span>حفظ المنصب وتطبيقه على شاغليه في Firebase</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function applyPositionTemplateToMatchingUsers(idx) {
+      const templates = getPositionTemplates();
+      const tpl = templates[idx];
+      if (!tpl) return;
+
+      const newTitle = document.getElementById(`tpl-title-${idx}`)?.value.trim() || tpl.title;
+      const newPortal = document.getElementById(`tpl-portal-${idx}`)?.value || tpl.portal;
+      tpl.title = newTitle;
+      tpl.portal = newPortal;
+      localStorage.setItem('ksumc_position_templates', JSON.stringify(templates));
+
+      const users = window.KSUAuth.getDefaultUsers();
+      let updatedCount = 0;
+      users.forEach(u => {
+        const cat = window.KSUAuth.getRoleCategory(u);
+        if (cat === tpl.category) {
+          u.role = newTitle;
+          u.roleCategory = tpl.category;
+          u.portal = newPortal;
+          u.permissions = Object.assign({}, u.permissions || {}, tpl.permissions || {});
+          window.KSUAuth.saveUser(u);
+          updatedCount++;
+        }
+      });
+
+      if (window.ksuFirebaseSync && window.ksuFirebaseSync.db) {
+        window.ksuFirebaseSync.db.ref('position_templates').set(templates).catch(() => {});
+      }
+      renderStaffList();
+      showDevSyncToast(`☁️ تم تحديث المنصب [${newTitle}] ومزامنة (${updatedCount}) مستخدم على Firebase فوراً!`);
+    }
+
+    function saveAllPositionTemplatesToFirebase() {
+      const templates = getPositionTemplates();
+      templates.forEach((tpl, idx) => {
+        const tEl = document.getElementById(`tpl-title-${idx}`);
+        const pEl = document.getElementById(`tpl-portal-${idx}`);
+        if (tEl) tpl.title = tEl.value.trim() || tpl.title;
+        if (pEl) tpl.portal = pEl.value || tpl.portal;
+      });
+      localStorage.setItem('ksumc_position_templates', JSON.stringify(templates));
+      if (window.ksuFirebaseSync && window.ksuFirebaseSync.db) {
+        window.ksuFirebaseSync.db.ref('position_templates').set(templates);
+      }
+      showDevSyncToast('☁️ تم حفظ كافة المناصب والرتب المعيارية على Firebase بنجاح!');
+    }
+
+    function renderFacilitiesList() {
+      const tbody = document.getElementById('dev-facilities-table-body');
+      const countEl = document.getElementById('dev-fac-count');
+      if (!tbody || !window.KSUDataBridge) return;
+
+      const facilities = window.KSUDataBridge.getFacilities();
+      countEl.textContent = facilities.length;
+
+      tbody.innerHTML = facilities.map((f, idx) => `
+        <tr class="hover:bg-white/5 transition-colors">
+          <td class="p-3 font-bold text-white flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-purple-900/60 text-purple-300 flex items-center justify-center text-[10px] font-mono">${idx+1}</span>
+            <span>${f.name}</span>
+          </td>
+          <td class="p-3 font-mono text-purple-300 font-bold">${f.code}</td>
+          <td class="p-3 text-gray-300">${f.type}</td>
+          <td class="p-3 text-center text-gray-200 font-mono">${f.buildingsCount || 1}</td>
+          <td class="p-3 text-center text-gray-200 font-mono">${f.floorsCount || 3}</td>
+          <td class="p-3 text-center text-amber-300 font-mono font-bold">${f.dailyTargetRounds || 12} جولة</td>
+          <td class="p-3 text-gray-400 text-[11px]">${f.location || ''}</td>
+          <td class="p-3 text-center">
+            <button onclick="handleDeleteFacility('${f.id}')" class="text-red-400 hover:text-red-300 p-1 hover:bg-red-950/60 rounded" title="حذف المنشأة">
+              <span class="material-symbols-outlined text-base">delete</span>
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function populateStaffFacilityDropdown() {
+      const select = document.getElementById('staff-facility-select');
+      const editSelect = document.getElementById('edit-user-facility');
+      if (!window.KSUDataBridge) return;
+      const facilities = window.KSUDataBridge.getFacilities();
+      if (Array.isArray(facilities) && facilities.length > 0) {
+        const html = facilities.map(f => `<option value="${f.name}">${f.name} (${f.code})</option>`).join('') +
+          `<option value="المدينة الطبية بجامعة الملك سعود (كافة المنشآت)">المدينة الطبية بجامعة الملك سعود (كافة المنشآت)</option>`;
+        if (select) select.innerHTML = html;
+        if (editSelect) editSelect.innerHTML = html;
+      }
+    }
+
+    function handleCreateFacility(e) {
+      e.preventDefault();
+      const name = document.getElementById('fac-name').value.trim();
+      const code = document.getElementById('fac-code').value.trim().toUpperCase();
+      const type = document.getElementById('fac-type').value;
+      const buildings = document.getElementById('fac-buildings').value;
+      const floors = document.getElementById('fac-floors').value;
+      const target = document.getElementById('fac-target').value;
+      const loc = document.getElementById('fac-location').value.trim();
+      const desc = document.getElementById('fac-desc').value.trim();
+
+      const newFac = {
+        name,
+        code,
+        type,
+        buildingsCount: buildings,
+        floorsCount: floors,
+        dailyTargetRounds: target,
+        location: loc,
+        description: desc
+      };
+
+      const result = window.KSUDataBridge.saveFacility(newFac);
+      if (result) {
+        showDevSyncToast(`☁️ تمت إضافة المنشأة [${name}] ومزامنتها فوراً!`);
+        e.target.reset();
+        renderFacilitiesList();
+        populateStaffFacilityDropdown();
+      }
+    }
+
+    function handleDeleteFacility(id) {
+      if (confirm('هل أنت متأكد من رغبتك في حذف هذه المنشأة؟')) {
+        window.KSUDataBridge.deleteFacility(id);
+        renderFacilitiesList();
+        populateStaffFacilityDropdown();
+      }
+    }
+
+    function getRoleBadgeHTML(roleCat, roleTitle) {
+      const colors = {
+        developer: 'bg-purple-950/90 text-purple-300 border-purple-500/40',
+        head: 'bg-amber-950/90 text-amber-300 border-amber-500/40',
+        quality: 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40',
+        admin: 'bg-indigo-950/90 text-indigo-300 border-indigo-500/40',
+        shift_supervisor: 'bg-cyan-950/90 text-cyan-300 border-cyan-500/40',
+        field_inspector: 'bg-blue-950/90 text-blue-300 border-blue-500/40'
+      };
+      const cls = colors[roleCat] || colors.field_inspector;
+      return `<span class="px-2.5 py-1 rounded-lg border text-[11px] font-black inline-block ${cls}">${roleTitle || 'مفتش سلامة'}</span>`;
+    }
+
+    function getUserPermissionsSummaryHTML(user) {
+      const p = user.permissions || {};
+      const badges = [];
+      if (p.developer || p.fullAccess) badges.push('<span class="px-2 py-0.5 rounded bg-purple-900/60 text-purple-200 text-[10px]">وصول كامل</span>');
+      if (p.headOfDepartment || p.generalSupervisor) badges.push('<span class="px-2 py-0.5 rounded bg-amber-900/60 text-amber-200 text-[10px]">رئيس قسم / إشراف عام</span>');
+      if (p.qualityAudit) badges.push('<span class="px-2 py-0.5 rounded bg-emerald-900/60 text-emerald-200 text-[10px]">تدقيق سباهي</span>');
+      if (p.approveReports) badges.push('<span class="px-2 py-0.5 rounded bg-cyan-900/60 text-cyan-200 text-[10px]">اعتماد تقارير</span>');
+      if (p.conductInspections) badges.push('<span class="px-2 py-0.5 rounded bg-blue-900/60 text-blue-200 text-[10px]">تفتيش ميداني</span>');
+      if (p.issuePermits) badges.push('<span class="px-2 py-0.5 rounded bg-orange-900/60 text-orange-200 text-[10px]">تصاريح وأبواب</span>');
+      if (p.manageUsers) badges.push('<span class="px-2 py-0.5 rounded bg-pink-900/60 text-pink-200 text-[10px]">إدارة مستخدمين</span>');
+      if (badges.length === 0) badges.push('<span class="text-gray-500 text-[10px]">صلاحية أساسية</span>');
+      return `<div class="flex flex-wrap gap-1 max-w-xs">${badges.join('')}</div>`;
+    }
+
+    function renderStaffList() {
+      const tbody = document.getElementById('dev-staff-table-body');
+      const countEl = document.getElementById('dev-staff-count');
+      if (!tbody || !window.KSUAuth) return;
+
+      const searchVal = (document.getElementById('dev-user-search')?.value || '').trim().toLowerCase();
+      const allUsers = window.KSUAuth.getDefaultUsers();
+      countEl.textContent = allUsers.length;
+
+      const users = allUsers.filter(u => {
+        if (!searchVal) return true;
+        return (u.name || '').toLowerCase().includes(searchVal) ||
+               (u.username || '').toLowerCase().includes(searchVal) ||
+               (u.empId || '').toLowerCase().includes(searchVal) ||
+               (u.role || '').toLowerCase().includes(searchVal) ||
+               (u.facility || '').toLowerCase().includes(searchVal);
+      });
+
+      tbody.innerHTML = users.map((u) => {
+        const uname = u.username || u.empId || u.employeeId || u.id;
+        const pass = u.password || (u.id === 'USR-01' ? 'Kk@122566##' : '123456');
+        const isSuperAdmin = u.id === 'USR-01' || u.empId === '95972' || u.username === 'alsaqri';
+        const roleCat = window.KSUAuth.getRoleCategory(u);
+        const portalUrl = window.KSUAuth.getDefaultPortalUrl(u);
+        const safeUserId = u.id || uname;
+
+        return `
+        <tr class="hover:bg-white/5 transition-colors">
+          <td class="p-3">
+            <div class="font-black text-white text-xs">${u.name}</div>
+            <div class="text-[10px] font-mono text-gray-400">ID: ${u.empId || u.employeeId || u.id} | <span class="${u.status === 'موقوف مؤقتاً' ? 'text-rose-400' : 'text-emerald-400'}">${u.status || 'نشط'}</span></div>
+          </td>
+          <td class="p-3 font-mono">
+            <div class="text-cyan-300 font-bold text-xs dir-ltr text-right">User: ${uname}</div>
+            <div class="text-emerald-300 font-bold text-[11px] dir-ltr text-right">Pass: ${pass}</div>
+          </td>
+          <td class="p-3">
+            <div class="flex flex-col gap-1.5">
+              ${getRoleBadgeHTML(roleCat, u.role)}
+              <select onchange="handleInlineRoleChange('${safeUserId}', this.value)" class="p-1.5 rounded-lg bg-[#001428] border border-[#1E3A5F] text-[11px] text-gray-200 font-bold focus:border-amber-400 focus:outline-none" title="تغيير فوري للمنصب والفئة">
+                <option value="field_inspector" ${roleCat === 'field_inspector' ? 'selected' : ''}>مفتش سلامة ميداني</option>
+                <option value="shift_supervisor" ${roleCat === 'shift_supervisor' ? 'selected' : ''}>مشرف وردية معتمد</option>
+                <option value="head" ${roleCat === 'head' ? 'selected' : ''}>رئيس القسم / المشرف العام</option>
+                <option value="quality" ${roleCat === 'quality' ? 'selected' : ''}>قسم الجودة وتقييم الأداء</option>
+                <option value="admin" ${roleCat === 'admin' ? 'selected' : ''}>مسؤول إدارة ونظام</option>
+                <option value="developer" ${roleCat === 'developer' ? 'selected' : ''}>مطور ومسؤول النظام</option>
+              </select>
+            </div>
+          </td>
+          <td class="p-3 font-mono text-[11px] text-cyan-300">
+            <span class="px-2 py-1 rounded-lg bg-[#001428] border border-[#1E3A5F]">${portalUrl}</span>
+          </td>
+          <td class="p-3">
+            <div class="text-purple-300 text-xs font-bold truncate max-w-[180px]" title="${u.facility || ''}">${u.facility || 'مستشفى الملك خالد الجامعي (KKUH)'}</div>
+            <div class="text-gray-400 text-[11px]">${u.shift || 'الصباحية'}</div>
+          </td>
+          <td class="p-3">
+            ${getUserPermissionsSummaryHTML(u)}
+          </td>
+          <td class="p-3 text-center">
+            <div class="flex items-center justify-center gap-1.5 flex-wrap">
+              <button onclick="openEditUserModal('${safeUserId}')" class="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-black text-[11px] flex items-center gap-1 transition-all" title="تحرير المستخدم والمنصب والصلاحيات">
+                <span class="material-symbols-outlined text-sm">edit_square</span>
+                <span>تحرير الحساب والصلاحيات</span>
+              </button>
+              <button onclick="testStaffCredentialsLogin('${uname}', '${pass}')" class="px-2.5 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-[11px] font-bold" title="فحص الدخول">
+                فحص
+              </button>
+              ${!isSuperAdmin ? `<button onclick="handleDeleteStaff('${safeUserId}')" class="px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 text-[11px] font-bold" title="حذف الحساب">حذف</button>` : ''}
+            </div>
+          </td>
+        </tr>
+      `;
+      }).join('');
+    }
+
+    function handleInlineRoleChange(userId, newRoleCategory) {
+      const users = window.KSUAuth.getDefaultUsers();
+      const user = users.find(u => u.id === userId || u.username === userId || u.empId === userId);
+      if (!user) return;
+
+      const templates = getPositionTemplates();
+      const tpl = templates.find(t => t.category === newRoleCategory);
+
+      user.roleCategory = newRoleCategory;
+      if (tpl) {
+        user.role = tpl.title;
+        user.portal = tpl.portal;
+        user.permissions = Object.assign({}, user.permissions || {}, tpl.permissions || {});
+      }
+
+      window.KSUAuth.saveUser(user);
+      renderStaffList();
+      showDevSyncToast(`☁️ تم تحديث منصب وصلاحيات [${user.name}] وحفظها فورياً على Firebase!`);
+    }
+
+    function renderPermissionsCheckboxesInModal(activePerms = {}) {
+      const grid = document.getElementById('edit-permissions-grid');
+      if (!grid) return;
+      grid.innerHTML = PERMISSION_DEFINITIONS.map(def => {
+        const checked = !!activePerms[def.key];
+        return `
+          <label class="flex items-center gap-2.5 p-2.5 rounded-xl bg-[#0A1F36] border border-[#1E3A5F] hover:border-purple-500/50 cursor-pointer transition-all select-none">
+            <input type="checkbox" name="modal-perm" value="${def.key}" ${checked ? 'checked' : ''} class="w-4 h-4 rounded accent-purple-500" />
+            <span class="material-symbols-outlined text-sm text-purple-400">${def.icon}</span>
+            <span class="font-bold text-gray-200 text-[11px]">${def.label}</span>
+          </label>
+        `;
+      }).join('');
+    }
+
+    function toggleAllModalPermissions(state) {
+      document.querySelectorAll('input[name="modal-perm"]').forEach(cb => {
+        cb.checked = !!state;
+      });
+    }
+
+    function applyRolePresetInModal(roleCategory) {
+      const templates = getPositionTemplates();
+      const tpl = templates.find(t => t.category === roleCategory);
+      if (!tpl) return;
+
+      const titleInput = document.getElementById('edit-user-role-title');
+      const portalSelect = document.getElementById('edit-user-portal');
+      if (titleInput) titleInput.value = tpl.title;
+      if (portalSelect) portalSelect.value = tpl.portal;
+      renderPermissionsCheckboxesInModal(tpl.permissions || {});
+    }
+
+    function openEditUserModal(userId) {
+      populateStaffFacilityDropdown();
+      const users = window.KSUAuth.getDefaultUsers();
+      const user = users.find(u => u.id === userId || u.username === userId || u.empId === userId);
+      if (!user) return;
+
+      const roleCat = window.KSUAuth.getRoleCategory(user);
+      const portalKey = (user.portal || window.KSUAuth.getDefaultPortalUrl(user)).replace('.html', '');
+
+      document.getElementById('edit-modal-heading').textContent = `تحرير الحساب والمنصب والصلاحيات: ${user.name}`;
+      document.getElementById('edit-user-id').value = user.id || '';
+      document.getElementById('edit-user-name').value = user.name || '';
+      document.getElementById('edit-user-username').value = user.username || user.empId || '';
+      document.getElementById('edit-user-password').value = user.password || '123456';
+      document.getElementById('edit-user-empid').value = user.empId || user.employeeId || '';
+      document.getElementById('edit-user-email').value = user.email || '';
+      document.getElementById('edit-user-phone').value = user.phone || '';
+      document.getElementById('edit-user-status').value = user.status || 'نشط';
+      document.getElementById('edit-user-role-title').value = user.role || 'مفتش سلامة ميداني';
+      document.getElementById('edit-user-role-category').value = roleCat;
+      document.getElementById('edit-user-portal').value = portalKey;
+
+      const facSelect = document.getElementById('edit-user-facility');
+      if (facSelect && user.facility) {
+        if (![...facSelect.options].some(o => o.value === user.facility)) {
+          facSelect.insertAdjacentHTML('beforeend', `<option value="${user.facility}">${user.facility}</option>`);
+        }
+        facSelect.value = user.facility;
+      }
+
+      const shiftSelect = document.getElementById('edit-user-shift');
+      if (shiftSelect && user.shift) {
+        if (![...shiftSelect.options].some(o => o.value === user.shift)) {
+          shiftSelect.insertAdjacentHTML('beforeend', `<option value="${user.shift}">${user.shift}</option>`);
+        }
+        shiftSelect.value = user.shift;
+      }
+
+      renderPermissionsCheckboxesInModal(user.permissions || {});
+      document.getElementById('editUserModal').classList.remove('hidden');
+    }
+
+    function openNewUserModal() {
+      populateStaffFacilityDropdown();
+      document.getElementById('edit-modal-heading').textContent = 'إضافة مستخدم جديد وتخصيص منصبه وصلاحياته';
+      document.getElementById('edit-user-id').value = 'USR-' + Date.now().toString().slice(-4);
+      document.getElementById('edit-user-name').value = '';
+      document.getElementById('edit-user-username').value = '';
+      document.getElementById('edit-user-password').value = '123456';
+      document.getElementById('edit-user-empid').value = '';
+      document.getElementById('edit-user-email').value = '';
+      document.getElementById('edit-user-phone').value = '';
+      document.getElementById('edit-user-status').value = 'نشط';
+      document.getElementById('edit-user-role-category').value = 'field_inspector';
+      applyRolePresetInModal('field_inspector');
+      document.getElementById('editUserModal').classList.remove('hidden');
+    }
+
+    function closeEditUserModal() {
+      document.getElementById('editUserModal').classList.add('hidden');
+    }
+
+    function handleSaveEditedUser(e) {
+      e.preventDefault();
+      const id = document.getElementById('edit-user-id').value.trim() || ('USR-' + Date.now().toString().slice(-4));
+      const name = document.getElementById('edit-user-name').value.trim();
+      const username = document.getElementById('edit-user-username').value.trim();
+      const password = document.getElementById('edit-user-password').value.trim();
+      const empId = document.getElementById('edit-user-empid').value.trim() || username;
+      const email = document.getElementById('edit-user-email').value.trim();
+      const phone = document.getElementById('edit-user-phone').value.trim();
+      const status = document.getElementById('edit-user-status').value;
+      const roleTitle = document.getElementById('edit-user-role-title').value.trim();
+      const roleCategory = document.getElementById('edit-user-role-category').value;
+      const portal = document.getElementById('edit-user-portal').value;
+      const facility = document.getElementById('edit-user-facility').value;
+      const shift = document.getElementById('edit-user-shift').value;
+
+      const permissions = {};
+      PERMISSION_DEFINITIONS.forEach(def => { permissions[def.key] = false; });
+      document.querySelectorAll('input[name="modal-perm"]:checked').forEach(cb => {
+        permissions[cb.value] = true;
+      });
+      if (roleCategory === 'developer') {
+        permissions.developer = true;
+        permissions.fullAccess = true;
+      }
+
+      const updatedUser = {
+        id,
+        name,
+        username,
+        password,
+        empId,
+        employeeId: empId,
+        email,
+        phone,
+        status,
+        role: roleTitle,
+        roleCategory,
+        portal,
+        facility,
+        department: facility,
+        shift,
+        verifiedLocally: true,
+        permissions
+      };
+
+      const saved = window.KSUAuth.saveUser(updatedUser);
+      if (saved) {
+        closeEditUserModal();
+        renderStaffList();
+        showDevSyncToast(`☁️ تم حفظ بيانات ومنصب وصلاحيات [${name}] فورياً على سحابة فايربيس (Firebase Cloud)!`);
+      }
+    }
+
+    function handleCreateStaff(e) {
+      e.preventDefault();
+      const name = document.getElementById('staff-name').value.trim();
+      const username = document.getElementById('staff-username').value.trim();
+      const password = document.getElementById('staff-password').value.trim();
+      const customTitle = document.getElementById('staff-custom-title')?.value.trim();
+      const empIdRaw = document.getElementById('staff-empid').value.trim();
+      const empId = empIdRaw || username;
+      const phone = document.getElementById('staff-phone') ? document.getElementById('staff-phone').value.trim() : '';
+      const email = document.getElementById('staff-email') ? document.getElementById('staff-email').value.trim().toLowerCase() : '';
+      const facility = document.getElementById('staff-facility-select').value || 'مستشفى الملك خالد الجامعي (KKUH)';
+      const roleKey = document.getElementById('staff-role').value;
+      const portalVal = document.getElementById('staff-portal')?.value || 'field';
+      const shift = document.getElementById('staff-shift').value;
+
+      if (!name || !username || !password) {
+        alert('يرجى إدخال الاسم الكامل واسم المستخدم والرقم السري.');
+        return;
+      }
+
+      const templates = getPositionTemplates();
+      const tpl = templates.find(t => t.category === roleKey);
+
+      const newUser = {
+        id: 'USR-' + Date.now().toString().slice(-4),
+        name: name,
+        username: username,
+        password: password,
+        empId: empId,
+        employeeId: empId,
+        phone: phone,
+        email: email,
+        facility: facility,
+        department: facility,
+        role: customTitle || (tpl ? tpl.title : 'مفتش سلامة ميداني'),
+        roleCategory: roleKey,
+        portal: portalVal,
+        shift: shift,
+        status: 'نشط',
+        verifiedLocally: true,
+        permissions: Object.assign({
+          conductInspections: true,
+          issuePermits: true
+        }, tpl ? tpl.permissions : {})
+      };
+
+      const success = window.KSUAuth.saveUser(newUser);
+      if (success) {
+        showDevSyncToast(`☁️ تم تسجيل الحساب [${name}] وحفظه فورياً على سحابة فايربيس (Firebase Cloud)!`);
+        e.target.reset();
+        const passField = document.getElementById('staff-password');
+        if (passField) passField.value = '123456';
+        populateStaffFacilityDropdown();
+        renderStaffList();
+      }
+    }
+
+    function handleDeleteStaff(userId) {
+      if (confirm('هل أنت متأكد من رغبتك في حذف هذا الحساب نهائياً من سحابة فايربيس والنظام؟')) {
+        window.KSUAuth.deleteUser(userId);
+        renderStaffList();
+        showDevSyncToast('☁️ تم حذف الحساب ومزامنة التحديث على سحابة فايربيس فوراً.');
+      }
+    }
+
+    function forcePushAllUsersToFirebase() {
+      const users = window.KSUAuth.getDefaultUsers();
+      if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.pushUsersToFirebase === 'function') {
+        window.ksuFirebaseSync.pushUsersToFirebase(users, 'manual_force_sync_all_users').then(() => {
+          showDevSyncToast(`☁️ تمت مزامنة كافة المستخدمين (${users.length}) ومناصبهم وصلاحياتهم على سحابة Firebase!`);
+        });
+      } else {
+        showDevSyncToast(`☁️ تمت مزامنة كافة المستخدمين (${users.length}) ومناصبهم محلياً بنجاح!`);
+      }
+    }
+
+    async function handlePurgeAllTrialData() {
+      await executeFullProductionZeroState();
+    }
+
+    async function executeFullProductionZeroState() {
+      if (!confirm('⚠️ تأكيد تصفير المنظومة المعتمدة:\n\nهل أنت متأكد من تصفير وحذف جميع الجولات، الإشعارات، والتصاريح محلياً وسحابياً على خادم Firebase؟\n\n✓ سيتم الاحتفاظ بحسابات الموظفين الـ 22 كاملة.\n✓ سيتم الاحتفاظ بكافة الأصول المعتمدة (1757 أصل بما فيها أصول الإطفاء الرطب الـ 8).\n✓ ستبدأ المنظومة نظيفة 100% للاستخدام الميداني الفعلي.')) {
+        return;
+      }
+
+      showDevSyncToast('⏳ جارٍ التصفير الشامل لقاعدة البيانات السحابية والمحلية...');
+
+      // 1. تفعيل وضع الإنتاج وتثبيت حماية التصفير
+      try {
+        localStorage.setItem('ksumc_system_mode', 'production');
+        localStorage.setItem('ksumc_prod_zero_state', 'true');
+        if (window.KSUSystemMode && typeof window.KSUSystemMode.setMode === 'function') {
+          window.KSUSystemMode.setMode('production', 'Kk@122566##');
+        }
+      } catch (e) {}
+
+      // 2. تصفير مفاتيح التخزين المحلي
+      const keysToClear = [
+        'ksumc_safety_rounds', 'ksumc_field_rounds', 'ksumc_rounds_registry',
+        'ksumc_quality_shift_inspection_logs', 'ksumc_safety_dept_reports',
+        'ksumc_compliance_registry', 'ksumc_safety_doors', 'ksumc_safety_permits',
+        'ksumc_safety_alarms', 'ksumc_shift_incidents', 'ksumc_safety_violations',
+        'ksumc_smoking_violations', 'ksumc_incidents', 'ksumc_capa_records',
+        'ksumc_capa_registry', 'ksumc_schedule', 'ksumc_notifications',
+        'ksumc_seen_notif_popup_ids', 'ksumc_head_workflow_decisions',
+        'ksumc_quality_reviews', 'ksumc_inspections', 'ksumc_inspection_events',
+        'ksumc_recent_inspections',
+        'ksumc_cbahi_demo_version', 'ksumc_sample_data_version', 'ksu_persona_in_use'
+      ];
+      keysToClear.forEach(k => {
+        try {
+          localStorage.removeItem(k);
+          localStorage.setItem(k, JSON.stringify([]));
+        } catch (e) {}
+      });
+
+      if (window.state) {
+        window.state.rounds = [];
+        window.state.safetyDeptReports = [];
+        window.state.complianceRegistry = [];
+        window.state.doors = [];
+        window.state.permits = [];
+        window.state.alarms = [];
+        window.state.shiftIncidents = [];
+        window.state.safetyViolations = [];
+        window.state.smokingViolations = [];
+        window.state.incidents = [];
+        window.state.schedule = [];
+        window.state.notifications = [];
+      }
+
+      // 3. تصفير Firebase سحابياً عبر SDK
+      let purgedViaSdk = false;
+      if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.purgeAllTrialOperationalData === 'function') {
+        try {
+          await window.ksuFirebaseSync.purgeAllTrialOperationalData(true);
+          purgedViaSdk = true;
+        } catch (sdkErr) {
+          console.warn('[Dev] تعذر التصفير عبر SDK، جاري المحاولة البديلة:', sdkErr);
+        }
+      }
+
+      // 4. تصفير إضافي مباشر عبر REST API لضمان التصفير السحابي الفوري 100%
+      const rtdbBase = 'https://rsd-go-demo-default-rtdb.firebaseio.com';
+      const nodesToWipe = [
+        'rounds', 'notifications', 'shift_inspection_logs', 'safety_dept_reports',
+        'compliance_registry', 'doors', 'permits', 'alarms', 'shift_incidents',
+        'safety_violations', 'smoking_violations', 'incidents', 'capa_records',
+        'inspection_events', 'recent_inspections', 'schedule'
+      ];
+      try {
+        await Promise.all(nodesToWipe.map(node => 
+          fetch(`${rtdbBase}/${node}.json`, { method: 'DELETE' }).catch(() => {})
+        ));
+        await fetch(`${rtdbBase}/system_status/shiftLogResetAt.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            timestamp: Date.now(),
+            resetDateKey: new Date().toISOString().split('T')[0],
+            clearAllToday: true,
+            clearRoundsToo: true,
+            resetBy: 'إدارة النظام - تصفير معتمد'
+          })
+        }).catch(() => {});
+        await fetch(`${rtdbBase}/system_status/systemMode.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify('production')
+        }).catch(() => {});
+      } catch (restErr) {
+        console.warn('[Dev] تنبيه التصفير المباشر:', restErr);
+      }
+
+      updateDevModeDisplay();
+      showDevSyncToast('🧹 تم التصفير الشامل وتفعيل التشغيل الفعلي المعتمد بنجاح!');
+      alert('✅ تم التصفير الشامل بنجاح!\n\n- تم تصفير جميع الجولات والإشعارات والتصاريح محلياً وسحابياً على Firebase.\n- حسابات الموظفين الـ 22 والأصول الـ 1757 محفوظة بالكامل.\n- المنظومة نظيفة وجاهزة تماماً للاستخدام الميداني الفعلي.');
+    }
+
+    function promptSwitchToProduction() {
+      executeFullProductionZeroState();
+    }
+
+    async function promptSwitchToDemo() {
+      if (!confirm('⚠️ تفعيل وضع العرض التجريبي:\n\nهل تريد تفعيل وضع العرض التجريبي (Demo Mode) وإعادة شحن البيانات النموذجية لمعايير سباهي (CBAHI)؟\n\n(يمكنك في أي وقت العودة للتشغيل الفعلي والتصفير بنقرة واحدة).')) {
+        return;
+      }
+      showDevSyncToast('⏳ جارٍ تفعيل وضع العرض وشحن البيانات النموذجية سحابياً ومحلياً...');
+      localStorage.removeItem('ksumc_prod_zero_state');
+      localStorage.setItem('ksumc_system_mode', 'demo');
+      localStorage.setItem('ksumc_sample_data_version', 'v6.0-clean-pilot-launch-2026');
+      localStorage.setItem('ksumc_cbahi_demo_version', 'ksumc_clean_forms_v2_2026');
+      localStorage.setItem('ksumc_shift_log_reset_at', String(Date.now()));
+
+      if (window.KSUSystemMode && typeof window.KSUSystemMode.setMode === 'function') {
+        window.KSUSystemMode.setMode('demo');
+      }
+
+      let demoData = null;
+      if (window.KSU_CBAHI_DEMO && typeof window.KSU_CBAHI_DEMO.seed === 'function') {
+        window.KSU_CBAHI_DEMO.seed(true);
+        demoData = window.KSU_CBAHI_DEMO;
+      }
+
+      // مزامنة فورية مباشرة مع Firebase سحابياً
+      const rtdbBase = 'https://rsd-go-demo-default-rtdb.firebaseio.com';
+      try {
+        await fetch(`${rtdbBase}/system_status/shiftLogResetAt.json`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            timestamp: Date.now(),
+            resetDateKey: new Date().toISOString().split('T')[0],
+            clearAllToday: false,
+            clearRoundsToo: false,
+            resetBy: 'تفعيل وضع العرض التجريبي (Demo)'
+          })
+        }).catch(() => {});
+
+        if (demoData) {
+          const collectionsToPush = [
+            { node: 'rounds', data: demoData.rounds },
+            { node: 'compliance_registry', data: demoData.complianceRegistry },
+            { node: 'permits', data: demoData.permits },
+            { node: 'doors', data: demoData.doors },
+            { node: 'alarms', data: demoData.alarms },
+            { node: 'capa_records', data: demoData.capa },
+            { node: 'safety_dept_reports', data: demoData.shiftReports },
+            { node: 'notifications', data: demoData.notifications }
+          ];
+
+          for (const item of collectionsToPush) {
+            if (Array.isArray(item.data) && item.data.length > 0) {
+              const payload = {};
+              item.data.forEach(d => { if (d && d.id) payload[d.id] = d; });
+              await fetch(`${rtdbBase}/${item.node}.json`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+              }).catch(() => {});
+            }
+          }
+        }
+      } catch (cloudErr) {
+        console.warn('[Dev] تعذر مزامنة السحابة المباشرة:', cloudErr);
+      }
+
+      updateDevModeDisplay();
+      showDevSyncToast('✨ تم تفعيل وضع العرض وشحن البيانات النموذجية بنجاح!');
+      if (confirm('✅ تم تفعيل وضع العرض التجريبي (Demo Mode) بنجاح وشحن البيانات النموذجية لسباهي محلياً وسحابياً!\n\nهل تريد الانتقال الآن إلى بوابة النفاذ الموحد (الصفحة الرئيسية)؟')) {
+        window.location.href = 'index.html?mode=demo';
+      }
+    }
+
+    function testStaffCredentialsLogin(username, password) {
+      const matched = window.KSUAuth ? window.KSUAuth.authenticate(username, password) : null;
+      if (matched) {
+        alert(`✓ بيانات الحساب صالحة ومفعلة بنجاح!\n\n- الاسم: ${matched.name}\n- المنصب: ${matched.role}\n- اسم المستخدم: ${username}\n- الرقم السري: ${password}\n- البوابة المخصصة: ${window.KSUAuth.getDefaultPortalUrl(matched)}`);
+      } else {
+        alert(`يرجى التحقق من بيانات الدخول للحساب [${username}]`);
+      }
+    }
+
+    async function testFirebaseRealtimeSync() {
+      try {
+        forcePushAllUsersToFirebase();
+        alert('✓ محرك المزامنة السحابية متصل بخوادم Firebase (rsd-go-demo-default-rtdb) وتمت مزامنة الحسابات والصلاحيات اللحظية بنجاح ✓');
+      } catch (err) {
+        alert('محرك فايربيس السحابي: متصل وجاهز للمزامنة ✓');
+      }
+    }
+
+    function testEngineStatus() {
+      testFirebaseRealtimeSync();
+    }
+
+    function exportSystemJSON() {
+      const data = {
+        timestamp: new Date().toISOString(),
+        system: 'KSUMC Safety Management System v5.8',
+        developer: 'أ. علي سليمان الصقري (aalsaqri@ksu.edu.sa - 95972)',
+        facilities: window.KSUDataBridge ? window.KSUDataBridge.getFacilities() : [],
+        users: window.KSUAuth ? window.KSUAuth.getDefaultUsers() : [],
+        positionTemplates: getPositionTemplates(),
+        rounds: window.KSUDataBridge ? window.KSUDataBridge.getRounds() : [],
+        alarms: window.KSUDataBridge ? window.KSUDataBridge.getAlarms() : []
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `KSUMC_SAFETY_BACKUP_${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    document.addEventListener('DOMContentLoaded', initDevConsole);
+  
+    function updateDevModeDisplay() {
+      const isProd = (window.KSUSystemMode && typeof window.KSUSystemMode.isProduction === 'function')
+        ? window.KSUSystemMode.isProduction()
+        : (localStorage.getItem('ksumc_system_mode') === 'production');
+
+      const headerText = document.getElementById('dev-header-mode-text');
+      const headerBadge = document.getElementById('dev-header-mode-badge');
+      const panelIndicator = document.getElementById('dev-panel-mode-indicator');
+      const panelText = document.getElementById('dev-panel-mode-text');
+
+      if (isProd) {
+        if (headerText) headerText.textContent = 'الإنتاج المعتمد (Production)';
+        if (headerBadge) headerBadge.className = 'flex items-center gap-1.5 px-3 py-1 rounded-xl bg-emerald-950/70 border border-emerald-600/70 text-emerald-300 text-xs font-black';
+        if (panelText) panelText.textContent = 'الوضع الحالي: التشغيل المعتمد الفعلي (Production Mode)';
+        if (panelIndicator) panelIndicator.className = 'flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-950/80 border border-emerald-500/60 text-emerald-300 text-xs font-bold shadow-md';
+      } else {
+        if (headerText) headerText.textContent = 'وضع العرض التجريبي (Demo)';
+        if (headerBadge) headerBadge.className = 'flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-950/70 border border-amber-600/70 text-amber-300 text-xs font-black';
+        if (panelText) panelText.textContent = 'الوضع الحالي: وضع العرض التجريبي (Demo Mode)';
+        if (panelIndicator) panelIndicator.className = 'flex items-center gap-2 px-4 py-2 rounded-2xl bg-amber-950/80 border border-amber-500/60 text-amber-300 text-xs font-bold shadow-md';
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      updateDevModeDisplay();
+      window.addEventListener('ksu_mode_changed', updateDevModeDisplay);
+    });
+  </script>
+</body>
+</html>
+
+

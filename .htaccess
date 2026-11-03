@@ -1,0 +1,69 @@
+# ==============================================================================
+# KSUMC Safety & Inspection Management System (v5.3)
+# Apache / cPanel / LiteSpeed Configuration (.htaccess)
+# ==============================================================================
+
+Options -Indexes
+AddDefaultCharset UTF-8
+
+# 1. MIME Types for PWA Manifest & Service Worker
+<IfModule mod_mime.c>
+    AddType application/manifest+json .webmanifest .json
+    AddType application/javascript .js
+    AddType text/cache-manifest .appcache
+</IfModule>
+
+# 2. URL Rewrites & Routing (Supports both Subfolder & Root Domain on cPanel)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    DirectoryIndex index.html dashboard.html
+
+    # Optional: Force HTTPS (Uncomment if SSL certificate is active on cPanel)
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Clean URLs matching Cloud Hosting (e.g., /field -> field.html)
+    RewriteRule ^sharek/?$ sharek-pitch.html [L]
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME}\.html -f
+    RewriteRule ^([a-zA-Z0-9_-]+)/?$ $1.html [L]
+</IfModule>
+
+# 3. GZIP / Deflate Compression for Fast Loading
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript
+    AddOutputFilterByType DEFLATE application/javascript application/x-javascript application/json application/manifest+json image/svg+xml
+</IfModule>
+
+# 4. Cache-Control Headers (Ensure real-time updates for HTML, JS, and Service Worker)
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+
+    # Never cache HTML, Service Worker, Manifest, or Core JS so updates reflect immediately
+    <FilesMatch "\.(html|htm|json)$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+
+    <FilesMatch "^sw\.js$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Service-Worker-Allowed "/"
+    </FilesMatch>
+</IfModule>
+
+# 5. Static Media & CSS Caching
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresDefault "access plus 1 week"
+    ExpiresByType text/html "access plus 0 seconds"
+    ExpiresByType application/json "access plus 0 seconds"
+    ExpiresByType application/manifest+json "access plus 0 seconds"
+    ExpiresByType text/css "access plus 1 week"
+    ExpiresByType image/png "access plus 1 month"
+    ExpiresByType image/jpeg "access plus 1 month"
+    ExpiresByType image/webp "access plus 1 month"
+    ExpiresByType image/svg+xml "access plus 1 month"
+</IfModule>

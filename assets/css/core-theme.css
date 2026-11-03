@@ -1,0 +1,662 @@
+@charset "UTF-8";
+/**
+ * منظومة سلامة المدينة الطبية بجامعة الملك سعود (KSUMC)
+ * النمط المشترك الأساسي لجميع البوابات (Core Theme)
+ * الهوية المؤسسية: الأزرق الملكي، الذهبي، والأبيض مع تدرجات الإنذار الرسمية
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+
+:root {
+  /* KSUMC Official Colors */
+  --ksu-primary: #082B49;
+  --ksu-primary-dark: #00162B;
+  --ksu-primary-light: #004B87;
+  --ksu-primary-dim: #D1E4FF;
+  
+  --ksu-secondary: #1E667F;
+  --ksu-secondary-light: #A1E0FD;
+  --ksu-gold: #C59B27;
+  --ksu-gold-light: #F9F1DC;
+  
+  /* Status & Severity Colors */
+  --ksu-success: #1E7E34;
+  --ksu-success-bg: #E8F5E9;
+  --ksu-warning: #E65100;
+  --ksu-warning-bg: #FFF3E0;
+  --ksu-error: #D32F2F;
+  --ksu-error-bg: #FFEBEE;
+  --ksu-info: #0284C7;
+  --ksu-info-bg: #E0F2FE;
+
+  /* Surfaces & Backgrounds */
+  --ksu-bg: #F7F9FF;
+  --ksu-surface: #FFFFFF;
+  --ksu-surface-container: #EBEEF3;
+  --ksu-surface-high: #E5E8EE;
+  --ksu-border: #C3C6CE;
+  --ksu-border-subtle: #E0E3E8;
+  --ksu-text: #181C20;
+  --ksu-text-muted: #5B626C;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: 'Cairo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--ksu-bg);
+  color: var(--ksu-text);
+  direction: rtl;
+  text-align: right;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Material Symbols Adjustments */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+.material-symbols-outlined.fill-1 {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F1F4F9;
+}
+::-webkit-scrollbar-thumb {
+  background: #C3C6CE;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #73777E;
+}
+
+/* Header & Top Navbar (Modern Sleek KSUMC Bar 58px + Full iOS Safe Area Support) */
+:root {
+  --ksu-safe-top: env(safe-area-inset-top, 0px);
+  --ksu-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --ksu-safe-left: env(safe-area-inset-left, 0px);
+  --ksu-safe-right: env(safe-area-inset-right, 0px);
+  --ksu-header-h: 58px;
+}
+
+#ksu-global-header,
+.ksu-top-header,
+header.ksu-top-header,
+body > header.fixed.top-0 {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: calc(58px + env(safe-area-inset-top, 0px)) !important;
+  min-height: calc(58px + env(safe-area-inset-top, 0px)) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(224, 227, 232, 0.9) !important;
+  box-shadow: 0 1px 6px rgba(0, 22, 43, 0.04) !important;
+  z-index: 50 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  padding-bottom: 0 !important;
+  padding-left: max(0.85rem, env(safe-area-inset-left, 0px)) !important;
+  padding-right: max(0.85rem, env(safe-area-inset-right, 0px)) !important;
+  gap: 0.75rem !important;
+  flex-wrap: nowrap !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+}
+
+/* Safe area content offset for main containers below fixed top header */
+body:has(#ksu-global-header) main,
+body:has(.ksu-top-header) main,
+body:has(header.fixed) main,
+main.pt-16,
+main[class*="pt-\[58px\]"],
+.ksu-page-container {
+  padding-top: calc(4.25rem + env(safe-area-inset-top, 0px)) !important;
+}
+
+/* Bottom safe clearance for pages with mobile bottom nav */
+body:has(.ksu-mobile-nav) main,
+body:has(nav.ksu-mobile-nav) main,
+main.pb-24 {
+  padding-bottom: calc(7rem + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+@media (max-width: 640px) {
+  body:has(#ksu-global-header) main,
+  body:has(.ksu-top-header) main,
+  body:has(header.fixed) main,
+  main.pt-16,
+  main[class*="pt-\[58px\]"],
+  .ksu-page-container {
+    padding-top: calc(4.25rem + env(safe-area-inset-top, 0px)) !important;
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px)) !important;
+  }
+}
+
+.ksu-page-container {
+  padding-top: calc(72px + env(safe-area-inset-top, 0px)) !important;
+  padding-bottom: 2rem;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+/* Card Component */
+.ksu-card {
+  background: var(--ksu-surface);
+  border-radius: 16px;
+  border: 1px solid var(--ksu-border-subtle);
+  box-shadow: 0 2px 8px rgba(8, 43, 73, 0.04);
+  padding: 1.25rem;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.ksu-card:hover {
+  box-shadow: 0 4px 16px rgba(8, 43, 73, 0.08);
+}
+
+/* Buttons */
+.ksu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  outline: none;
+}
+
+.ksu-btn:active {
+  transform: scale(0.98);
+}
+
+.ksu-btn-primary {
+  background-color: var(--ksu-primary);
+  color: #ffffff;
+}
+.ksu-btn-primary:hover {
+  background-color: var(--ksu-primary-light);
+}
+
+.ksu-btn-secondary {
+  background-color: var(--ksu-secondary);
+  color: #ffffff;
+}
+.ksu-btn-secondary:hover {
+  background-color: #154c60;
+}
+
+.ksu-btn-outline {
+  background-color: transparent;
+  border-color: var(--ksu-border);
+  color: var(--ksu-text);
+}
+.ksu-btn-outline:hover {
+  background-color: var(--ksu-surface-container);
+}
+
+.ksu-btn-danger {
+  background-color: var(--ksu-error);
+  color: #ffffff;
+}
+.ksu-btn-danger:hover {
+  background-color: #b71c1c;
+}
+
+.ksu-btn-gold {
+  background-color: var(--ksu-gold);
+  color: #ffffff;
+}
+.ksu-btn-gold:hover {
+  background-color: #9e7a17;
+}
+
+/* Status Badges */
+.ksu-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ksu-badge-success {
+  background-color: var(--ksu-success-bg);
+  color: var(--ksu-success);
+  border: 1px solid #c8e6c9;
+}
+
+.ksu-badge-warning {
+  background-color: var(--ksu-warning-bg);
+  color: var(--ksu-warning);
+  border: 1px solid #ffe0b2;
+}
+
+.ksu-badge-danger {
+  background-color: var(--ksu-error-bg);
+  color: var(--ksu-error);
+  border: 1px solid #ffcdd2;
+}
+
+.ksu-badge-info {
+  background-color: var(--ksu-info-bg);
+  color: var(--ksu-info);
+  border: 1px solid #bae6fd;
+}
+
+/* Pulse animation for active emergency alarms */
+@keyframes ksuAlertPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(211, 47, 47, 0);
+  }
+}
+
+.ksu-animate-pulse {
+  animation: ksuAlertPulse 1.8s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+/* Modals */
+.ksu-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 22, 43, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.ksu-modal-dialog {
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid var(--ksu-border-subtle);
+  box-shadow: 0 20px 40px rgba(0, 22, 43, 0.2);
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Portal Navigation Bar Dropdown */
+.ksu-portal-switcher {
+  position: relative;
+}
+
+.ksu-portal-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ffffff;
+  border: 1px solid rgba(224, 227, 232, 0.9);
+  border-radius: 18px;
+  box-shadow: 0 14px 40px rgba(0, 22, 43, 0.14);
+  width: 280px;
+  max-width: 90vw;
+  z-index: 70;
+  display: none;
+  flex-direction: column;
+  padding: 0.5rem;
+}
+
+.ksu-portal-menu.show {
+  display: flex;
+  animation: ksuFadeDown 0.15s ease-out forwards;
+}
+
+@keyframes ksuFadeDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -6px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* Hide Scrollbar helper */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.ksu-portal-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: 10px;
+  color: var(--ksu-text);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  transition: background 0.15s ease;
+}
+
+.ksu-portal-menu-item:hover {
+  background-color: var(--ksu-surface-container);
+}
+
+.ksu-portal-menu-item.active {
+  background-color: var(--ksu-primary-dim);
+  color: var(--ksu-primary-dark);
+}
+
+/* Print optimizations */
+@media print {
+  .no-print, .ksu-top-header, .ksu-btn, .ksu-mobile-nav {
+    display: none !important;
+  }
+  .ksu-page-container {
+    padding-top: 0 !important;
+    max-width: 100% !important;
+  }
+}
+
+/* ============================================================== */
+/* KSUMC MOBILE-FIRST APP SHELL & BENTO CARDS                     */
+/* ============================================================== */
+
+/* Modern Floating Bottom Navigation Bar (Rock-solid iOS PWA Pinning) */
+.ksu-mobile-nav {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid rgba(195, 198, 206, 0.5) !important;
+  z-index: 50 !important;
+  padding: 0.35rem 0.5rem !important;
+  padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px)) !important;
+  box-shadow: 0 -4px 20px rgba(0, 22, 43, 0.08) !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  will-change: transform !important;
+  box-sizing: border-box !important;
+  touch-action: manipulation !important;
+}
+
+.ksu-mobile-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 0.25rem 0.15rem;
+  color: #5B626C;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 12px;
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.ksu-mobile-nav-item .nav-icon {
+  font-size: 1.45rem;
+  margin-bottom: 2px;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.ksu-mobile-nav-item.active {
+  color: var(--ksu-primary);
+}
+
+.ksu-mobile-nav-item.active .nav-icon {
+  color: var(--ksu-primary);
+  transform: translateY(-2px);
+  font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Elevated Center Camera Button */
+.ksu-nav-cam-btn {
+  position: relative;
+  top: -14px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #0284C7, #0D9488);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.4), 0 0 0 4px #ffffff;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: none;
+  cursor: pointer;
+}
+
+.ksu-nav-cam-btn:active {
+  transform: scale(0.92) translateY(2px);
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.5), 0 0 0 3px #ffffff;
+}
+
+/* Central Floating AI Smart Vision Button (الراصد الذكي العائم) */
+.ksu-nav-ai-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  top: -12px;
+  flex: 0 0 auto;
+  min-width: 68px;
+  z-index: 50;
+  text-decoration: none;
+}
+
+.ksu-nav-ai-center .ai-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #004B87 0%, #0284C7 50%, #0D9488 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 20px rgba(0, 75, 135, 0.35), 0 0 0 3.5px #ffffff;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.ksu-nav-ai-center .ai-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 10px 24px rgba(0, 75, 135, 0.45), 0 0 0 4px #ffffff;
+}
+
+.ksu-nav-ai-center .ai-btn:active {
+  transform: scale(0.92) translateY(2px);
+}
+
+.ksu-nav-ai-center .ai-btn .material-symbols-outlined {
+  font-size: 26px;
+  font-variation-settings: 'FILL' 1, 'wght' 600, 'GRAD' 0, 'opsz' 24;
+}
+
+.ksu-nav-ai-center .ai-pulse-dot {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 10px;
+  height: 10px;
+  background-color: #f59e0b;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.8);
+  animation: ksuPulseDot 2s infinite ease-in-out;
+}
+
+@keyframes ksuPulseDot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.75;
+  }
+}
+
+.ksu-nav-ai-center .ai-label {
+  font-size: 0.625rem;
+  font-weight: 800;
+  color: #004B87;
+  margin-top: 3px;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+}
+
+/* Bento Quick Action Cards */
+.ksu-bento-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid rgba(224, 227, 232, 0.9);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 2px 10px rgba(8, 43, 73, 0.04);
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ksu-bento-card:active {
+  transform: scale(0.97);
+  box-shadow: 0 1px 4px rgba(8, 43, 73, 0.08);
+}
+
+.ksu-bento-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100%;
+  height: 3px;
+  background: currentColor;
+  opacity: 0.8;
+}
+
+/* Hospital Emergency Code Badges */
+.code-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  border: 1px solid transparent;
+  transition: transform 0.15s ease;
+  cursor: pointer;
+}
+
+.code-badge:active {
+  transform: scale(0.96);
+}
+
+.code-badge-red { background: #FEF2F2; color: #DC2626; border-color: #FECACA; }
+.code-badge-blue { background: #EFF6FF; color: #2563EB; border-color: #BFDBFE; }
+.code-badge-brown { background: #FEF3C7; color: #78350F; border-color: #D97706; }
+.code-badge-yellow { background: #FEFCE8; color: #CA8A04; border-color: #FEF08A; }
+.code-badge-orange { background: #FFF7ED; color: #EA580C; border-color: #FED7AA; }
+.code-badge-pink { background: #FDF2F8; color: #DB2777; border-color: #FBCFE8; }
+.code-badge-black { background: #F3F4F6; color: #1F2937; border-color: #D1D5DB; }
+.code-badge-gray { background: #F8FAFC; color: #475569; border-color: #CBD5E1; }
+.code-badge-white { background: #FFFFFF; color: #0F172A; border-color: #94A3B8; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.code-badge-elev { background: #FFFBEB; color: #D97706; border-color: #FDE68A; }
+
+.code-badge.active {
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px currentColor;
+  transform: scale(1.03);
+  font-weight: 900;
+}
+
+/* ==========================================================================
+   KSUMC User Profile Dropdown Menu - 100% Solid Opaque High-Contrast Styling
+   Fixes transparency issues across mobile & desktop viewports
+   ========================================================================== */
+#field-user-menu,
+#ksu-user-dropdown-menu,
+.ksu-user-dropdown-menu,
+.user-profile-dropdown {
+  background-color: #ffffff !important;
+  background: #ffffff !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0, 75, 135, 0.18) !important;
+  border: 1.5px solid #cbd5e1 !important;
+  z-index: 99999 !important;
+}
+
+#field-user-menu .menu-item-row,
+#ksu-user-dropdown-menu .menu-item-row {
+  background-color: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+#field-user-menu .menu-item-row:hover,
+#ksu-user-dropdown-menu .menu-item-row:hover {
+  background-color: #eff6ff !important;
+  border-color: #bfdbfe !important;
+  color: #004b87 !important;
+}
+
+
+

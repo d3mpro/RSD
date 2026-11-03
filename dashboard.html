@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8"/>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta name="theme-color" content="#f4f7fb"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="لوحة سلامة KSUMC"/>
+  <link rel="manifest" href="./manifest.json"/>
+  <link rel="apple-touch-icon" href="./assets/images/app-icon.png"/>
+  <link rel="icon" type="image/png" href="./assets/images/app-icon.png"/>
+  <title>لوحة العمليات والتحليلات الزجاجية المتقدمة | منصة رصد الذكية</title>
+  
+  <link href="https://fonts.googleapis.com" rel="preconnect"/>
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#082B49",          // الكحلي الملكي الرسمي لجامعة الملك سعود
+            "primary-container": "#00162B",
+            secondary: "#1E667F",        // التركواز البحري المعتمد لمنصة رصد
+            "secondary-container": "#0D5C75",
+            "ksu-gold": "#D97706",       // الذهبي المؤسسي لسباهي والاعتماد الأكاديمي
+            "safety-green": "#059669",   // أخضر السلامة والامتثال المعتمد
+            brand: {
+              50: "#f0f9ff",
+              100: "#e0f2fe",
+              400: "#38bdf8",
+              500: "#0ea5e9",
+              600: "#0284c7",
+              900: "#082B49"
+            }
+          },
+          fontFamily: {
+            cairo: ["Cairo", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+  
+  <link rel="stylesheet" href="assets/css/styles.css?v=6.3"/>
+  <script src="assets/js/auth-guard.js?v=5.0"></script>
+  <script src="assets/js/ksumc-data-bridge.js?v=6.2"></script>
+  <script src="assets/js/ksu-firebase-realtime.js?v=6.8.0"></script>
+  <script src="assets/js/ksu-system-mode.js?v=1.2"></script>
+  <script src="assets/js/cbahi-demo-data.js?v=1.2"></script>
+  <script src="assets/js/ksu-oracle-realtime.js?v=6.0"></script>
+  <script src="assets/js/ksu-ai-client.js?v=7.0.0"></script>
+  <script src="assets/js/ksu-demo-switcher.js?v=1.1"></script>
+  
+  <style>
+    /* ==========================================================
+       CLEAN LIGHT GLASSMORPHISM (FROSTED CRYSTAL GLASS)
+       الهوية الرسمية الفاتحة للمدينة الطبية بجامعة الملك سعود ومنصة رصد
+       ========================================================== */
+    body {
+      font-family: 'Cairo', sans-serif;
+      background-color: #f1f5f9;
+      color: #0f172a;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* إضاءة بيئية بلورية ناعمة خلف الألواح الزجاجية */
+    .bg-light-ambient {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background:
+        radial-gradient(circle at 10% 8%, rgba(8, 43, 73, 0.07) 0%, transparent 45%),
+        radial-gradient(circle at 90% 12%, rgba(30, 102, 127, 0.08) 0%, transparent 50%),
+        radial-gradient(circle at 50% 90%, rgba(5, 150, 105, 0.05) 0%, transparent 55%),
+        radial-gradient(circle at 85% 75%, rgba(14, 165, 233, 0.06) 0%, transparent 45%);
+    }
+
+    /* البطاقات الزجاجية الشفافة الفاتحة (Frosted Crystal Glass) */
+    .glass-light-card {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.95);
+      box-shadow: 
+        0 4px 20px -2px rgba(8, 43, 73, 0.05),
+        0 1px 3px 0 rgba(8, 43, 73, 0.03);
+      border-radius: 1.25rem;
+      transition: all 0.2s ease;
+    }
+
+    .glass-light-card:hover {
+      background: rgba(255, 255, 255, 0.92);
+      border-color: rgba(56, 189, 248, 0.45);
+      box-shadow: 
+        0 10px 25px -4px rgba(8, 43, 73, 0.09),
+        0 2px 6px 0 rgba(8, 43, 73, 0.04);
+    }
+
+    /* تجويف زجاجي بلوري داخلي (Frosted Well) */
+    .glass-light-well {
+      background: rgba(241, 245, 249, 0.75);
+      border: 1px solid rgba(226, 232, 240, 0.85);
+      border-radius: 0.875rem;
+    }
+
+    /* شريط تقدم نحيف وأنيق */
+    .glass-light-track {
+      background: rgba(226, 232, 240, 0.8);
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    /* أزرار زجاجية فاتحة */
+    .glass-light-btn {
+      background: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(14px);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      color: #082B49;
+      transition: all 0.2s ease;
+    }
+    .glass-light-btn:hover {
+      background: #ffffff;
+      border-color: #38bdf8;
+      color: #0284c7;
+      box-shadow: 0 2px 8px rgba(8, 43, 73, 0.06);
+    }
+
+    .glass-light-btn-primary {
+      background: linear-gradient(135deg, #082B49 0%, #1E667F 100%);
+      border: 1px solid rgba(8, 43, 73, 0.1);
+      box-shadow: 0 4px 14px rgba(8, 43, 73, 0.25);
+      color: #ffffff;
+      transition: all 0.2s ease;
+    }
+    .glass-light-btn-primary:hover {
+      background: linear-gradient(135deg, #0c395f 0%, #237a97 100%);
+      box-shadow: 0 6px 18px rgba(8, 43, 73, 0.35);
+    }
+
+    /* القوائم المنسدلة الزجاجية الفاتحة */
+    .glass-light-select {
+      background: rgba(255, 255, 255, 0.9);
+      border: 1px solid rgba(203, 213, 225, 0.8);
+      color: #082B49;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    .glass-light-select:focus {
+      border-color: #0284c7;
+      box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+      background: #ffffff;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    @media print {
+      header, .no-print, .bg-light-ambient { display: none !important; }
+      body { background: white !important; color: black !important; }
+      .glass-light-card { background: white !important; border: 1px solid #cbd5e1 !important; color: black !important; box-shadow: none !important; }
+    }
+  </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col selection:bg-sky-500 selection:text-white">
+
+  <!-- إضاءة بيئية بلورية ناعمة -->
+  <div class="bg-light-ambient"></div>
+
+  <!-- =============================================================== -->
+  <!-- TOP HEADER (FROSTED LIGHT GLASS)                                -->
+  <!-- =============================================================== -->
+  <header class="fixed top-0 w-full z-50 bg-white/85 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_2px_12px_rgba(8,43,73,0.03)]" style="padding-top: env(safe-area-inset-top, 0px); min-height: calc(4rem + env(safe-area-inset-top, 0px));">
+    <div class="h-16 max-w-[1440px] mx-auto w-full px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+      
+      <!-- Brand & Organization -->
+      <div class="flex items-center gap-3 min-w-0">
+        <a href="index.html" class="flex items-center gap-3 hover:opacity-95 transition-opacity min-w-0 group">
+          <div class="p-1 rounded-xl bg-white border border-slate-200/80 shadow-xs">
+            <img src="assets/images/ksu_official_logo.png" alt="جامعة الملك سعود" class="h-9 w-auto max-w-[110px] sm:max-w-[145px] object-contain rounded-lg p-0.5" />
+          </div>
+          <div class="flex flex-col min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-extrabold text-sm text-[#082B49] leading-tight truncate">المدينة الطبية بجامعة الملك سعود</span>
+              <span class="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                مباشر 24/7
+              </span>
+            </div>
+            <span class="text-xs text-slate-500 font-medium leading-tight truncate hidden sm:block">الإدارة العامة للأمن والسلامة — لوحة العمليات والتحليلات الرقابية</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Navigation & Profile -->
+      <nav aria-label="التنقل الرئيسي للبوابات" class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <a href="index.html" class="glass-light-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold" title="العودة للبوابة الرئيسية">
+          <span class="material-symbols-outlined text-base text-[#082B49]">home</span>
+          <span class="hidden md:inline">الرئيسية</span>
+        </a>
+
+        <a href="quality.html" class="glass-light-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-teal-800">
+          <span class="material-symbols-outlined text-base text-teal-700">verified</span>
+          <span class="hidden md:inline">الجودة</span>
+        </a>
+
+        <button type="button" onclick="window.KSUAI ? window.KSUAI.openCBAHIAuditModal() : (window.openCBAHIAuditModal && window.openCBAHIAuditModal())" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 transition-colors font-bold text-xs cursor-pointer active:scale-95" title="محاكي تدقيق سباهي الافتراضي" aria-label="محاكي تدقيق سباهي الافتراضي">
+          <span class="material-symbols-outlined text-base text-amber-600">verified_user</span>
+          <span class="hidden lg:inline">محاكي سباهي (AI)</span>
+          <span class="lg:hidden">سباهي AI</span>
+        </button>
+
+        <a href="admin.html" class="glass-light-btn flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-800 hover:text-[#082B49]">
+          <span class="material-symbols-outlined text-base text-[#082B49]">admin_panel_settings</span>
+          <span class="hidden sm:inline">الإدارة</span>
+        </a>
+
+        <div class="h-5 w-px bg-slate-200 hidden sm:block"></div>
+
+        <!-- User Profile Pill -->
+        <div id="dash-user-profile" role="button" tabindex="0" aria-label="الملف الشخصي والحساب" class="flex items-center gap-2.5 cursor-pointer py-1 px-2.5 rounded-xl bg-white/80 hover:bg-white border border-slate-200 shadow-2xs transition-all" onclick="location.href='index.html?login=1'" title="انقر لتبديل الحساب">
+          <div class="flex flex-col text-left hidden sm:flex">
+            <span id="dash-user-name" class="text-xs font-bold text-[#082B49] leading-tight">أ. علي سليمان الصقري</span>
+            <span id="dash-user-role" class="text-[11px] text-slate-500 font-medium leading-tight">المشرف العام ومطور النظام</span>
+          </div>
+          <div id="dash-user-avatar" class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#082B49] to-[#1E667F] text-white flex items-center justify-center font-bold text-xs shadow-xs border border-white">
+            ص
+          </div>
+        </div>
+      </nav>
+
+    </div>
+  </header>
+
+  <!-- =============================================================== -->
+  <!-- MAIN CONTENT                                                    -->
+  <!-- =============================================================== -->
+  <div class="w-full flex-1 relative z-10">
+    <main class="relative pt-24 pb-16 min-h-screen">
+      <div class="px-4 sm:px-6 lg:px-8 flex flex-col gap-6 max-w-[1440px] mx-auto">
+        
+        <!-- =============================================================== -->
+        <!-- 1. HERO COMMAND BAR & SMART FILTERS (LIGHT GLASS)               -->
+        <!-- =============================================================== -->
+        <div class="glass-light-card p-6 sm:p-7 border border-white/90">
+          <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+            
+            <!-- Information & Status -->
+            <div class="flex flex-col gap-2.5">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  مركز الرقابة والتحليلات المتقدمة
+                </span>
+                <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs font-medium">
+                  الوردية الأولى (صباحي)
+                </span>
+                <span class="text-slate-500 text-xs font-medium" id="dash-live-time-indicator">(مزامنة حية للبيانات التشغيلية)</span>
+              </div>
+
+              <div class="flex items-center gap-3 flex-wrap">
+                <h1 class="text-2xl sm:text-3xl font-black text-[#082B49] tracking-tight">لوحة تحليلات السلامة الميدانية</h1>
+                <span class="px-3 py-1 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-bold flex items-center gap-1.5">
+                  <span class="material-symbols-outlined text-sm text-amber-600">workspace_premium</span>
+                  <span>الامتثال العام: <strong id="hero-compliance-val" class="text-amber-800 font-black">98.6%</strong></span>
+                </span>
+              </div>
+
+              <p class="text-xs sm:text-sm text-slate-600 max-w-3xl leading-relaxed font-medium">
+                متابعة دقيقة لجولات التفتيش الوقائية، فحص الأصول وأنظمة الإطفاء، ومؤشرات الامتثال في كافة مستشفيات ومرافق المدينة الطبية بجامعة الملك سعود.
+              </p>
+            </div>
+
+            <!-- Controls (Facility, Sync, Range) -->
+            <div class="flex flex-col sm:flex-row xl:flex-col items-stretch sm:items-center xl:items-end justify-between gap-3 shrink-0">
+              
+              <!-- Top Controls -->
+              <div class="flex items-center gap-2.5 flex-wrap">
+                <!-- Facility Select -->
+                <div class="relative flex items-center">
+                  <select class="glass-light-select rounded-xl px-3.5 py-2 text-xs font-bold cursor-pointer pr-2 pl-6" id="dashFacilityFilter" onchange="applyFacilityFilter()">
+                    <option value="all">كافة مرافق المدينة الطبية (KSUMC)</option>
+                    <option value="kkh">مستشفى الملك خالد الجامعي (KKUH)</option>
+                    <option value="kash">مستشفى الملك عبد العزيز الجامعي (KAUH)</option>
+                    <option value="dentistry">مستشفى طب الأسنان الجامعي (KUDH)</option>
+                    <option value="oncology">مركز الأورام الجامعي (KSUCCC)</option>
+                    <option value="cardiac">مركز الملك فهد لطب وجراحة القلب (KFCC)</option>
+                    <option value="admin">مباني الخدمات والإدارة العامة</option>
+                  </select>
+                </div>
+
+                <!-- Sync Button -->
+                <button class="glass-light-btn flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer active:scale-95 shadow-2xs" id="dashSyncBtn" onclick="simulateSync()">
+                  <span class="material-symbols-outlined text-base text-[#082B49]" id="dashSyncIcon">sync</span>
+                  <span>مزامنة</span>
+                </button>
+
+                <!-- Export PDF -->
+                <button onclick="exportDashboardPDF()" class="glass-light-btn-primary flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer active:scale-95">
+                  <span class="material-symbols-outlined text-base">file_download</span>
+                  <span>تصدير PDF</span>
+                </button>
+              </div>
+
+              <!-- Date Range Tabs -->
+              <div class="glass-light-well p-1 flex items-center text-xs font-bold self-start sm:self-auto">
+                <button onclick="setDateRange('today')" class="dash-range-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-[#082B49] transition-all cursor-pointer" data-range="today">اليوم</button>
+                <button onclick="setDateRange('week')" class="dash-range-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-[#082B49] transition-all cursor-pointer" data-range="week">هذا الأسبوع</button>
+                <button onclick="setDateRange('month')" class="dash-range-btn px-3 py-1.5 rounded-lg bg-[#082B49] text-white font-bold shadow-2xs transition-all cursor-pointer" data-range="month">هذا الشهر</button>
+                <button onclick="setDateRange('q1')" class="dash-range-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-[#082B49] transition-all cursor-pointer" data-range="q1">الربع السنوي</button>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+        <!-- =============================================================== -->
+        <!-- 1.5. DIRECTOR GENERAL SAFETY REPORTS INBOX (المرحلة 4)           -->
+        <!-- =============================================================== -->
+        <div id="director-safety-reports-section" class="glass-light-card p-5 sm:p-6 border-amber-300 bg-amber-50/30 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/70 pb-4">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 border border-amber-300 flex items-center justify-center shrink-0 shadow-2xs">
+                <span class="material-symbols-outlined text-xl">workspace_premium</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h2 class="text-sm sm:text-base font-extrabold text-[#082B49]">تقارير السلامة الموجهة لسعادة المدير العام للسلامة والأمن (المرحلة 4)</h2>
+                  <span id="director-pending-reports-badge" class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold">
+                    0 بانتظار التوجيه التنفيذي
+                  </span>
+                </div>
+                <p class="text-xs text-slate-500 mt-0.5">التقارير المحالة من رئيس إدارة السلامة للتوجيه التنفيذي والاعتماد النهائي بالأرشيف</p>
+              </div>
+            </div>
+            <a href="head.html#tab-approvals" class="glass-light-btn px-3 py-1.5 rounded-xl text-xs font-bold text-[#082B49] hover:bg-slate-100 flex items-center gap-1.5 shrink-0">
+              <span class="material-symbols-outlined text-sm text-[#082B49]">account_tree</span>
+              <span>مسار التقارير (4 مراحل)</span>
+            </a>
+          </div>
+          <div id="director-safety-reports-list" class="space-y-3">
+            <!-- Populated dynamically via renderDirectorSafetyReports() -->
+          </div>
+        </div>
+
+        <!-- =============================================================== -->
+        <!-- 2. CLEAN 2D KPI CARDS (LIGHT FROSTED GLASS)                     -->
+        <!-- =============================================================== -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          
+          <!-- KPI 1: إنجاز الجولات -->
+          <div class="glass-light-card p-5 flex flex-col justify-between">
+            <div class="flex items-start justify-between mb-3">
+              <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center">
+                <span class="material-symbols-outlined text-xl">task_alt</span>
+              </div>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
+                <span class="material-symbols-outlined text-xs">trending_up</span> +14.8%
+              </span>
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 font-bold block">الجولات التفتيشية المكتملة</span>
+              <div class="flex items-baseline gap-1.5 mt-1">
+                <span class="text-3xl font-black text-[#082B49] tracking-tight" id="dash-card-inspections">0</span>
+                <span class="text-xs text-emerald-700 font-bold">جولة</span>
+              </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-100">
+              <div class="flex justify-between items-center text-xs text-slate-500 mb-1.5 font-medium">
+                <span id="dash-card-inspections-sub">المستهدف: 0%</span>
+                <span class="text-slate-700 font-bold">14 نموذج</span>
+              </div>
+              <div class="w-full h-1.5 glass-light-track">
+                <div id="dash-card-inspections-bar" class="h-full bg-emerald-600 rounded-full transition-all duration-500" style="width: 0%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI 2: مؤشر الامتثال -->
+          <div class="glass-light-card p-5 flex flex-col justify-between">
+            <div class="flex items-start justify-between mb-3">
+              <div class="w-10 h-10 rounded-xl bg-sky-50 text-[#082B49] border border-sky-200 flex items-center justify-center">
+                <span class="material-symbols-outlined text-xl">workspace_premium</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg bg-sky-50 text-[#082B49] text-xs font-bold border border-sky-200">
+                معايير معتمدة
+              </span>
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 font-bold block">مؤشر الامتثال الوقائي العام</span>
+              <div class="flex items-baseline gap-1.5 mt-1">
+                <span class="text-3xl font-black text-[#082B49] tracking-tight" id="dash-card-compliance">100%</span>
+                <span class="text-xs text-[#1E667F] font-bold">مطابقة</span>
+              </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-100">
+              <div class="flex justify-between items-center text-xs text-slate-500 mb-1.5 font-medium">
+                <span>المعيار: 95.0%</span>
+                <span class="text-emerald-700 font-bold">جاهزية</span>
+              </div>
+              <div class="w-full h-1.5 glass-light-track">
+                <div class="h-full bg-[#082B49] rounded-full" style="width: 100%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI 3: فحص الأصول -->
+          <div class="glass-light-card p-5 flex flex-col justify-between">
+            <div class="flex items-start justify-between mb-3">
+              <div class="w-10 h-10 rounded-xl bg-cyan-50 text-cyan-800 border border-cyan-200 flex items-center justify-center">
+                <span class="material-symbols-outlined text-xl">qr_code_scanner</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg bg-cyan-50 text-cyan-800 text-xs font-bold border border-cyan-200">
+                99.4% جاهزية
+              </span>
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 font-bold block">فحص الأصول والإطفاء</span>
+              <div class="flex items-baseline gap-1.5 mt-1">
+                <span class="text-3xl font-black text-[#082B49] tracking-tight" id="dash-card-assets">1,293</span>
+                <span class="text-xs text-cyan-700 font-bold">أصل</span>
+              </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-100">
+              <div class="flex justify-between items-center text-xs text-slate-500 mb-1.5 font-medium">
+                <span>مضخات و FM200</span>
+                <span class="text-cyan-800 font-bold">100% QR</span>
+              </div>
+              <div class="w-full h-1.5 glass-light-track">
+                <div class="h-full bg-cyan-600 rounded-full" style="width: 99.4%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI 4: إنجاز التحسينات CAPA -->
+          <div class="glass-light-card p-5 flex flex-col justify-between">
+            <div class="flex items-start justify-between mb-3">
+              <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-800 border border-teal-200 flex items-center justify-center">
+                <span class="material-symbols-outlined text-xl">published_with_changes</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg bg-teal-50 text-teal-800 text-xs font-bold border border-teal-200">
+                إغلاق وقائي
+              </span>
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 font-bold block">إنجاز الـ CAPA والتحسينات</span>
+              <div class="flex items-baseline gap-1.5 mt-1">
+                <span class="text-3xl font-black text-[#082B49] tracking-tight" id="dash-card-capa">100%</span>
+                <span class="text-xs text-teal-700 font-bold">مكتمل</span>
+              </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-100">
+              <div class="flex justify-between items-center text-xs text-slate-500 mb-1.5 font-medium">
+                <span id="dash-card-violations-sub">معالجة فورية</span>
+                <span class="text-emerald-700 font-bold">تصفير</span>
+              </div>
+              <div class="w-full h-1.5 glass-light-track">
+                <div class="h-full bg-[#1E667F] rounded-full" style="width: 100%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI 5: تصاريح العمل الساخن -->
+          <div class="glass-light-card p-5 flex flex-col justify-between">
+            <div class="flex items-start justify-between mb-3">
+              <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center">
+                <span class="material-symbols-outlined text-xl">verified_user</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg bg-amber-50 text-amber-800 text-xs font-bold border border-amber-200">
+                صفر حوادث
+              </span>
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 font-bold block">تصاريح العمل الساخن</span>
+              <div class="flex items-baseline gap-1.5 mt-1">
+                <span class="text-3xl font-black text-[#082B49] tracking-tight" id="dash-card-hotwork">0</span>
+                <span class="text-xs text-amber-700 font-bold">تصريح</span>
+              </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-100">
+              <div class="flex justify-between items-center text-xs text-slate-500 mb-1.5 font-medium">
+                <span>مراقبو حريق</span>
+                <span class="text-emerald-700 font-bold">100% تدقيق</span>
+              </div>
+              <div class="w-full h-1.5 glass-light-track">
+                <div class="h-full bg-amber-500 rounded-full" style="width: 100%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI 6: مؤشر الاستجابة للبلاغات -->
+          <div class="glass-light-card p-5 flex flex-col justify-between">
+            <div class="flex items-start justify-between mb-3">
+              <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center">
+                <span class="material-symbols-outlined text-xl">bolt</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
+                استجابة فورية
+              </span>
+            </div>
+            <div>
+              <span class="text-xs text-slate-500 font-bold block">البلاغات الطارئة النشطة</span>
+              <div class="flex items-baseline gap-1.5 mt-1">
+                <span class="text-3xl font-black text-[#082B49] tracking-tight" id="dash-card-alarms">0</span>
+                <span class="text-xs text-slate-500 font-bold">نشط</span>
+              </div>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-100">
+              <div class="flex justify-between items-center text-xs text-slate-500 mb-1.5 font-medium">
+                <span>مباشرة البلاغ</span>
+                <span class="text-emerald-700 font-bold">100% احتواء</span>
+              </div>
+              <div class="w-full h-1.5 glass-light-track">
+                <div class="h-full bg-emerald-600 rounded-full" style="width: 100%;"></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- =============================================================== -->
+        <!-- 3. HOSPITALS ACHIEVEMENT LEADERBOARD (LIGHT GLASS)              -->
+        <!-- =============================================================== -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="dashHospitalsLeaderboard">
+          
+          <!-- KKUH -->
+          <div class="glass-light-card p-5 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-sky-50 text-[#082B49] border border-sky-200 flex items-center justify-center">
+                  <span class="material-symbols-outlined text-xl">local_hospital</span>
+                </div>
+                <div>
+                  <span class="font-extrabold text-sm text-[#082B49] block">مستشفى الملك خالد الجامعي</span>
+                  <span class="text-xs text-slate-500 font-medium">أبراج التنويم والطوارئ</span>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">100%</span>
+            </div>
+            <div class="my-3.5 glass-light-well p-3">
+              <div class="flex justify-between text-xs font-bold mb-1.5">
+                <span class="text-[#082B49]" id="hosp-kkuh-rounds">0 جولة منجزة</span>
+                <span class="text-emerald-700">جاهزية 100%</span>
+              </div>
+              <div class="w-full h-1.5 glass-light-track">
+                <div class="h-full bg-[#082B49] rounded-full" style="width: 100%;"></div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100 font-medium">
+              <span>تغطية 9 أدوار و 4 مباني</span>
+              <span class="text-[#1E667F] font-bold flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">verified</span> امتثال فائق
+              </span>
+            </div>
+          </div>
+
+          <!-- KAUH -->
+          <div class="glass-light-card p-5 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-800 border border-teal-200 flex items-center justify-center">
+                  <span class="material-symbols-outlined text-xl">domain_add</span>
+                </div>
+                <div>
+                  <span class="font-extrabold text-sm text-[#082B49] block">مستشفى الملك عبد العزيز</span>
+                  <span class="text-xs text-slate-500 font-medium">العيادات والأقسام التخصصية</span>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">100%</span>
+            </div>
+            <div class="my-3.5 glass-light-well p-3">
+              <div class="flex justify-between text-xs font-bold mb-1.5">
+                <span class="text-teal-900" id="hosp-kauh-rounds">0 جولة منجزة</span>
+                <span class="text-emerald-700">جاهزية 100%</span>
+              </div>
+              <div class="w-full h-1.5 glass-light-track">
+                <div class="h-full bg-[#1E667F] rounded-full" style="width: 100%;"></div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100 font-medium">
+              <span>تغطية 6 أدوار و 3 مباني</span>
+              <span class="text-teal-700 font-bold flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">military_tech</span> امتثال استثنائي
+              </span>
+            </div>
+          </div>
+
+          <!-- Dental -->
+          <div class="glass-light-card p-5 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center justify-center">
+                  <span class="material-symbols-outlined text-xl">dentistry</span>
+                </div>
+                <div>
+                  <span class="font-extrabold text-sm text-[#082B49] block">مستشفى طب الأسنان</span>
+                  <span class="text-xs text-slate-500 font-medium">المبنى الأكاديمي والعيادات</span>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">100%</span>
+            </div>
+            <div class="my-3.5 glass-light-well p-3">
+              <div class="flex justify-between text-xs font-bold mb-1.5">
+                <span class="text-emerald-900" id="hosp-dental-rounds">0 جولة منجزة</span>
+                <span class="text-emerald-700">صفر ملاحظات</span>
+              </div>
+              <div class="w-full h-1.5 glass-light-track">
+                <div class="h-full bg-emerald-600 rounded-full" style="width: 100%;"></div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100 font-medium">
+              <span>تغطية شاملة 100%</span>
+              <span class="text-emerald-700 font-bold flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">emoji_events</span> المركز الأول
+              </span>
+            </div>
+          </div>
+
+          <!-- Oncology & Cardiac -->
+          <div class="glass-light-card p-5 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-sky-50 text-[#082B49] border border-sky-200 flex items-center justify-center">
+                  <span class="material-symbols-outlined text-xl">medical_services</span>
+                </div>
+                <div>
+                  <span class="font-extrabold text-sm text-[#082B49] block">مركز الأورام ومركز القلب</span>
+                  <span class="text-xs text-slate-500 font-medium">المراكز التخصصية والمختبرات</span>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">100%</span>
+            </div>
+            <div class="my-3.5 glass-light-well p-3">
+              <div class="flex justify-between text-xs font-bold mb-1.5">
+                <span class="text-[#082B49]" id="hosp-onc-rounds">0 جولة منجزة</span>
+                <span class="text-[#1E667F]">صفر مخاطر حرجة</span>
+              </div>
+              <div class="w-full h-1.5 glass-light-track">
+                <div class="h-full bg-[#082B49] rounded-full" style="width: 100%;"></div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between text-xs text-slate-500 pt-2 border-t border-slate-100 font-medium">
+              <span>أمان إشعاعي وغازات طبية</span>
+              <span class="text-[#1E667F] font-bold flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm">shield_with_heart</span> جاهزية عالية
+              </span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- =============================================================== -->
+        <!-- 4. MODERN FLAT 2D CHARTS (LIGHT THEME)                          -->
+        <!-- =============================================================== -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          <!-- Chart 1 (7 cols): Timeline & Growth -->
+          <div class="lg:col-span-7 glass-light-card p-6 flex flex-col justify-between">
+            <div class="flex items-start justify-between flex-wrap gap-3 mb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-sky-50 text-[#082B49] border border-sky-200 flex items-center justify-center shrink-0">
+                  <span class="material-symbols-outlined text-xl">show_chart</span>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-base font-extrabold text-[#082B49]">مسار الإنجازات الميدانية ونمو الامتثال</h3>
+                    <span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">+18.4% نمو</span>
+                  </div>
+                  <span class="text-xs text-slate-500 font-medium">متابعة الجولات المكتملة، فحوصات الأصول، ومنحنى الامتثال الأسبوعي</span>
+                </div>
+              </div>
+
+              <!-- Legend Pills -->
+              <div class="flex items-center gap-3 glass-light-well px-3 py-1.5 text-xs">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 rounded-sm bg-[#082B49]"></span>
+                  <span class="text-slate-700 font-bold">الجولات المكتملة</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 rounded-sm bg-emerald-600"></span>
+                  <span class="text-slate-700 font-bold">فحص الأصول</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                  <span class="text-slate-700 font-bold">الامتثال (98.6%)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Summary Counters -->
+            <div class="grid grid-cols-3 gap-3 mb-4">
+              <div class="p-3 glass-light-well flex items-center justify-between">
+                <div>
+                  <span class="text-xs text-slate-500 font-bold block">إجمالي الفحوصات</span>
+                  <span class="text-lg font-black text-[#082B49]">14,820 <small class="text-xs text-emerald-700 font-bold">نقطة</small></span>
+                </div>
+                <span class="material-symbols-outlined text-emerald-600 text-xl">fact_check</span>
+              </div>
+              <div class="p-3 glass-light-well flex items-center justify-between">
+                <div>
+                  <span class="text-xs text-slate-500 font-bold block">تغطية الأقسام الحرجة</span>
+                  <span class="text-lg font-black text-emerald-700">100% <small class="text-xs text-slate-500 font-medium">ICU</small></span>
+                </div>
+                <span class="material-symbols-outlined text-[#082B49] text-xl">vital_signs</span>
+              </div>
+              <div class="p-3 glass-light-well flex items-center justify-between">
+                <div>
+                  <span class="text-xs text-slate-500 font-bold block">الالتزام بالجدول</span>
+                  <span class="text-lg font-black text-amber-700">99.2%</span>
+                </div>
+                <span class="material-symbols-outlined text-amber-600 text-xl">schedule</span>
+              </div>
+            </div>
+
+            <!-- Crisp Flat SVG Chart (Light Theme) -->
+            <div class="w-full h-64 relative flex items-end">
+              <svg class="w-full h-full overflow-visible" preserveaspectratio="none" viewbox="0 0 700 220">
+                <defs>
+                  <linearGradient id="lightNavyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#1E667F"/>
+                    <stop offset="100%" stop-color="#082B49"/>
+                  </linearGradient>
+                  <linearGradient id="lightEmeraldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#10b981"/>
+                    <stop offset="100%" stop-color="#047857"/>
+                  </linearGradient>
+                  <linearGradient id="lightAreaGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.18"/>
+                    <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.0"/>
+                  </linearGradient>
+                </defs>
+
+                <!-- Gridlines -->
+                <line stroke="#e2e8f0" stroke-dasharray="3,3" x1="20" x2="680" y1="35" y2="35"></line>
+                <line stroke="#e2e8f0" stroke-dasharray="3,3" x1="20" x2="680" y1="85" y2="85"></line>
+                <line stroke="#e2e8f0" stroke-dasharray="3,3" x1="20" x2="680" y1="135" y2="135"></line>
+                <line stroke="#cbd5e1" x1="20" x2="680" y1="185" y2="185"></line>
+
+                <!-- Area Fill Under Compliance Curve -->
+                <path d="M 68 100 C 135 90, 175 80, 208 74 C 275 65, 315 60, 348 52 C 415 44, 455 38, 488 32 C 555 26, 595 22, 628 16 L 628 185 L 68 185 Z" fill="url(#lightAreaGlow)"></path>
+
+                <!-- Clean Flat Bar Groups (KSU Navy & Emerald) -->
+                <!-- Week 1 -->
+                <g class="transition-opacity duration-200 hover:opacity-85">
+                  <rect x="46" y="95" width="20" height="90" rx="4" fill="url(#lightNavyGrad)"/>
+                  <rect x="70" y="78" width="20" height="107" rx="4" fill="url(#lightEmeraldGrad)"/>
+                </g>
+                <!-- Week 2 -->
+                <g class="transition-opacity duration-200 hover:opacity-85">
+                  <rect x="186" y="78" width="20" height="107" rx="4" fill="url(#lightNavyGrad)"/>
+                  <rect x="210" y="62" width="20" height="123" rx="4" fill="url(#lightEmeraldGrad)"/>
+                </g>
+                <!-- Week 3 -->
+                <g class="transition-opacity duration-200 hover:opacity-85">
+                  <rect x="326" y="65" width="20" height="120" rx="4" fill="url(#lightNavyGrad)"/>
+                  <rect x="350" y="48" width="20" height="137" rx="4" fill="url(#lightEmeraldGrad)"/>
+                </g>
+                <!-- Week 4 -->
+                <g class="transition-opacity duration-200 hover:opacity-85">
+                  <rect x="466" y="50" width="20" height="135" rx="4" fill="url(#lightNavyGrad)"/>
+                  <rect x="490" y="34" width="20" height="151" rx="4" fill="url(#lightEmeraldGrad)"/>
+                </g>
+                <!-- Current Week -->
+                <g class="transition-opacity duration-200 hover:opacity-85">
+                  <rect x="606" y="38" width="20" height="147" rx="4" fill="url(#lightNavyGrad)"/>
+                  <rect x="630" y="20" width="20" height="165" rx="4" fill="url(#lightEmeraldGrad)"/>
+                </g>
+
+                <!-- Compliance Smooth Bezier Trendline -->
+                <path d="M 68 100 C 135 90, 175 80, 208 74 C 275 65, 315 60, 348 52 C 415 44, 455 38, 488 32 C 555 26, 595 22, 628 16" fill="none" stroke="#d97706" stroke-linecap="round" stroke-width="3.5"></path>
+
+                <!-- Markers & Labels -->
+                <circle cx="68" cy="100" fill="#ffffff" r="4.5" stroke="#d97706" stroke-width="2.5"></circle>
+                <text x="68" y="86" text-anchor="middle" fill="#92400e" font-size="11" font-weight="800">94.5%</text>
+
+                <circle cx="208" cy="74" fill="#ffffff" r="4.5" stroke="#d97706" stroke-width="2.5"></circle>
+                <text x="208" y="60" text-anchor="middle" fill="#92400e" font-size="11" font-weight="800">96.1%</text>
+
+                <circle cx="348" cy="52" fill="#ffffff" r="4.5" stroke="#d97706" stroke-width="2.5"></circle>
+                <text x="348" y="38" text-anchor="middle" fill="#92400e" font-size="11" font-weight="800">97.3%</text>
+
+                <circle cx="488" cy="32" fill="#ffffff" r="4.5" stroke="#d97706" stroke-width="2.5"></circle>
+                <text x="488" y="18" text-anchor="middle" fill="#92400e" font-size="11" font-weight="800">98.1%</text>
+
+                <circle cx="628" cy="16" fill="#ffffff" r="5.5" stroke="#059669" stroke-width="2.5"></circle>
+                <text x="628" y="4" text-anchor="middle" fill="#047857" font-size="12" font-weight="900">98.6%</text>
+              </svg>
+            </div>
+
+            <!-- X Axis Labels -->
+            <div class="flex justify-between items-center text-slate-500 text-xs font-bold pt-2 border-t border-slate-100 px-2">
+              <span>الأسبوع 1</span>
+              <span>الأسبوع 2</span>
+              <span>الأسبوع 3</span>
+              <span>الأسبوع 4</span>
+              <span class="text-emerald-700 font-extrabold">الأسبوع الجاري</span>
+            </div>
+          </div>
+
+          <!-- Chart 2 (5 cols): Clean Donut Harvest -->
+          <div class="lg:col-span-5 glass-light-card p-6 flex flex-col justify-between">
+            <div class="flex items-start justify-between mb-2">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-800 border border-teal-200 flex items-center justify-center shrink-0">
+                  <span class="material-symbols-outlined text-xl">donut_large</span>
+                </div>
+                <div>
+                  <h3 class="text-base font-extrabold text-[#082B49]">حصاد الإنجازات الرقابية</h3>
+                  <span class="text-xs text-slate-500 font-medium">توزيع الفحوصات عبر النماذج الـ 14 المعتمدة</span>
+                </div>
+              </div>
+              <span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">تغطية شاملة</span>
+            </div>
+
+            <!-- Minimalist Donut Visualization -->
+            <div class="flex items-center justify-center my-4 relative">
+              <div class="relative w-48 h-48 flex items-center justify-center">
+                <svg class="w-full h-full transform -rotate-90 relative z-10" viewbox="0 0 100 100">
+                  <!-- Base Track Ring -->
+                  <circle cx="50" cy="50" fill="none" r="37" stroke="#e2e8f0" stroke-width="10"></circle>
+                  
+                  <!-- Fallback shadows for JS compatibility (hidden) -->
+                  <circle id="donut-shadow-exits" cx="50" cy="50" fill="none" r="37" stroke="transparent" stroke-dasharray="0 232.5" stroke-width="0"></circle>
+                  <circle id="donut-shadow-pumps" cx="50" cy="50" fill="none" r="37" stroke="transparent" stroke-dasharray="0 232.5" stroke-width="0"></circle>
+                  <circle id="donut-shadow-medgas" cx="50" cy="50" fill="none" r="37" stroke="transparent" stroke-dasharray="0 232.5" stroke-width="0"></circle>
+                  <circle id="donut-shadow-hazmat" cx="50" cy="50" fill="none" r="37" stroke="transparent" stroke-dasharray="0 232.5" stroke-width="0"></circle>
+
+                  <!-- Crisp Flat Segments -->
+                  <circle id="donut-segment-exits" cx="50" cy="50" fill="none" r="37" stroke="#059669" stroke-dasharray="88.3 232.5" stroke-dashoffset="0" stroke-width="10"></circle>
+                  <circle id="donut-segment-pumps" cx="50" cy="50" fill="none" r="37" stroke="#082B49" stroke-dasharray="65.1 232.5" stroke-dashoffset="-88.3" stroke-width="10"></circle>
+                  <circle id="donut-segment-medgas" cx="50" cy="50" fill="none" r="37" stroke="#1E667F" stroke-dasharray="46.5 232.5" stroke-dashoffset="-153.4" stroke-width="10"></circle>
+                  <circle id="donut-segment-hazmat" cx="50" cy="50" fill="none" r="37" stroke="#D97706" stroke-dasharray="32.6 232.5" stroke-dashoffset="-199.9" stroke-width="10"></circle>
+                </svg>
+
+                <!-- Center Metric -->
+                <div class="absolute z-20 flex flex-col items-center justify-center text-center">
+                  <span class="text-3xl font-black text-[#082B49] tracking-tight" id="donut-total-achievements">0</span>
+                  <span class="text-xs font-bold text-emerald-700">مهمة منجزة</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Domain Breakdown List -->
+            <div class="flex flex-col gap-2 text-xs">
+              <div class="p-2.5 glass-light-well flex items-center justify-between">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-3 h-3 rounded-full bg-emerald-600 shrink-0"></span>
+                  <span class="truncate font-bold text-slate-800">تأمين مخارج الطوارئ ومسارات الإخلاء</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-bold shrink-0" id="domain-bar-exits">0 جولة (38%)</span>
+              </div>
+
+              <div class="p-2.5 glass-light-well flex items-center justify-between">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-3 h-3 rounded-full bg-[#082B49] shrink-0"></span>
+                  <span class="truncate font-bold text-slate-800">فحص مضخات الحريق و FM200 والطفايات</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-md bg-sky-100 text-[#082B49] font-bold shrink-0" id="domain-bar-pumps">0 فحص (28%)</span>
+              </div>
+
+              <div class="p-2.5 glass-light-well flex items-center justify-between">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-3 h-3 rounded-full bg-[#1E667F] shrink-0"></span>
+                  <span class="truncate font-bold text-slate-800">الغازات الطبية واللوحات الكهربائية</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-md bg-teal-100 text-teal-900 font-bold shrink-0" id="domain-bar-medgas">0 فحص (20%)</span>
+              </div>
+
+              <div class="p-2.5 glass-light-well flex items-center justify-between">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-3 h-3 rounded-full bg-amber-500 shrink-0"></span>
+                  <span class="truncate font-bold text-slate-800">تصاريح العمل الآمن والمواد الخطرة</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-bold shrink-0" id="domain-bar-hazmat">0 إجراء (14%)</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- =============================================================== -->
+        <!-- 5. LIVE ACHIEVEMENTS LOG (LIGHT CLEAN TABLE)                    -->
+        <!-- =============================================================== -->
+        <div class="w-full">
+          <div class="glass-light-card p-6 flex flex-col justify-between w-full">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-sky-50 text-[#082B49] border border-sky-200 flex items-center justify-center shrink-0">
+                  <span class="material-symbols-outlined text-xl">military_tech</span>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h3 class="text-base font-extrabold text-[#082B49]">سجل العمليات الميدانية الحية</h3>
+                    <span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">مزامنة لحظية</span>
+                  </div>
+                  <span class="text-xs text-slate-500 font-medium">توثيق مباشر للجولات وفحوصات الجاهزية المعتمدة</span>
+                </div>
+              </div>
+
+              <!-- Filter Tabs -->
+              <div class="flex items-center gap-1 glass-light-well p-1 text-xs font-bold self-start sm:self-auto">
+                <button onclick="filterAchievementsTable('all')" data-ach-filter="all" class="ach-filter-btn px-3 py-1 rounded-lg bg-[#082B49] text-white transition-all cursor-pointer">الكل</button>
+                <button onclick="filterAchievementsTable('rounds')" data-ach-filter="rounds" class="ach-filter-btn px-3 py-1 rounded-lg text-slate-600 hover:text-[#082B49] transition-all cursor-pointer">الجولات</button>
+                <button onclick="filterAchievementsTable('systems')" data-ach-filter="systems" class="ach-filter-btn px-3 py-1 rounded-lg text-slate-600 hover:text-[#082B49] transition-all cursor-pointer">الأنظمة</button>
+                <button onclick="filterAchievementsTable('permits')" data-ach-filter="permits" class="ach-filter-btn px-3 py-1 rounded-lg text-slate-600 hover:text-[#082B49] transition-all cursor-pointer">التصاريح</button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white/70">
+              <table class="w-full text-right border-collapse text-xs" aria-label="سجل العمليات الميدانية الحية">
+                <thead>
+                  <tr class="bg-slate-50 text-[#082B49] font-extrabold border-b border-slate-200">
+                    <th scope="col" class="py-3 px-4">كود العملية</th>
+                    <th scope="col" class="py-3 px-4">نوع الإنجاز والنشاط الوقائي</th>
+                    <th scope="col" class="py-3 px-4">المنشأة والموقع</th>
+                    <th scope="col" class="py-3 px-4 text-center">مؤشر الكفاءة</th>
+                    <th scope="col" class="py-3 px-4">الكادر المنجز</th>
+                    <th scope="col" class="py-3 px-4 text-center">حالة الاعتماد</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100" id="dashDispatchTableBody">
+                  <tr id="dash-empty-state-row">
+                    <td colspan="6" class="py-8 text-center text-slate-400 font-medium text-xs">
+                      لا توجد جولات تفتيشية مسجلة بعد — السجل جاهز لتوثيق جولات العمل الحقيقية لحظياً
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="flex items-center justify-between pt-4 border-t border-slate-100 mt-3">
+              <span class="text-xs text-slate-500 font-medium" id="dash-log-summary-text">بانتظار تسجيل أول جولة عمل ميدانية</span>
+              <div class="flex items-center gap-2">
+                <button onclick="paginateDispatch('prev')" class="glass-light-btn px-3 py-1 rounded-lg text-xs font-bold cursor-pointer">السابق</button>
+                <button onclick="paginateDispatch('next')" class="glass-light-btn-primary px-3 py-1 rounded-lg text-xs font-bold cursor-pointer">التالي</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- =============================================================== -->
+        <!-- 6. COVERAGE MATRIX BANNER (LIGHT GLASS)                         -->
+        <!-- =============================================================== -->
+        <div class="glass-light-card p-5 sm:p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div class="flex items-center gap-3.5">
+            <div class="w-11 h-11 rounded-xl bg-sky-50 text-[#082B49] border border-sky-200 flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-2xl">domain_verification</span>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 class="text-sm sm:text-base font-extrabold text-[#082B49]">مصفوفة إنجاز التغطية الرقابية للأدوار والمباني (11 مبنى)</h3>
+                <span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">متابعة الورديات</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-1 font-medium">
+                مؤشر تغطية الأدوار: 
+                <span class="font-extrabold text-emerald-700">48 دوراً مكتملاً (92.3%)</span>، 
+                و<span class="font-extrabold text-[#1E667F]">4 أدوار جاري استكمالها حالياً</span>.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2.5 shrink-0">
+            <a href="field.html" class="glass-light-btn px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-base text-[#082B49]">checklist_rtl</span>
+              <span>بوابة الجولات الميدانية</span>
+            </a>
+            <a href="index.html#shift-handover-log" class="glass-light-btn-primary px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5">
+              <span>استعراض المصفوفة الكاملة</span>
+              <span class="material-symbols-outlined text-sm">arrow_back</span>
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Interactive JavaScript Logic (Pure Clean Engine) -->
+  <script>
+    // Live Clock update
+    function updateLiveClocks() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const indicator = document.getElementById('dash-live-time-indicator');
+      if (indicator) {
+        indicator.textContent = `(مزامنة حية — ${timeStr})`;
+      }
+    }
+    setInterval(updateLiveClocks, 1000);
+    updateLiveClocks();
+
+    let currentRange = 'month';
+
+    // Active Live Sync: Pulls directly from Oracle Server API & WebSockets
+    async function triggerLiveSync() {
+      const icon = document.getElementById('dashSyncIcon');
+      if (icon) icon.classList.add('animate-spin');
+
+      try {
+        if (window.KSUOracleSync && typeof window.KSUOracleSync.syncInitialData === 'function') {
+          await window.KSUOracleSync.syncInitialData();
+        }
+
+        const apiKey = 'ksu_sec_token_95972_riyadh';
+        let targetHost = (window.location.host && !window.location.host.includes('localhost') && !window.location.host.includes('127.0.0.1')) ? window.location.host : '84.13.138.203';
+        const isHttps = window.location.protocol === 'https:';
+        const httpProto = (targetHost.includes('84.13.138.203') && !isHttps) ? 'http:' : window.location.protocol;
+        const apiBase = `${httpProto}//${targetHost}/safety/api`;
+
+        const [resRounds, resViolations] = await Promise.allSettled([
+          fetch(`${apiBase}/rounds`, { headers: { 'X-KSUMC-KEY': apiKey } }),
+          fetch(`${apiBase}/safety_violations`, { headers: { 'X-KSUMC-KEY': apiKey } })
+        ]);
+
+        if (resRounds.status === 'fulfilled' && resRounds.value.ok) {
+          const rounds = await resRounds.value.json();
+          if (Array.isArray(rounds)) {
+            localStorage.setItem('ksumc_safety_rounds', JSON.stringify(rounds));
+          }
+        }
+
+        if (resViolations.status === 'fulfilled' && resViolations.value.ok) {
+          const viols = await resViolations.value.json();
+          if (Array.isArray(viols)) {
+            localStorage.setItem('ksumc_safety_violations', JSON.stringify(viols));
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ [KSU-Oracle] تنبيه أثناء المزامنة:', err);
+      } finally {
+        if (icon) icon.classList.remove('animate-spin');
+        updateLiveClocks();
+        renderDashboardLiveMetrics(document.getElementById('dashFacilityFilter')?.value || 'all', currentRange);
+      }
+    }
+
+    function simulateSync() {
+      triggerLiveSync();
+    }
+
+    // Dynamic Achievement Harvest Engine: Updates domains and donut
+    function renderAchievementHarvest(roundsList) {
+      const rounds = Array.isArray(roundsList) ? roundsList : [];
+      let exitsCount = 0;
+      let pumpsCount = 0;
+      let medgasCount = 0;
+      let hazmatCount = 0;
+
+      rounds.forEach(r => {
+        const text = ((r.formTitle || '') + ' ' + (r.formType || '') + ' ' + (r.type || '') + ' ' + (r.id || '')).toLowerCase();
+        if (text.includes('مخارج') || text.includes('إخلاء') || text.includes('طوارئ') || text.includes('أبواب') || text.includes('exit') || text.includes('door')) {
+          exitsCount++;
+        } else if (text.includes('مضخ') || text.includes('إطفاء') || text.includes('طفا') || text.includes('fm200') || text.includes('رش') || text.includes('pump') || text.includes('extinguish')) {
+          pumpsCount++;
+        } else if (text.includes('غاز') || text.includes('كهرب') || text.includes('لوح') || text.includes('مولد') || text.includes('gas') || text.includes('electric') || text.includes('99')) {
+          medgasCount++;
+        } else if (text.includes('خطر') || text.includes('تصاريح') || text.includes('ساخن') || text.includes('hazmat') || text.includes('permit') || text.includes('كيميا')) {
+          hazmatCount++;
+        } else {
+          pumpsCount++;
+        }
+      });
+
+      const total = rounds.length;
+      const pExits = total > 0 ? Math.round((exitsCount / total) * 100) : 0;
+      const pPumps = total > 0 ? Math.round((pumpsCount / total) * 100) : 0;
+      const pMedgas = total > 0 ? Math.round((medgasCount / total) * 100) : 0;
+      const pHazmat = total > 0 ? Math.round((hazmatCount / total) * 100) : 0;
+
+      const donutTotal = document.getElementById('donut-total-achievements');
+      if (donutTotal) donutTotal.textContent = total.toLocaleString('en-US');
+
+      const barExits = document.getElementById('domain-bar-exits');
+      if (barExits) barExits.textContent = `${exitsCount} جولة (${pExits}%)`;
+
+      const barPumps = document.getElementById('domain-bar-pumps');
+      if (barPumps) barPumps.textContent = `${pumpsCount} فحص (${pPumps}%)`;
+
+      const barMedgas = document.getElementById('domain-bar-medgas');
+      if (barMedgas) barMedgas.textContent = `${medgasCount} فحص (${pMedgas}%)`;
+
+      const barHazmat = document.getElementById('domain-bar-hazmat');
+      if (barHazmat) barHazmat.textContent = `${hazmatCount} إجراء (${pHazmat}%)`;
+
+      // Update SVG donut arcs dynamically
+      const circ = 232.5;
+      const segExits = document.getElementById('donut-segment-exits');
+      const segPumps = document.getElementById('donut-segment-pumps');
+      const segMedgas = document.getElementById('donut-segment-medgas');
+      const segHazmat = document.getElementById('donut-segment-hazmat');
+
+      if (segExits && segPumps && segMedgas && segHazmat) {
+        if (total === 0) {
+          segExits.setAttribute('stroke-dasharray', `0 ${circ}`);
+          segPumps.setAttribute('stroke-dasharray', `0 ${circ}`);
+          segMedgas.setAttribute('stroke-dasharray', `0 ${circ}`);
+          segHazmat.setAttribute('stroke-dasharray', `0 ${circ}`);
+        } else {
+          const lExits = (exitsCount / total) * circ;
+          const lPumps = (pumpsCount / total) * circ;
+          const lMedgas = (medgasCount / total) * circ;
+          const lHazmat = (hazmatCount / total) * circ;
+
+          segExits.setAttribute('stroke-dasharray', `${lExits.toFixed(1)} ${circ}`);
+          segExits.setAttribute('stroke-dashoffset', '0');
+
+          segPumps.setAttribute('stroke-dasharray', `${lPumps.toFixed(1)} ${circ}`);
+          segPumps.setAttribute('stroke-dashoffset', `${(-lExits).toFixed(1)}`);
+
+          segMedgas.setAttribute('stroke-dasharray', `${lMedgas.toFixed(1)} ${circ}`);
+          segMedgas.setAttribute('stroke-dashoffset', `${(-(lExits + lPumps)).toFixed(1)}`);
+
+          segHazmat.setAttribute('stroke-dasharray', `${lHazmat.toFixed(1)} ${circ}`);
+          segHazmat.setAttribute('stroke-dashoffset', `${(-(lExits + lPumps + lMedgas)).toFixed(1)}`);
+        }
+      }
+    }
+
+    function exportDashboardPDF() {
+      window.print();
+    }
+
+    function filterAchievementsTable(category) {
+      document.querySelectorAll('.ach-filter-btn').forEach(btn => {
+        if (btn.getAttribute('data-ach-filter') === category) {
+          btn.className = 'ach-filter-btn px-3 py-1 rounded-lg bg-[#082B49] text-white transition-all cursor-pointer';
+        } else {
+          btn.className = 'ach-filter-btn px-3 py-1 rounded-lg text-slate-600 hover:text-[#082B49] transition-all cursor-pointer';
+        }
+      });
+
+      const rows = document.querySelectorAll('#dashDispatchTableBody tr');
+      let visibleCount = 0;
+      rows.forEach(row => {
+        const rowCat = row.getAttribute('data-category');
+        if (category === 'all' || !rowCat || rowCat === category) {
+          row.style.display = '';
+          visibleCount++;
+        } else {
+          row.style.display = 'none';
+        }
+      });
+
+      const summaryEl = document.getElementById('dash-log-summary-text');
+      if (summaryEl) {
+        summaryEl.textContent = `عرض ${visibleCount} من أحدث العمليات المعتمدة`;
+      }
+    }
+
+    function renderDashboardLiveMetrics(filter = 'all', range = currentRange) {
+      const assetCounts = {
+        all: '1,293',
+        kkh: '540',
+        kash: '380',
+        dentistry: '165',
+        oncology: '208',
+        cardiac: '175',
+        admin: '110'
+      };
+
+      let liveRoundsCount = 0;
+      let livePermitsCount = 0;
+      let activeAlarms = 0;
+      let complianceRate = '100%';
+      let capaRate = '100%';
+      let achRate = 0;
+
+      if (window.KSUDataBridge) {
+        const metrics = window.KSUDataBridge.getFacilityMetrics(filter, range);
+        const kpis = window.KSUDataBridge.getLiveKPIs();
+        const targets = window.KSUDataBridge.getDepartmentTargets ? window.KSUDataBridge.getDepartmentTargets() : { dailyTotalRounds: 36 };
+        const storedRounds = window.KSUDataBridge.getRounds() || [];
+
+        liveRoundsCount = (metrics.achievedRounds > 0) ? metrics.achievedRounds : (range === 'month' || range === 'all' ? metrics.totalRoundsHistory : (metrics.achievedRounds || metrics.totalRoundsHistory || 0));
+        livePermitsCount = kpis.hotPermitsCount || 0;
+        activeAlarms = metrics.activeAlarmsCount || 0;
+        complianceRate = `${metrics.complianceRate || 100}%`;
+        capaRate = `${metrics.capaClosureRate || 100}%`;
+
+        const targetBase = Math.max(Number(targets.dailyTotalRounds) || 36, 1);
+        achRate = liveRoundsCount > 0 ? Math.min(100, Math.round((liveRoundsCount / targetBase) * 100)) : 0;
+
+        const staffEl = document.getElementById('map-active-staff-val');
+        if (staffEl && metrics.activeStaffCount) {
+          staffEl.textContent = `${metrics.activeStaffCount} ضابط ومفتش سلامة`;
+        }
+
+        const kkhMetrics = window.KSUDataBridge.getFacilityMetrics('kkh', range);
+        const kauhMetrics = window.KSUDataBridge.getFacilityMetrics('kash', range);
+        const dentalMetrics = window.KSUDataBridge.getFacilityMetrics('dentistry', range);
+        const oncMetrics = window.KSUDataBridge.getFacilityMetrics('oncology', range);
+
+        const elKkuh = document.getElementById('hosp-kkuh-rounds');
+        if (elKkuh) elKkuh.textContent = `${kkhMetrics.achievedRounds || kkhMetrics.totalRoundsHistory || 0} جولة منجزة`;
+        const elKauh = document.getElementById('hosp-kauh-rounds');
+        if (elKauh) elKauh.textContent = `${kauhMetrics.achievedRounds || kauhMetrics.totalRoundsHistory || 0} جولة منجزة`;
+        const elDental = document.getElementById('hosp-dental-rounds');
+        if (elDental) elDental.textContent = `${dentalMetrics.achievedRounds || dentalMetrics.totalRoundsHistory || 0} جولة منجزة`;
+        const elOnc = document.getElementById('hosp-onc-rounds');
+        if (elOnc) elOnc.textContent = `${oncMetrics.achievedRounds || oncMetrics.totalRoundsHistory || 0} جولة منجزة`;
+
+        const harvestRounds = (metrics.matchedRounds && metrics.matchedRounds.length > 0) ? metrics.matchedRounds : storedRounds.filter(r => window.KSUDataBridge.matchesFacility(r, filter));
+        renderAchievementHarvest(harvestRounds.length > 0 ? harvestRounds : storedRounds);
+
+        const tbody = document.getElementById('dashDispatchTableBody');
+        const summaryEl = document.getElementById('dash-log-summary-text');
+        if (tbody) {
+          if (storedRounds.length === 0) {
+            tbody.innerHTML = `
+              <tr id="dash-empty-state-row">
+                <td colspan="6" class="py-8 text-center text-slate-400 font-medium text-xs">
+                  لا توجد جولات تفتيشية مسجلة بعد — السجل جاهز لتوثيق جولات العمل الحقيقية لحظياً
+                </td>
+              </tr>
+            `;
+            if (summaryEl) summaryEl.textContent = 'بانتظار تسجيل أول جولة عمل ميدانية';
+          } else {
+            tbody.innerHTML = storedRounds.slice(0, 10).map(r => `
+              <tr class="hover:bg-slate-50 transition-colors" data-category="rounds">
+                <td class="py-3 px-4 font-bold text-[#082B49] font-mono">#${r.id || 'RND-LIVE'}</td>
+                <td class="py-3 px-4">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0">
+                      <span class="material-symbols-outlined text-sm">task_alt</span>
+                    </span>
+                    <div>
+                      <span class="font-bold text-slate-900 block">${r.formTitle || r.type || 'جولة تفتيش سلامة'}</span>
+                      <span class="text-[11px] text-slate-500 font-normal">${r.shift || 'الوردية الحالية'}</span>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3 px-4 text-slate-700 font-medium">${r.facility || r.hospital || r.building || 'المدينة الطبية'}</td>
+                <td class="py-3 px-4 text-center"><span class="font-extrabold text-emerald-700">${r.complianceRate || 100}%</span></td>
+                <td class="py-3 px-4 text-slate-800 font-medium">${r.inspector || r.inspectorName || 'مفتش السلامة'}</td>
+                <td class="py-3 px-4 text-center">
+                  <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-bold">
+                    معتمد
+                  </span>
+                </td>
+              </tr>
+            `).join('');
+            if (summaryEl) summaryEl.textContent = `عرض أحدث ${Math.min(storedRounds.length, 10)} من إجمالي ${storedRounds.length} جولة عمل معتمدة`;
+          }
+        }
+      }
+
+      const inspections = document.getElementById('dash-card-inspections');
+      if (inspections) inspections.textContent = liveRoundsCount.toLocaleString('en-US');
+
+      const donutTotal = document.getElementById('donut-total-achievements');
+      if (donutTotal) donutTotal.textContent = liveRoundsCount.toLocaleString('en-US');
+
+      const inspectionsSub = document.getElementById('dash-card-inspections-sub');
+      if (inspectionsSub) inspectionsSub.textContent = `المستهدف: ${achRate}%`;
+
+      const inspectionsBar = document.getElementById('dash-card-inspections-bar');
+      if (inspectionsBar) inspectionsBar.style.width = `${achRate}%`;
+
+      const complianceEl = document.getElementById('dash-card-compliance');
+      if (complianceEl) complianceEl.textContent = complianceRate;
+
+      const heroCompEl = document.getElementById('hero-compliance-val');
+      if (heroCompEl) heroCompEl.textContent = complianceRate;
+
+      const assetsEl = document.getElementById('dash-card-assets');
+      if (assetsEl) assetsEl.textContent = assetCounts[filter] || assetCounts.all;
+
+      const capaEl = document.getElementById('dash-card-capa');
+      if (capaEl) capaEl.textContent = capaRate;
+
+      const hotwork = document.getElementById('dash-card-hotwork');
+      if (hotwork) hotwork.textContent = livePermitsCount.toString();
+
+      const alarms = document.getElementById('dash-card-alarms');
+      if (alarms) alarms.textContent = activeAlarms.toString();
+    }
+
+    function applyFacilityFilter() {
+      const filter = document.getElementById('dashFacilityFilter').value;
+      renderDashboardLiveMetrics(filter, currentRange);
+    }
+
+    function setDateRange(range) {
+      currentRange = (range === 'q1') ? 'quarter' : range;
+      document.querySelectorAll('.dash-range-btn').forEach(btn => {
+        const btnRange = btn.getAttribute('data-range');
+        if (btnRange === range || (range === 'quarter' && btnRange === 'q1')) {
+          btn.className = 'dash-range-btn px-3 py-1.5 rounded-lg bg-[#082B49] text-white font-bold shadow-2xs transition-all cursor-pointer';
+        } else {
+          btn.className = 'dash-range-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-[#082B49] transition-all cursor-pointer';
+        }
+      });
+      renderDashboardLiveMetrics(document.getElementById('dashFacilityFilter')?.value || 'all', currentRange);
+    }
+
+    let currentPage = 1;
+    function paginateDispatch(direction) {
+      if (direction === 'next') {
+        currentPage++;
+      } else if (currentPage > 1) {
+        currentPage--;
+      }
+      const summaryEl = document.getElementById('dash-log-summary-text');
+      if (summaryEl) {
+        summaryEl.textContent = `صفحة ${currentPage} — عرض أحدث الإنجازات والعمليات المعتمدة`;
+      }
+    }
+
+    function getUserRoleCategory(user) {
+      if (!user) return 'field_inspector';
+      const role = (user.role || '').toLowerCase();
+      const id = user.id || '';
+      const p = user.permissions || {};
+
+      if (id === 'USR-01' || role.includes('admin') || role.includes('مسؤول ومطور') || p.manageUsers) {
+        return 'admin';
+      }
+      if (id === 'USR-02' || id === 'USR-04' || role.includes('رئيس') || role.includes('مدير')) {
+        return 'executive';
+      }
+      if (id === 'USR-03' || role.includes('أخصائي') || role.includes('جودة') || role.includes('سباهي')) {
+        return 'quality';
+      }
+      if (id === 'USR-05' || id === 'USR-12' || id === 'USR-17' || role.includes('مشرف') || p.approveReports) {
+        return 'shift_supervisor';
+      }
+      return 'field_inspector';
+    }
+
+    function updateDashboardUserProfile() {
+      let user = null;
+      const isLoggedOut = localStorage.getItem('ksu_user_logged_out') === 'true';
+      const savedActive = localStorage.getItem('ksu_active_user');
+      if (savedActive && !isLoggedOut) {
+        try { user = JSON.parse(savedActive); } catch(e) {}
+      }
+      const nameEl = document.getElementById('dash-user-name');
+      const roleEl = document.getElementById('dash-user-role');
+      const avatarEl = document.getElementById('dash-user-avatar');
+
+      if (isLoggedOut || !user) {
+        if (nameEl) nameEl.textContent = 'تسجيل الدخول الموحد';
+        if (roleEl) roleEl.textContent = 'انقر للدخول بالحساب الجامعي';
+        if (avatarEl) avatarEl.textContent = '?';
+        return;
+      }
+
+      const roleCat = getUserRoleCategory(user);
+      if (roleCat === 'field_inspector') {
+        alert('تنبيه: شاشة التحليلات المركزية (DASH) مخصصة للإدارة والمشرفين والجودة. يتم توجيهك إلى بوابة الجولات الميدانية...');
+        window.location.replace('index.html#field-inspection-rounds');
+        return;
+      }
+
+      const name = user.name || 'أ. علي سليمان الصقري';
+      const role = user.role || 'المشرف العام ومطور النظام';
+      const words = name.replace(/^(أ\.|م\.|د\.|فني\.)\s*/, '').trim().split(' ');
+      const initial = words[0] ? words[0].charAt(0) : 'ص';
+
+      if (nameEl) nameEl.textContent = name;
+      if (roleEl) roleEl.textContent = role;
+      if (avatarEl) avatarEl.textContent = initial;
+    }
+
+    function renderDirectorSafetyReports() {
+      const container = document.getElementById('director-safety-reports-list');
+      const badge = document.getElementById('director-pending-reports-badge');
+      if (!container) return;
+
+      let reports = [];
+      try {
+        reports = JSON.parse(localStorage.getItem('ksumc_safety_dept_reports') || '[]') || [];
+      } catch (e) { reports = []; }
+
+      reports = reports.filter(r => r && r.id && !(String(r.id).startsWith('REP-KKUH-') && !r.subject));
+      const directorItems = reports.filter(r => r.workflowStage === 'pending_director' || r.headDecision === 'forwarded_to_director' || r.workflowStage === 'approved_by_director');
+      const pendingCount = directorItems.filter(r => r.workflowStage !== 'approved_by_director').length;
+
+      if (badge) {
+        badge.textContent = `${pendingCount} بانتظار التوجيه التنفيذي`;
+      }
+
+      if (directorItems.length === 0) {
+        container.innerHTML = `
+          <div class="p-4 rounded-xl glass-light-well border border-dashed border-amber-200 text-center text-xs text-slate-500 font-medium">
+            لا توجد تقارير سلامة موجهة للمدير العام للسلامة والأمن حالياً (0).
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = directorItems.map(r => {
+        const isApproved = r.workflowStage === 'approved_by_director';
+        return `
+          <div class="p-4 rounded-xl glass-light-well border ${isApproved ? 'border-emerald-200 bg-emerald-50/40' : 'border-amber-200 bg-amber-50/50'} flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div class="space-y-1.5 flex-1">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-mono text-xs font-bold px-2 py-0.5 rounded bg-[#082B49] text-white">${r.id}</span>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${isApproved ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-900 border border-amber-300'}">
+                  ${isApproved ? '🏅 معتمد من المدير العام ومحفوظ بالأرشيف' : '🏛️ موجه للمدير العام للسلامة والأمن للتوجيه'}
+                </span>
+                <span class="text-xs font-mono text-slate-500">${r.date || ''} ${r.time || ''}</span>
+              </div>
+              <h3 class="text-sm font-bold text-[#082B49]">${r.subject || 'تقرير سلامة ميداني'}</h3>
+              <p class="text-xs text-slate-600">${r.details || '-'} | <strong class="text-slate-800">الإجراء:</strong> ${r.action || '-'}</p>
+              <p class="text-xs text-slate-500">الموقع: <strong class="text-slate-700">${r.building || 'المستشفى'} (${r.floor || '-'})</strong> • رافع التقرير: <strong class="text-slate-700">${r.inspector || 'مفتش السلامة'}</strong></p>
+              ${r.supNotes ? `<p class="text-xs text-[#082B49] bg-sky-50 px-3 py-1 rounded-lg border border-sky-200 font-bold">🔹 مرئيات المشرف العام: ${r.supNotes}</p>` : ''}
+              ${r.headNotes ? `<p class="text-xs text-[#1E667F] bg-teal-50 px-3 py-1 rounded-lg border border-teal-200 font-bold">🔸 مرئيات رئيس إدارة السلامة: ${r.headNotes}</p>` : ''}
+              ${r.directorNotes ? `<p class="text-xs text-amber-900 bg-amber-100 px-3 py-1 rounded-lg border border-amber-300 font-bold">🏅 توجيه المدير العام: ${r.directorNotes}</p>` : ''}
+            </div>
+            <div class="flex flex-col sm:flex-row lg:flex-col gap-2 shrink-0 min-w-[220px]">
+              ${!isApproved ? `
+                <input type="text" id="dash-dir-note-${r.id}" placeholder="توجيه المدير العام..." class="glass-light-select p-2 rounded-lg text-xs" />
+                <button type="button" onclick="approveSafetyReportByDirector('${r.id}')" class="px-3.5 py-2 rounded-lg bg-[#082B49] hover:bg-[#0c395f] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer">
+                  <span class="material-symbols-outlined text-sm text-amber-300">verified</span>
+                  <span>اعتماد التوجيه والحفظ</span>
+                </button>
+              ` : `
+                <span class="px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs text-center">
+                  ✓ معتمد ومحفوظ بالأرشيف
+                </span>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function approveSafetyReportByDirector(reportId) {
+      let reports = [];
+      try { reports = JSON.parse(localStorage.getItem('ksumc_safety_dept_reports') || '[]') || []; } catch (e) {}
+      const idx = reports.findIndex(x => String(x.id) === String(reportId));
+      if (idx === -1) return;
+      const noteEl = document.getElementById('dash-dir-note-' + reportId);
+      const note = noteEl ? noteEl.value.trim() : '';
+      const nowIso = new Date().toISOString();
+
+      reports[idx].workflowStage = 'approved_by_director';
+      reports[idx].directorDecision = 'approved_and_archived';
+      reports[idx].directorRouting = 'اعتماد وحفظ في الأرشيف المرجعي';
+      reports[idx].directorNotes = note || 'يُعتمد التوجيه ويُحفظ في الأرشيف المرجعي الشامل.';
+      reports[idx].directorReviewedAt = nowIso.split('T')[0];
+      reports[idx].headApprovalStatus = 'approved_by_director';
+      reports[idx].status = 'معتمد من المدير العام ومحفوظ بالأرشيف';
+      reports[idx].updatedAt = nowIso;
+      reports[idx].updatedAtMs = Date.now();
+
+      localStorage.setItem('ksumc_safety_dept_reports', JSON.stringify(reports));
+      if (window.KSUOracleSync && typeof window.KSUOracleSync.saveSafetyDeptReport === 'function') {
+        window.KSUOracleSync.saveSafetyDeptReport(reports[idx]).catch(() => {});
+      }
+      if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncSafetyDeptReport === 'function') {
+        window.ksuFirebaseSync.syncSafetyDeptReport(reports[idx]);
+      }
+      renderDirectorSafetyReports();
+      alert('🏅 تم اعتماد التقرير من سعادة المدير العام للسلامة والأمن بنجاح.');
+    }
+    window.renderDirectorSafetyReports = renderDirectorSafetyReports;
+    window.approveSafetyReportByDirector = approveSafetyReportByDirector;
+
+    // Initialization on Page Load
+    updateDashboardUserProfile();
+    renderDashboardLiveMetrics('all', currentRange);
+    renderDirectorSafetyReports();
+    triggerLiveSync();
+
+    window.addEventListener('storage', () => {
+      renderDashboardLiveMetrics(document.getElementById('dashFacilityFilter')?.value || 'all', currentRange);
+      renderDirectorSafetyReports();
+    });
+    window.addEventListener('ksumc_data_updated', () => {
+      renderDashboardLiveMetrics(document.getElementById('dashFacilityFilter')?.value || 'all', currentRange);
+      renderDirectorSafetyReports();
+    });
+    window.addEventListener('ksumc_rounds_updated', () => {
+      renderDashboardLiveMetrics(document.getElementById('dashFacilityFilter')?.value || 'all', currentRange);
+      renderDirectorSafetyReports();
+    });
+  </script>
+
+  <!-- Service Worker Registration for PWA Offline Functionality -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => console.log('[KSUMC PWA] Service Worker registered:', reg.scope))
+          .catch((err) => console.warn('[KSUMC PWA] Service Worker registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>

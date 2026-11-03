@@ -1,0 +1,162 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": false,
+
+    "users": {
+      ".read": true,
+      ".indexOn": ["username", "empId", "roleCategory", "shift", "status"],
+      "$userId": {
+        ".write": "newData.exists()",
+        ".validate": "(newData.hasChildren(['id', 'name']) || newData.hasChildren(['username'])) && !newData.hasChildren(['password']) && (!newData.hasChild('id') || (newData.child('id').isString() && newData.child('id').val().length < 100))"
+      }
+    },
+
+    "ksumc_users": {
+      ".read": true,
+      "$userId": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['id']) && !newData.hasChildren(['password']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+      }
+    },
+
+    "rounds": {
+      ".read": true,
+      ".indexOn": ["timestamp", "inspectorName", "facility", "building", "checklistType", "status"],
+      "$roundId": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+      }
+    },
+
+    "shift_inspection_logs": {
+      ".read": true,
+      ".indexOn": ["timestamp", "date", "shift", "supervisor"],
+      "$logId": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['id', 'timestamp', 'date', 'shift']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+      }
+    },
+
+    "safety_dept_reports": {
+      ".read": true,
+      ".indexOn": ["timestamp", "date", "facility", "shift"],
+      "$reportId": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['id', 'timestamp', 'date', 'shift']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+      }
+    },
+
+    "compliance_registry": {
+      ".read": true,
+      ".indexOn": ["standard", "status", "category"],
+      "$recordId": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['id', 'standard', 'status']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+      }
+    },
+
+    "doors": {
+      ".read": true,
+      ".indexOn": ["timestamp", "doorId", "status", "building"],
+      "$doorId": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['id']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+      }
+    },
+
+    "permits": {
+      ".read": true,
+      ".indexOn": ["timestamp", "permitType", "status", "building"],
+      "$permitId": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['id']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+      }
+    },
+
+    "alarms": {
+      ".read": true,
+      ".indexOn": ["timestamp", "alarmCode", "status", "building"],
+      "$alarmId": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['id']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+      }
+    },
+
+    "shift_incidents": {
+      ".read": true,
+      ".indexOn": ["timestamp", "severity", "status", "location"],
+      "$incidentId": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['id', 'timestamp', 'severity']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+      }
+    },
+
+    "incidents": {
+      ".read": true,
+      ".indexOn": ["timestamp", "severity", "status"],
+      "$incidentId": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+      }
+    },
+
+    "safety_violations": {
+      ".read": true,
+      ".indexOn": ["timestamp", "severity", "status", "building"],
+      "$violId": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+      }
+    },
+
+    "smoking_violations": {
+      ".read": true,
+      ".indexOn": ["timestamp", "status", "building"],
+      "$violId": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+      }
+    },
+
+    "department_targets": {
+      ".read": true,
+      ".write": "newData.exists()"
+    },
+
+    "capa_records": {
+      ".read": true,
+      ".indexOn": ["timestamp", "dueDate", "status", "severity", "building"],
+      "$capaId": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+      }
+    },
+
+    "notifications": {
+      ".read": true,
+      ".indexOn": ["timestamp", "priority", "targetRole"],
+      "$notifId": {
+        ".write": true,
+        ".validate": "newData.hasChildren(['id', 'timestamp']) || !newData.exists()"
+      }
+    },
+
+    "system_status": {
+      ".read": true,
+      ".write": false,
+      "lastUpdate": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['timestamp'])"
+      },
+      "shiftLogResetAt": {
+        ".write": "newData.exists()",
+        ".validate": "newData.hasChildren(['timestamp'])"
+      },
+      "prodCleanVersion": {
+        ".write": "newData.exists()",
+        ".validate": "newData.isString() && newData.val().length < 100"
+      }
+    }
+  }
+}
