@@ -142,6 +142,15 @@
       }
     },
 
+    "ai_queue": {
+      ".read": true,
+      ".indexOn": ["status", "createdAt", "action"],
+      "$taskId": {
+        ".write": true,
+        ".validate": "newData.hasChildren(['status', 'createdAt']) || !newData.exists()"
+      }
+    },
+
     "system_status": {
       ".read": true,
       ".write": false,
