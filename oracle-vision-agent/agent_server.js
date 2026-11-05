@@ -100,34 +100,15 @@ function extractJsonObject(rawText) {
   }
 }
 
-function buildVisionPrompt(ctx, req) {
-  return `أنت خبير واستشاري السلامة والحماية من الحريق بالمدينة الطبية بجامعة الملك سعود (KSUMC).
-قم بتقييم الصورة/الصور المرفقة وفق المعايير والأنظمة التالية بدقة صارمة:
-1. معايير المركز السعودي لاعتماد المنشآت الصحية (CBAHI - معايير السلامة وإدارة المرافق FMS، وبخاصة FMS.04، FMS.05، FMS.07، FMS.11، FMS.14).
-2. كود الحريق الوطني وكود البناء السعودي (SBC 801 / SBC 201).
-3. مواصفات الجمعية الوطنية للحماية من الحرائق (NFPA 72 لوحات الإنذار، NFPA 101 مسالك الهروب، NFPA 99، NFPA 10 طفايات الحريق، NFPA 13 رشاشات المياه).
-4. لائحة مكافحة التدخين بالمنشآت الحكومية والصحية (المرسوم الملكي م/56).
-
-التاريخ الفعلي للمعاينة بتوقيت الرياض: ${ctx.currentDate} (عام ${ctx.year}) والوقت: ${ctx.currentTime}.
-سياق الفحص: المنشأة: ${req.facility || 'المدينة الطبية (KSUMC)'} | المبنى: ${req.building || ''} | الدور: ${req.floor || ''} | نوع الفحص: ${req.checklistType || 'general'} | البند/الغرفة: ${req.itemLabel || ''}
-ملاحظات المفتش الميداني: ${req.notes || 'لا توجد ملاحظات إضافية'}
-
-أجب بصيغة JSON نظيفة وصحيحة فقط على الشكل التالي:
-{
-  "hazard_detected": true,
-  "compliance_status": "مطابق" أو "غير مطابق" أو "ملاحظة حرجة" أو "تحذير وقائي",
-  "risk_level": "عالي جداً" أو "عالي" أو "متوسط" أو "منخفض" أو "آمن",
-  "confidence_score": 96,
-  "detected_element": "وصف دقيق للمعدة أو العنصر أو الخطر الظاهر في الصورة",
-  "detected_devices": ["قائمة بالأجهزة المخالفة إن وجدت"],
-  "findings_summary": "ملخص الملاحظات والمخاطر المكتشفة بأسلوب هندسي ورقابي رصين",
-  "violations_list": ["قائمة بالمخالفات بالتفصيل إن وجدت"],
-  "corrective_actions": ["قائمة بالإجراءات التصحيحية والوقائية الفورية المطلوبة CAPA"],
-  "standard_reference": "المعيار النظامي المرجعي (مثال: CBAHI FMS.04 أو NFPA 101 أو SBC 801)",
-  "inspector_recommendation": "توجيه مهني فوري للمفتش الميداني",
-  "suggested_directive": "التوجيه الإداري المقترح لمدير إدارة السلامة"
-}`;
-}
+const {
+  resolveSubmode,
+  buildVisionPrompt,
+  buildExtinguisherPrompt,
+  buildExitPrompt,
+  buildHazardPrompt,
+  buildGeneralPrompt,
+  sanitizeVisionOutput
+} = require('./prompt_builder.js');
 
 async function callQwenApiVision(images, prompt) {
   if (!CONFIG.qwenKeys.length) throw new Error('لم يتم إدخال QWEN_API_KEYS بعد');
@@ -345,9 +326,11 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 400, { detail: 'لم يتم إرفاق أي صورة للفحص' });
       }
 
+      const submode = resolveSubmode(body.submode, body.checklistType);
+
       const hash = crypto.createHash('sha256');
       for (const img of images) hash.update(img.slice(0, 4096));
-      hash.update(`${body.checklistType}|${body.building}|${body.floor}|${body.notes}`);
+      hash.update(`${submode}|${body.checklistType}|${body.building}|${body.floor}|${body.notes}`);
       const cacheKey = hash.digest('hex');
 
       const cached = ANALYSIS_CACHE.get(cacheKey);
@@ -361,7 +344,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const ctx = getRiyadhContext();
-      const prompt = buildVisionPrompt(ctx, body);
+      const prompt = buildVisionPrompt(ctx, { ...body, submode });
       const errors = [];
 
       for (const provider of CONFIG.priority) {
@@ -381,13 +364,14 @@ const server = http.createServer(async (req, res) => {
             continue;
           }
 
-          parsed.ai_engine_source = sourceLabel;
+          const cleanData = sanitizeVisionOutput(parsed, ctx, submode);
+          cleanData.ai_engine_source = sourceLabel;
           STATE.lastProviderUsed = sourceLabel;
-          ANALYSIS_CACHE.set(cacheKey, { ts: Date.now(), data: parsed, source: sourceLabel });
+          ANALYSIS_CACHE.set(cacheKey, { ts: Date.now(), data: cleanData, source: sourceLabel });
 
           return sendJson(res, 200, {
             success: true,
-            data: parsed,
+            data: cleanData,
             source: sourceLabel
           });
         } catch (err) {
@@ -407,10 +391,21 @@ const server = http.createServer(async (req, res) => {
   return sendJson(res, 404, { detail: 'المسار غير موجود في وكيل الرؤية البصرية' });
 });
 
-server.listen(CONFIG.port, '0.0.0.0', () => {
-  console.log('=====================================================================');
-  console.log(`   وكيل الرؤية البصرية الذكي (Qwen2.5-VL Agent) يعمل على المنفذ ${CONFIG.port}`);
-  console.log(`   - لوحة حالة الوكيل:  http://localhost:${CONFIG.port}/`);
-  console.log(`   - نقطة ربط المنصة:   http://localhost:${CONFIG.port}/safety/api`);
-  console.log('=====================================================================');
-});
+if (require.main === module) {
+  server.listen(CONFIG.port, '0.0.0.0', () => {
+    console.log('=====================================================================');
+    console.log(`   وكيل الرؤية البصرية الذكي (Qwen2.5-VL Agent) يعمل على المنفذ ${CONFIG.port}`);
+    console.log(`   - لوحة حالة الوكيل:  http://localhost:${CONFIG.port}/`);
+    console.log(`   - نقطة ربط المنصة:   http://localhost:${CONFIG.port}/safety/api`);
+    console.log('=====================================================================');
+  });
+}
+
+module.exports = {
+  server,
+  CONFIG,
+  STATE,
+  buildVisionPrompt,
+  sanitizeVisionOutput,
+  resolveSubmode
+};

@@ -113,6 +113,7 @@ ANALYSIS_CACHE: Dict[str, Dict[str, Any]] = {}
 class VisionAnalysisRequest(BaseModel):
     image: Optional[str] = ""
     images: Optional[List[str]] = None
+    submode: Optional[str] = "general"
     checklistType: Optional[str] = "general"
     itemLabel: Optional[str] = ""
     facility: Optional[str] = "المدينة الطبية (KSUMC)"
@@ -228,9 +229,34 @@ def extract_json_object(raw_text: str) -> Dict[str, Any]:
         raise
 
 
-def sanitize_vision_output(parsed_data: Dict[str, Any], riyadh_ctx: Dict[str, Any]) -> Dict[str, Any]:
+def resolve_submode(submode: Optional[str] = None, checklist_type: Optional[str] = None) -> str:
+    if submode and isinstance(submode, str) and submode.strip():
+        s = submode.strip().lower()
+        if s in ("extinguisher", "emergency_exit", "hazard", "general"):
+            return s
+        if s == "exit":
+            return "emergency_exit"
+
+    if checklist_type and isinstance(checklist_type, str) and checklist_type.strip():
+        c = checklist_type.strip().lower()
+        if any(w in c for w in ("extinguisher", "طفاية", "طفايات", "إطفاء")):
+            return "extinguisher"
+        if any(w in c for w in ("exit", "مخرج", "مخارج", "طوارئ", "إخلاء", "evacuation")):
+            return "emergency_exit"
+        if any(w in c for w in ("hazard", "كهرباء", "electrical", "panel", "heating", "سخان", "أجهزة")):
+            return "hazard"
+
+    return "general"
+
+
+def sanitize_vision_output(
+    parsed_data: Dict[str, Any],
+    riyadh_ctx: Dict[str, Any],
+    submode: str = "general",
+) -> Dict[str, Any]:
     """تطهير مخرجات النموذج من أي هلوسة بخصوص التاريخ وتوحيد الحقول للواجهة"""
-    cur_date = riyadh_ctx["currentDate"]
+    cur_date = riyadh_ctx.get("currentDate", datetime.now(RIYADH_TZ).strftime("%Y-%m-%d"))
+    target_submode = resolve_submode(submode or parsed_data.get("submode"), parsed_data.get("checklistType"))
 
     def clean_txt(txt: Any) -> Any:
         if not txt or not isinstance(txt, str):
@@ -249,6 +275,8 @@ def sanitize_vision_output(parsed_data: Dict[str, Any], riyadh_ctx: Dict[str, An
             for v in parsed_data["violations_list"]
             if v and "عدم دقة الوقت والتاريخ" not in str(v) and "تاريخ مستقبلي" not in str(v)
         ]
+    else:
+        parsed_data["violations_list"] = []
 
     if isinstance(parsed_data.get("corrective_actions"), list):
         parsed_data["corrective_actions"] = [
@@ -256,18 +284,18 @@ def sanitize_vision_output(parsed_data: Dict[str, Any], riyadh_ctx: Dict[str, An
             for c in parsed_data["corrective_actions"]
             if c and "ضبط وتحديث الوقت والتاريخ" not in str(c) and "تاريخ مستقبلي" not in str(c)
         ]
+    else:
+        parsed_data["corrective_actions"] = ["استمرار المتابعة الدورية وتوثيق الفحص"]
+
+    parsed_data["submode"] = target_submode
 
     # ضمان وجود جميع الحقول المطلوبة لواجهة الراصد البصري الذكي
     defaults = {
-        "hazard_detected": False,
-        "compliance_status": "مطابق",
-        "risk_level": "منخفض",
+        "compliance_status": "غير مطابق" if parsed_data["violations_list"] else "مطابق",
+        "risk_level": "متوسط" if parsed_data["violations_list"] else "منخفض",
         "confidence_score": 95,
         "detected_element": "عنصر / معدة سلامة ميدانية",
-        "detected_devices": [],
         "findings_summary": "تم فحص الموقع وتدقيق الاشتراطات الهندسية وفق معايير CBAHI FMS و NFPA.",
-        "violations_list": [],
-        "corrective_actions": ["استمرار المتابعة الدورية وتوثيق الفحص"],
         "standard_reference": "CBAHI FMS / SBC 801 / NFPA",
         "inspector_recommendation": "توثيق الحالة في محضر الجولة الميدانية",
         "suggested_directive": "التأكيد على استدامة الجاهزية التشغيلية",
@@ -276,10 +304,235 @@ def sanitize_vision_output(parsed_data: Dict[str, Any], riyadh_ctx: Dict[str, An
         if k not in parsed_data or parsed_data[k] is None:
             parsed_data[k] = v
 
+    # Submode specific defaults
+    if target_submode == "extinguisher":
+        if "gauge_status" not in parsed_data or not parsed_data["gauge_status"]:
+            parsed_data["gauge_status"] = "unknown"
+        if "gauge_description" not in parsed_data:
+            parsed_data["gauge_description"] = ""
+        parsed_data["tag_detected"] = bool(parsed_data.get("tag_detected", False))
+        parsed_data["tag_last_date"] = parsed_data.get("tag_last_date") or ""
+        parsed_data["tag_valid"] = bool(parsed_data.get("tag_valid", False))
+        parsed_data["pin_and_seal_intact"] = bool(parsed_data.get("pin_and_seal_intact", True))
+        if "extinguisher_type" not in parsed_data or not parsed_data["extinguisher_type"]:
+            parsed_data["extinguisher_type"] = "بودرة جافة (Dry Powder)"
+        if not parsed_data.get("standard_reference") or parsed_data["standard_reference"] == "CBAHI FMS / SBC 801 / NFPA":
+            parsed_data["standard_reference"] = "CBAHI FMS.04 / NFPA 10 / SBC 801"
+    elif target_submode == "emergency_exit":
+        parsed_data["door_wedged"] = bool(parsed_data.get("door_wedged", False))
+        parsed_data["exit_clear"] = bool(parsed_data.get("exit_clear", not parsed_data["door_wedged"]))
+        try:
+            parsed_data["exit_obstruction_percent"] = int(parsed_data.get("exit_obstruction_percent", 25 if parsed_data["door_wedged"] else 0))
+        except (ValueError, TypeError):
+            parsed_data["exit_obstruction_percent"] = 25 if parsed_data["door_wedged"] else 0
+        if "sign_illuminated" not in parsed_data:
+            parsed_data["sign_illuminated"] = "unknown"
+        if not parsed_data.get("standard_reference") or parsed_data["standard_reference"] == "CBAHI FMS / SBC 801 / NFPA":
+            parsed_data["standard_reference"] = "CBAHI FMS.14 / NFPA 101 / NFPA 80 / SBC 801"
+    elif target_submode == "hazard":
+        parsed_data["hazard_detected"] = bool(parsed_data.get("hazard_detected", bool(parsed_data["violations_list"])))
+        parsed_data["clearance_violation_36in"] = bool(parsed_data.get("clearance_violation_36in", False))
+        if not isinstance(parsed_data.get("detected_devices"), list):
+            parsed_data["detected_devices"] = []
+        if "hazard_type" not in parsed_data or not parsed_data["hazard_type"]:
+            parsed_data["hazard_type"] = "other"
+        if not parsed_data.get("standard_reference") or parsed_data["standard_reference"] == "CBAHI FMS / SBC 801 / NFPA":
+            parsed_data["standard_reference"] = "CBAHI FMS.07 / NFPA 70 / SBC 801"
+
+    # Cross-safe guarantees
+    if "gauge_status" not in parsed_data:
+        parsed_data["gauge_status"] = "unknown"
+    if "tag_detected" not in parsed_data:
+        parsed_data["tag_detected"] = False
+    if "tag_valid" not in parsed_data:
+        parsed_data["tag_valid"] = False
+    if "pin_and_seal_intact" not in parsed_data:
+        parsed_data["pin_and_seal_intact"] = True
+    if "door_wedged" not in parsed_data:
+        parsed_data["door_wedged"] = False
+    if "exit_clear" not in parsed_data:
+        parsed_data["exit_clear"] = True
+    if "exit_obstruction_percent" not in parsed_data:
+        parsed_data["exit_obstruction_percent"] = 0
+    if "hazard_detected" not in parsed_data:
+        parsed_data["hazard_detected"] = bool(parsed_data["violations_list"])
+    if "clearance_violation_36in" not in parsed_data:
+        parsed_data["clearance_violation_36in"] = False
+    if "detected_devices" not in parsed_data or not isinstance(parsed_data.get("detected_devices"), list):
+        parsed_data["detected_devices"] = []
+
     return parsed_data
 
 
-def build_vision_prompt(
+def build_extinguisher_prompt(
+    riyadh_ctx: Dict[str, Any],
+    facility: str,
+    building: str,
+    floor: str,
+    item_label: str,
+    notes: str,
+) -> str:
+    current_date = riyadh_ctx.get("currentDate", "2026-11-05")
+    year = riyadh_ctx.get("year", 2026)
+    current_time = riyadh_ctx.get("currentTime", "11:00 AM")
+
+    return f"""أنت خبير واستشاري السلامة والحماية من الحريق بالمدينة الطبية بجامعة الملك سعود (KSUMC) المتخصص في فحص طفايات الحريق وفق معايير CBAHI FMS.04 وكود الحريق SBC 801 ومواصفات NFPA 10.
+
+التاريخ الفعلي الحالي للمعاينة بتوقيت الرياض: {current_date} (عام {year}) والوقت: {current_time}.
+سياق الفحص: المنشأة: {facility} | المبنى: {building} | الدور: {floor} | البند/الطفاية: {item_label}
+ملاحظات المفتش: {notes or 'لا توجد ملاحظات إضافية'}
+
+مهمتك فحص الصورة المرفقة واستخراج البيانات الفنية بدقة هندسية صارمة:
+1. مقياس الضغط (Pressure Gauge):
+   - افحص موقع إبرة العداد:
+     * "green": إذا كانت الإبرة داخل المنطقة الخضراء السليمة (Green Zone / 100-195 psi).
+     * "undercharge": إذا كانت الإبرة على اليسار في المنطقة الحمراء السفلية (ضغط منخفض بحاجة لإعادة تعبئة).
+     * "overcharge": إذا كانت الإبرة على اليمين في المنطقة الحمراء العلوية (ضغط زائد خطر).
+     * "unknown": إذا كان العداد غير واضح، أو طفاية CO2 بدون عداد، أو الصورة غير واضحة. لا تخمّن أبداً.
+   - اكتب وصفاً دقيقاً في gauge_description.
+
+2. بطاقة الفحص والصيانة الدورية (Inspection / Maintenance Tag):
+   - تحقق من وجود بطاقة الفحص: tag_detected (true/false).
+   - اقرأ آخر تاريخ صيانة مسجل على البطاقة بصيغة YYYY-MM في tag_last_date (مثال: "2026-08"). إذا لم يظهر، ضعه null أو "".
+   - قارن التاريخ مع تاريخ اليوم الفعلي بتوقيت الرياض ({current_date}):
+     * إذا كان تاريخ الصيانة أقدم من سنة (12 شهراً للصيانة السنوية) أو أقدم من شهر للفحص الدوري الشهري، فالبطاقة منتهية (tag_valid: false).
+     * إذا كان التاريخ ضمن الفترة النظامية السارية: tag_valid: true.
+     * إذا لم تكتشف بطاقة: tag_valid: false.
+
+3. مسمار الأمان والختم البلاستيكي (Safety Pin and Tamper Seal):
+   - تحقق هل مسمار الأمان وسلك الختم البلاستيكي سليمين ومثبتين بإحكام: pin_and_seal_intact (true/false).
+
+4. نوع الطفاية (Extinguisher Type):
+   - حدد نوع الطفاية بدقة في extinguisher_type: "بودرة جافة (Dry Powder)" أو "ثاني أكسيد الكربون (CO2)" أو "رغوة (Foam)" أو "ماء (Water)" أو "غاز نظيف (Clean Agent)".
+
+5. التقييم النهائي:
+   - compliance_status: "مطابق" (إذا كان العداد أخضر والبطاقة سارية والختم سليم) أو "غير مطابق" في حال أي خلل.
+   - risk_level: "منخفض" | "متوسط" | "عالي" | "عالي جداً".
+   - standard_reference: "CBAHI FMS.04 / NFPA 10 / SBC 801".
+
+أجب حصراً بكائن JSON نظيف وبدون أي نصوص مسبقة أو لاحقة:
+{{
+  "submode": "extinguisher",
+  "gauge_status": "green" | "undercharge" | "overcharge" | "unknown",
+  "gauge_description": "وصف دقيق لمؤشر مقياس الضغط",
+  "tag_detected": true,
+  "tag_last_date": "YYYY-MM",
+  "tag_valid": true,
+  "pin_and_seal_intact": true,
+  "extinguisher_type": "بودرة جافة (Dry Powder)",
+  "compliance_status": "مطابق",
+  "risk_level": "منخفض",
+  "confidence_score": 95,
+  "detected_element": "طفاية حريق",
+  "findings_summary": "ملخص الفحص الفني للطفاية",
+  "violations_list": [],
+  "corrective_actions": [],
+  "standard_reference": "CBAHI FMS.04 / NFPA 10 / SBC 801"
+}}"""
+
+
+def build_exit_prompt(
+    riyadh_ctx: Dict[str, Any],
+    facility: str,
+    building: str,
+    floor: str,
+    item_label: str,
+    notes: str,
+) -> str:
+    current_date = riyadh_ctx.get("currentDate", "2026-11-05")
+    year = riyadh_ctx.get("year", 2026)
+    current_time = riyadh_ctx.get("currentTime", "11:00 AM")
+
+    return f"""أنت خبير واستشاري السلامة والحماية من الحريق بالمدينة الطبية بجامعة الملك سعود (KSUMC) المتخصص في فحص مخارج الطوارئ ومسالك الهروب وفق معايير CBAHI FMS.14 وكود SBC 801 ومواصفات NFPA 101 و NFPA 80 للأبواب المقاومة للحريق.
+
+التاريخ الفعلي الحالي للمعاينة بتوقيت الرياض: {current_date} (عام {year}) والوقت: {current_time}.
+سياق الفحص: المنشأة: {facility} | المبنى: {building} | الدور: {floor} | البند/المخرج: {item_label}
+ملاحظات المفتش: {notes or 'لا توجد ملاحظات إضافية'}
+
+مهمتك تقييم الصورة المرفقة لمخرج الطوارئ والمسار بدقة بالغة:
+1. احتجاز الباب بأوتاد أو مخامد (Door Wedges / Propped Doors):
+   - تحقق هل باب الطوارئ محتجز بقطعة خشبية، وتد، سلة مهملات، أو أي أداة تمنع إغلاقه التلقائي الذاتي (مخالفة صريحة لكود NFPA 80 الخاص بأبواب الحريق): door_wedged (true/false).
+2. خلو المسار والمخرج ونسبة الانسداد (Clearance & Obstruction Percentage):
+   - هل مخرج الطوارئ سالك تماماً وبدون عوائق: exit_clear (true/false).
+   - احسب أو قدّر نسبة انسداد عرض المسار بالنسبة المئوية من 0 إلى 100: exit_obstruction_percent (0-100). إذا كان سالكاً تماماً تكون القيمة 0.
+3. لوحة مخرج الطوارئ المضيئة (Illuminated Exit Sign):
+   - تحقق من وجود لوحة مخرج الطوارئ وإنارتها: sign_illuminated (true / false / "unknown").
+4. التقييم الهندسي:
+   - compliance_status: "غير مطابق" إذا كان الباب محتجزاً (door_wedged: true) أو كان هناك عائق في المسار (exit_obstruction_percent > 0)، و"مطابق" إذا كان سالكاً ومغلقاً ذاتياً.
+   - risk_level: "عالي جداً" إذا كان المخرج مغلقاً بقفل، "عالي" إذا كان محتجزاً بوتد أثناء العمل، "متوسط" إذا كان هناك عائق جزئي، "منخفض" إذا كان مطابقاً.
+   - standard_reference: "CBAHI FMS.14 / NFPA 101 / NFPA 80 / SBC 801".
+
+أجب حصراً بكائن JSON نظيف وصحيح:
+{{
+  "submode": "emergency_exit",
+  "door_wedged": false,
+  "exit_clear": true,
+  "exit_obstruction_percent": 0,
+  "sign_illuminated": true,
+  "compliance_status": "مطابق",
+  "risk_level": "منخفض",
+  "confidence_score": 95,
+  "detected_element": "مخرج طوارئ وباب مقاوم للحريق",
+  "findings_summary": "ملخص فحص مخرج الطوارئ ومسار الإخلاء",
+  "violations_list": [],
+  "corrective_actions": [],
+  "standard_reference": "CBAHI FMS.14 / NFPA 101 / NFPA 80 / SBC 801"
+}}"""
+
+
+def build_hazard_prompt(
+    riyadh_ctx: Dict[str, Any],
+    facility: str,
+    building: str,
+    floor: str,
+    item_label: str,
+    notes: str,
+) -> str:
+    current_date = riyadh_ctx.get("currentDate", "2026-11-05")
+    year = riyadh_ctx.get("year", 2026)
+    current_time = riyadh_ctx.get("currentTime", "11:00 AM")
+
+    return f"""أنت خبير واستشاري السلامة والحماية من الحريق بالمدينة الطبية بجامعة الملك سعود (KSUMC) المتخصص في كشف المخاطر الكهربائية والحرارية والمواد القابلة للاشتعال وفق معايير CBAHI FMS.07 وكود الكهرباء NFPA 70 / SBC 401 وكود SBC 801.
+
+التاريخ الفعلي الحالي للمعاينة بتوقيت الرياض: {current_date} (عام {year}) والوقت: {current_time}.
+سياق الفحص: المنشأة: {facility} | المبنى: {building} | الدور: {floor} | الموقع: {item_label}
+ملاحظات المفتش: {notes or 'لا توجد ملاحظات إضافية'}
+
+مهمتك تقييم الصورة المرفقة لاكتشاف أي مخاطر أو أجهزة مخالفة:
+1. المخاطر الكهربائية ولوحات التوزيع (Electrical Panels & Wiring):
+   - تحقق من خلو المسافة الأمامية أمام لوحات التوزيع الكهربائية بمسافة لا تقل عن 36 بوصة (90 سم) clearance_violation_36in (true/false) وفق NFPA 70.
+   - تحقق من وجود أسلاك مكشوفة، توصيلات كهربائية رديئة (Extension Cords)، توصيلات متتالية (Daisy Chaining)، أو قواطع محملة بأكثر من طاقتها.
+2. أجهزة التسخين والطهي المخالفة (Heating & Cooking Appliances):
+   - تحقق من وجود سخانات مياه، غلايات كهربائية (Electric Kettles)، مايكرويف، أو دفايات في أماكن غير مرخصة داخل الأقسام الطبية أو غرف التمريض.
+   - اذكر أسماء الأجهزة المكتشفة في قائمة detected_devices (مثال: ["غلاية ماء", "توصيلة كهربائية غير مطابقة"]).
+3. التخزين العشوائي والمواد القابلة للاشتعال:
+   - تخزين تحت السلالم، أو صناديق كرتون بالقرب من مصادر الحرارة.
+4. نوع الخطر الرئيسي:
+   - hazard_type: "electrical" | "heating_device" | "storage_combustible" | "smoking" | "other".
+   - hazard_detected: true/false.
+5. التقييم الهندسي:
+   - compliance_status: "غير مطابق" في حال وجود أي خطر أو مخالفة، "مطابق" في حال السلامة.
+   - standard_reference: "CBAHI FMS.07 / NFPA 70 / SBC 801".
+
+أجب حصراً بكائن JSON نظيف:
+{{
+  "submode": "hazard",
+  "hazard_type": "electrical",
+  "hazard_detected": true,
+  "clearance_violation_36in": false,
+  "detected_devices": [],
+  "compliance_status": "غير مطابق",
+  "risk_level": "متوسط",
+  "confidence_score": 95,
+  "detected_element": "لوحة كهربائية / توصيلات / أجهزة تسخين",
+  "findings_summary": "ملخص تقييم المخاطر المكتشفة",
+  "violations_list": [],
+  "corrective_actions": [],
+  "standard_reference": "CBAHI FMS.07 / NFPA 70 / SBC 801"
+}}"""
+
+
+def build_general_prompt(
     riyadh_ctx: Dict[str, Any],
     facility: str,
     building: str,
@@ -307,6 +560,7 @@ def build_vision_prompt(
 
 أجب بصيغة JSON نظيفة وصحيحة فقط بدون أي نص خارجي على الشكل التالي:
 {{
+  "submode": "general",
   "hazard_detected": true,
   "compliance_status": "مطابق" أو "غير مطابق" أو "ملاحظة حرجة" أو "تحذير وقائي",
   "risk_level": "عالي جداً" أو "عالي" أو "متوسط" أو "منخفض" أو "آمن",
@@ -320,6 +574,26 @@ def build_vision_prompt(
   "inspector_recommendation": "توجيه مهني فوري للمفتش الميداني",
   "suggested_directive": "التوجيه الإداري المقترح لمدير إدارة السلامة"
 }}"""
+
+
+def build_vision_prompt(
+    riyadh_ctx: Dict[str, Any],
+    facility: str,
+    building: str,
+    floor: str,
+    checklist_type: str,
+    item_label: str,
+    notes: str,
+    submode: str = "general",
+) -> str:
+    resolved = resolve_submode(submode, checklist_type)
+    if resolved == "extinguisher":
+        return build_extinguisher_prompt(riyadh_ctx, facility, building, floor, item_label, notes)
+    elif resolved == "emergency_exit":
+        return build_exit_prompt(riyadh_ctx, facility, building, floor, item_label, notes)
+    elif resolved == "hazard":
+        return build_hazard_prompt(riyadh_ctx, facility, building, floor, item_label, notes)
+    return build_general_prompt(riyadh_ctx, facility, building, floor, checklist_type, item_label, notes)
 
 
 # ==============================================================================
@@ -642,6 +916,8 @@ async def analyze_inspection_image(req: VisionAnalysisRequest):
     if not raw_images:
         raise HTTPException(status_code=400, detail="لم يتم إرفاق أي صورة للفحص")
 
+    submode = resolve_submode(req.submode, req.checklistType)
+
     # 1. ضغط وتحسين الصور
     optimized_images = [optimize_base64_image(img) for img in raw_images[:5]]
 
@@ -649,7 +925,7 @@ async def analyze_inspection_image(req: VisionAnalysisRequest):
     hasher = hashlib.sha256()
     for _, b64 in optimized_images:
         hasher.update(b64[:4096].encode("utf-8"))
-    hasher.update(f"{req.checklistType}|{req.building}|{req.floor}|{req.notes}".encode("utf-8"))
+    hasher.update(f"{submode}|{req.checklistType}|{req.building}|{req.floor}|{req.notes}".encode("utf-8"))
     cache_key = hasher.hexdigest()
 
     now_ts = time.time()
@@ -673,6 +949,7 @@ async def analyze_inspection_image(req: VisionAnalysisRequest):
         checklist_type=req.checklistType or "general",
         item_label=req.itemLabel or "",
         notes=req.notes or "",
+        submode=submode,
     )
 
     errors: List[str] = []
@@ -682,15 +959,15 @@ async def analyze_inspection_image(req: VisionAnalysisRequest):
         try:
             if provider == "qwen_api":
                 parsed = await call_qwen_api_vision(optimized_images, prompt)
-                clean_data = sanitize_vision_output(parsed, riyadh_ctx)
+                clean_data = sanitize_vision_output(parsed, riyadh_ctx, submode=submode)
                 source_label = f"Oracle Qwen2.5-VL ({CONFIG['qwen_vision_model']})"
             elif provider == "ollama_local":
                 parsed = await call_ollama_local_vision(optimized_images, prompt)
-                clean_data = sanitize_vision_output(parsed, riyadh_ctx)
+                clean_data = sanitize_vision_output(parsed, riyadh_ctx, submode=submode)
                 source_label = f"Oracle Local Ollama ({CONFIG['ollama_vision_model']})"
             elif provider == "gemini_api":
                 parsed = await call_gemini_pool_vision(optimized_images, prompt)
-                clean_data = sanitize_vision_output(parsed, riyadh_ctx)
+                clean_data = sanitize_vision_output(parsed, riyadh_ctx, submode=submode)
                 source_label = f"Oracle Gemini Pool ({CONFIG['gemini_model']})"
             else:
                 continue
