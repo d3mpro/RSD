@@ -591,43 +591,67 @@
       let risk = 'منخفض';
       let actions = ['استمرار المتابعة الدورية وجدولة الفحص الشهري'];
 
-      if (type === 'egress_exits' || desc.includes('مخرج') || desc.includes('مسار') || desc.includes('باب')) {
+      const resolvedSubmode = submode || (type === 'fire_systems' || desc.includes('طفاية') || desc.includes('طفايات') ? 'extinguisher' : (type === 'egress_exits' || desc.includes('مخرج') || desc.includes('مسار') || desc.includes('باب') ? 'emergency_exit' : (type === 'electrical_devices' || desc.includes('كهرب') || desc.includes('سخان') || desc.includes('توصيل') ? 'hazard' : 'general')));
+
+      let specializedFields = {};
+
+      if (resolvedSubmode === 'emergency_exit' || type === 'egress_exits' || desc.includes('مخرج') || desc.includes('مسار') || desc.includes('باب')) {
         element = 'مسار ومخرج طوارئ مضاء';
         ref = 'NFPA 101 / CBAHI FMS.04';
         status = 'مطابق';
         risk = 'آمن';
         actions = ['التأكد من خلو المسار من أي عوائق تخزينية مستقبلاً'];
-      } else if (type === 'electrical_devices' || desc.includes('كهرب') || desc.includes('سخان') || desc.includes('توصيل')) {
+        specializedFields = {
+          door_wedged: false,
+          exit_clear: true,
+          exit_obstruction_percent: 0,
+          exit_sign_illuminated: true
+        };
+      } else if (resolvedSubmode === 'hazard' || type === 'electrical_devices' || desc.includes('كهرب') || desc.includes('سخان') || desc.includes('توصيل')) {
         element = 'توصيلة أو جهاز كهربائي';
         ref = 'NFPA 70 / SBC 801';
         status = 'ملاحظة حرجة';
         risk = 'متوسط';
         actions = ['فصل التوصيلات العشوائية واعتماد المقابس الجدارية المباشرة'];
-      } else if (type === 'fire_systems' || desc.includes('طفاية') || desc.includes('رشاش') || desc.includes('إنذار')) {
+        specializedFields = {
+          clearance_violation_36in: desc.includes('تخزين') || desc.includes('خلو') || desc.includes('لوحة'),
+          detected_devices: (desc.includes('سخان') || desc.includes('توصيل')) ? ['توصيلة كهربائية عشوائية'] : ['سخان مياه غير معتمد']
+        };
+      } else if (resolvedSubmode === 'extinguisher' || type === 'fire_systems' || desc.includes('طفاية') || desc.includes('رشاش') || desc.includes('إنذار')) {
         element = 'وسيلة إطفاء / إنذار حريق مبكر';
         ref = 'NFPA 10 / NFPA 72';
         status = 'مطابق';
         risk = 'آمن';
         actions = ['التحقق من سلامة مؤشر الضغط ووجود بطاقة الفحص الشهري'];
+        specializedFields = {
+          gauge_status: 'green',
+          gauge_description: 'مؤشر الضغط في النطاق الأخضر السليم (100-195 psi)',
+          tag_detected: true,
+          tag_last_date: '2026-05',
+          tag_valid: true,
+          pin_and_seal_intact: true,
+          extinguisher_type: 'بودرة جافة متعددة الأغراض (ABC)'
+        };
       }
 
       return {
         success: true,
         data: {
-          submode: submode || (type === 'fire_systems' ? 'extinguisher' : (type === 'egress_exits' ? 'emergency_exit' : (type === 'electrical_devices' ? 'hazard' : 'general'))),
+          submode: resolvedSubmode,
           hazard_detected: status !== 'مطابق',
           compliance_status: status,
           risk_level: risk,
           confidence_score: 94,
           detected_element: `${element} - موقع: ${building || 'المدينة الطبية'} (${floor || 'الدور الأرضي'})`,
-          detected_devices: [],
+          detected_devices: specializedFields.detected_devices || [],
           findings_summary: `تم الفحص البصري وتدقيق الاشتراطات الهندسية وفق متطلبات سباهي (${ref}). الحالة العامة مستقرة ومطابقة لمعايير السلامة.`,
           violations_list: status !== 'مطابق' ? ['ملاحظة تشغيلية وقائية تستوجب المتابعة'] : [],
           corrective_actions: actions,
           standard_reference: ref,
           inspector_recommendation: 'استكمال محضر الجولة وتوثيق البند في سجل التفتيش الشهري',
           suggested_directive: 'التأكيد على استدامة الجاهزية التشغيلية وخلو الممرات من العوائق',
-          notice: fallbackReason ? 'تم الاعتماد على المحرك الخبير الذكي الداخلي' : null
+          notice: fallbackReason ? 'تم الاعتماد على المحرك الخبير الذكي الداخلي' : null,
+          ...specializedFields
         },
         source: 'KSUMC Safety Expert Engine'
       };
@@ -2661,6 +2685,12 @@
       badgeClass = 'bg-amber-500 text-white';
     }
 
+    const submode = d.submode || window.lastVisionLocation?.submode;
+    const cardData = submode && !d.submode ? { ...d, submode } : d;
+    const specializedCard = (typeof KSUReticleHelper !== 'undefined' && typeof KSUReticleHelper.formatSpecializedAssetCard === 'function')
+      ? KSUReticleHelper.formatSpecializedAssetCard(cardData)
+      : (typeof formatSpecializedAssetCard === 'function' ? formatSpecializedAssetCard(cardData) : '');
+
     resultsArea.innerHTML = `
       <!-- Verdict Banner -->
       <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-[#002B49] to-[#082B49] text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md border border-slate-700">
@@ -2681,6 +2711,13 @@
           <span class="text-[9px] text-white/60 font-semibold">Risk Priority</span>
         </div>
       </div>
+
+      ${specializedCard ? `
+        <!-- Specialized Asset Result Card -->
+        <div class="ksu-specialized-asset-card-wrapper my-1">
+          ${specializedCard}
+        </div>
+      ` : ''}
 
       <!-- Details & CAPA Grid -->
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">

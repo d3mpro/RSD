@@ -267,11 +267,259 @@
     el.innerHTML = getReticleSvg(submode, options);
   }
 
+  /**
+   * Format Fire Extinguisher Specialized Result Card
+   * @param {Object} data - Inspection results containing gauge_status, tag details, etc.
+   * @returns {string} HTML card markup
+   */
+  function formatExtinguisherBadge(data) {
+    if (!data) return '';
+    const status = String(data.gauge_status || 'unknown').toLowerCase();
+    let gaugeText = '⚠️ مقياس الضغط غير واضح أو غير ظاهر';
+    let gaugeColorClass = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+    let gaugeIndicator = '⚠️';
+
+    if (status === 'green') {
+      gaugeText = '🟢 مؤشر الضغط في النطاق الأخضر (سليم)';
+      gaugeColorClass = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+      gaugeIndicator = '🟢';
+    } else if (status === 'undercharge') {
+      gaugeText = '🔴 مؤشر الضغط منخفض (بحاجة لإعادة التعبئة)';
+      gaugeColorClass = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+      gaugeIndicator = '🔴';
+    } else if (status === 'overcharge') {
+      gaugeText = '🔴 مؤشر الضغط مرتفع (خطر زيادة الضغط)';
+      gaugeColorClass = 'bg-rose-500/15 text-rose-300 border-rose-500/30';
+      gaugeIndicator = '🔴';
+    }
+
+    const tagDetected = Boolean(data.tag_detected);
+    const tagValid = Boolean(data.tag_valid);
+    const tagDate = data.tag_last_date || 'غير محدد';
+    const tagBadge = tagDetected
+      ? (tagValid
+          ? '<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold">🟢 سارية الصلاحية</span>'
+          : '<span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-bold">🔴 منتهية الصلاحية</span>')
+      : '<span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-bold">🔴 بطاقة الصيانة غير متوفرة / مفقودة</span>';
+
+    const pinIntact = data.pin_and_seal_intact !== false;
+    const pinBadge = pinIntact
+      ? '<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold">🟢 سليم ومثبت</span>'
+      : '<span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-bold">🔴 مفقود أو مكسور</span>';
+
+    const extType = data.extinguisher_type || 'طفاية حريق يدوية معتمدة';
+
+    return `
+      <div class="p-4 rounded-2xl bg-slate-900/90 text-white border border-slate-700/80 shadow-md space-y-3 font-sans" dir="rtl">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/60 pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🧯</span>
+            <span class="font-bold text-sm text-slate-100">فحص مكونات طفاية الحريق (NFPA 10 / CBAHI FMS.04)</span>
+          </div>
+          <span class="px-2.5 py-0.5 rounded-full bg-slate-800 text-cyan-300 border border-cyan-500/30 text-xs font-semibold">${extType}</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+          <!-- Pressure Gauge -->
+          <div class="p-3 rounded-xl bg-slate-800/80 border border-slate-700 space-y-1.5">
+            <div class="text-[11px] text-slate-400 font-semibold flex items-center justify-between">
+              <span>مقياس الضغط (Gauge)</span>
+              <span>${gaugeIndicator}</span>
+            </div>
+            <div class="p-2 rounded-lg border text-xs font-bold ${gaugeColorClass} flex items-center gap-1.5">
+              <span>${gaugeText}</span>
+            </div>
+            ${data.gauge_description ? `<div class="text-[11px] text-slate-300 font-medium">${data.gauge_description}</div>` : ''}
+          </div>
+
+          <!-- Maintenance Tag -->
+          <div class="p-3 rounded-xl bg-slate-800/80 border border-slate-700 space-y-1.5">
+            <div class="text-[11px] text-slate-400 font-semibold flex items-center justify-between">
+              <span>بطاقة الصيانة الدورية (Tag)</span>
+              ${tagBadge}
+            </div>
+            <div class="text-slate-200 text-xs font-semibold flex items-center justify-between pt-1">
+              <span class="text-slate-400">تاريخ آخر فحص:</span>
+              <span class="font-mono font-bold text-amber-300" dir="ltr">${tagDate}</span>
+            </div>
+            <div class="text-[10px] text-slate-400">
+              ${tagDetected ? 'تم رصد وقراءة بيانات بطاقة الفحص الميداني' : 'لم يتم رصد بطاقة الفحص المعتمدة على جسم الطفاية'}
+            </div>
+          </div>
+
+          <!-- Safety Pin & Seal -->
+          <div class="p-3 rounded-xl bg-slate-800/80 border border-slate-700 space-y-1.5">
+            <div class="text-[11px] text-slate-400 font-semibold flex items-center justify-between">
+              <span>مسمار الأمان والختم البلاستيكي</span>
+              ${pinBadge}
+            </div>
+            <div class="text-xs text-slate-300 font-medium pt-1">
+              ${pinIntact ? 'مسمار الأمان وختم التلاعب البلاستيكي سليم وفي موضعه' : 'مسمار الأمان أو ختم التلاعب مفقود أو مكسور (يتطلب إعادة تأهيل فوري)'}
+            </div>
+          </div>
+        </div>
+      </div>
+    `.trim();
+  }
+
+  /**
+   * Format Emergency Exit Specialized Result Card
+   * @param {Object} data - Inspection results containing door_wedged, exit_obstruction_percent, etc.
+   * @returns {string} HTML card markup
+   */
+  function formatExitBadge(data) {
+    if (!data) return '';
+    const doorWedged = Boolean(data.door_wedged);
+    const obstruction = typeof data.exit_obstruction_percent === 'number'
+      ? Math.max(0, Math.min(100, data.exit_obstruction_percent))
+      : (data.exit_clear === false ? 25 : 0);
+
+    let obsColor = 'bg-emerald-500';
+    let obsBgBadge = 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30';
+    let obsStatusLabel = 'مسار الإخلاء خالٍ تماماً (0% إعاقة)';
+
+    if (obstruction > 25) {
+      obsColor = 'bg-rose-500';
+      obsBgBadge = 'bg-rose-500/10 text-rose-300 border-rose-500/30';
+      obsStatusLabel = `إعاقة حرجة لمسار الخروج (${obstruction}%)`;
+    } else if (obstruction > 0) {
+      obsColor = 'bg-amber-500';
+      obsBgBadge = 'bg-amber-500/10 text-amber-300 border-amber-500/30';
+      obsStatusLabel = `إعاقة جزئية لمسار الخروج (${obstruction}%)`;
+    }
+
+    const exitSignLit = data.exit_sign_illuminated !== false && data.exit_sign_illuminated !== null;
+    const exitSignBadge = exitSignLit
+      ? '<span class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold">🟢 لوحة المخرج مضاءة وتعمل</span>'
+      : '<span class="px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[11px] font-bold">🔴 لوحة المخرج غير مضاءة أو معطلة</span>';
+
+    return `
+      <div class="p-4 rounded-2xl bg-slate-900/90 text-white border border-slate-700/80 shadow-md space-y-3 font-sans" dir="rtl">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/60 pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">🚪</span>
+            <span class="font-bold text-sm text-slate-100">فحص مخرج الطوارئ ومسار الإخلاء (NFPA 101 / CBAHI FMS.14)</span>
+          </div>
+          ${exitSignBadge}
+        </div>
+
+        ${doorWedged ? `
+          <div class="p-3 rounded-xl bg-rose-950/80 border-2 border-rose-500 text-rose-200 flex items-center gap-3 animate-pulse">
+            <span class="text-2xl shrink-0">🚨</span>
+            <div>
+              <div class="font-black text-xs text-rose-100">🚨 تنبيه حرج: باب الحريق مثبت بوتد أو حاجز أرضي (مخالفة CBAHI FMS.14 / NFPA 80)</div>
+              <div class="text-[11px] text-rose-300 mt-0.5">يُحظر تثبيت أبواب الحريق أو منع إغلاقها التلقائي بمصدات أو أوتاد لحماية مسالك الهروب من الدخان واللهب.</div>
+            </div>
+          </div>
+        ` : ''}
+
+        <div class="p-3 rounded-xl bg-slate-800/80 border border-slate-700 space-y-2 text-xs">
+          <div class="flex items-center justify-between text-[11px]">
+            <span class="font-semibold text-slate-300">نسبة إعاقة مسار الإخلاء (Egress Obstruction):</span>
+            <span class="px-2 py-0.5 rounded-lg border text-[11px] font-bold ${obsBgBadge}">${obsStatusLabel}</span>
+          </div>
+          <div class="w-full bg-slate-700/70 rounded-full h-3 overflow-hidden p-0.5">
+            <div class="${obsColor} h-2 rounded-full transition-all duration-500" style="width: ${Math.max(4, obstruction)}%"></div>
+          </div>
+          <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+            <span>0% (خالٍ تماماً)</span>
+            <span>25% (حد تحذيري)</span>
+            <span>100% (إعاقة كاملة)</span>
+          </div>
+        </div>
+      </div>
+    `.trim();
+  }
+
+  /**
+   * Format Electrical & Hazard Specialized Result Card
+   * @param {Object} data - Inspection results containing clearance_violation_36in, detected_devices, etc.
+   * @returns {string} HTML card markup
+   */
+  function formatHazardBadge(data) {
+    if (!data) return '';
+    const clearanceViolation = Boolean(data.clearance_violation_36in);
+    const detectedDevices = Array.isArray(data.detected_devices) ? data.detected_devices : [];
+
+    return `
+      <div class="p-4 rounded-2xl bg-slate-900/90 text-white border border-slate-700/80 shadow-md space-y-3 font-sans" dir="rtl">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/60 pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">⚡</span>
+            <span class="font-bold text-sm text-slate-100">فحص المخاطر الكهربائية ومسافة الخلو (NFPA 70 / CBAHI FMS.07)</span>
+          </div>
+          <span class="px-2 py-0.5 rounded-full ${clearanceViolation || detectedDevices.length ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'} text-xs font-bold">
+            ${clearanceViolation || detectedDevices.length ? '⚠️ توجد مخالفات مرصودة' : '✅ الوضع الكهربائي آمن'}
+          </span>
+        </div>
+
+        ${clearanceViolation ? `
+          <div class="p-3 rounded-xl bg-rose-950/80 border border-rose-500 text-rose-200 flex items-start gap-2.5">
+            <span class="text-xl shrink-0">⚠️</span>
+            <div class="space-y-0.5 text-xs">
+              <div class="font-bold text-rose-100">مخالفة مسافة الخلو أمام اللوحة الكهربائية (36 بوصة / 90 سم)</div>
+              <div class="text-[11px] text-rose-300 font-normal">تم رصد تخزين مواد أو عوائق أمام القواطع مما يخالف متطلبات NFPA 70 ومعايير سباهي للوصول السريع والآمن.</div>
+            </div>
+          </div>
+        ` : `
+          <div class="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 text-xs flex items-center justify-between">
+            <span class="text-slate-400">مسافة الخلو أمام اللوحة الكهربائية (36 بوصة / 90 سم):</span>
+            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-bold text-[11px]">مستوفي ومحقق لمسافة خلو آمنة</span>
+          </div>
+        `}
+
+        ${detectedDevices.length ? `
+          <div class="p-3 rounded-xl bg-slate-800/80 border border-slate-700 space-y-2 text-xs">
+            <span class="font-bold text-amber-300 block text-[11px]">الأجهزة والتوصيلات المرصودة والمحظورة:</span>
+            <div class="flex flex-wrap gap-1.5">
+              ${detectedDevices.map(dev => `
+                <span class="px-2.5 py-1 rounded-lg bg-rose-500/20 border border-rose-500/30 text-rose-200 text-xs font-bold flex items-center gap-1">
+                  <span>⚡</span>
+                  <span>${dev}</span>
+                </span>
+              `).join('')}
+            </div>
+          </div>
+        ` : `
+          <div class="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700 text-slate-300 text-xs flex items-center justify-between">
+            <span class="text-slate-400">الأجهزة والتوصيلات المحظورة:</span>
+            <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-bold text-[11px]">لم يتم رصد أي أجهزة حرارية أو توصيلات عشوائية</span>
+          </div>
+        `}
+      </div>
+    `.trim();
+  }
+
+  /**
+   * Dispatcher for Specialized Asset Result Cards
+   * @param {Object} data - Vision inspection data
+   * @returns {string} HTML markup for specialized card or empty string
+   */
+  function formatSpecializedAssetCard(data) {
+    if (!data || typeof data !== 'object') return '';
+    const mode = String(data.submode || '').trim().toLowerCase();
+
+    if (mode === 'extinguisher' || (!mode && (data.gauge_status || data.tag_last_date))) {
+      return formatExtinguisherBadge(data);
+    }
+    if (mode === 'emergency_exit' || mode === 'exit' || (!mode && (data.door_wedged !== undefined || data.exit_obstruction_percent !== undefined))) {
+      return formatExitBadge(data);
+    }
+    if (mode === 'hazard' || (!mode && data.clearance_violation_36in !== undefined)) {
+      return formatHazardBadge(data);
+    }
+    return '';
+  }
+
   return {
     getReticleSvg,
     getSubmodeList,
     resolveSubmodeLabel,
     renderReticleInto,
+    formatExtinguisherBadge,
+    formatExitBadge,
+    formatHazardBadge,
+    formatSpecializedAssetCard,
     GUIDANCE_MAP
   };
 });
