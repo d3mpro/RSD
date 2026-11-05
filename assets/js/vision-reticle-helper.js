@@ -643,6 +643,107 @@
     };
   }
 
+  /**
+   * إعداد وصف تقرير المخالفة المهني المنسق باللغة العربية
+   */
+  function formatViolationDescription(analysis) {
+    const a = analysis || {};
+    const parts = [];
+
+    // 1. ملخص المعاينة
+    const summary = a.findings_summary || a.detected_element || 'رصد ملاحظة ومخالفة سلامة ميدانية تستوجب التدخل والتصحيح.';
+    parts.push(`ملخص المعاينة الميدانية:\n${summary}`);
+
+    // 2. المخالفات المرصودة (منقطة)
+    const viols = Array.isArray(a.violations_list)
+      ? a.violations_list.filter(Boolean)
+      : (a.violations_list ? [a.violations_list] : []);
+    if (viols.length > 0) {
+      parts.push(`المخالفات والملاحظات المرصودة:\n${viols.map(v => `• ${v}`).join('\n')}`);
+    }
+
+    // 3. المرجع الرقابي والنظامي
+    const std = a.standard_reference || 'CBAHI / NFPA';
+    parts.push(`المرجع النظامي والرقابي:\n${std}`);
+
+    // 4. خطة الإجراءات التصحيحية والوقائية (CAPA)
+    const capas = Array.isArray(a.corrective_actions)
+      ? a.corrective_actions.filter(Boolean)
+      : (a.corrective_actions ? [a.corrective_actions] : []);
+    if (capas.length > 0) {
+      parts.push(`خطة الإجراءات التصحيحية والوقائية (CAPA):\n${capas.map(c => `• ${c}`).join('\n')}`);
+    } else if (a.suggested_directive) {
+      parts.push(`خطة الإجراءات التصحيحية والوقائية (CAPA):\n• ${a.suggested_directive}`);
+    }
+
+    return parts.join('\n\n');
+  }
+
+  /**
+   * تحضير بيانات بلاغ المخالفة الفوري من الفحص البصري المستقل
+   * Prepare structured violation payload from vision analysis
+   */
+  function prepareViolationFromVision(analysisData, locationData, imageBase64) {
+    const a = analysisData || {};
+    const loc = locationData || {};
+
+    const building = loc.building || 'المستشفى';
+    const floor = loc.floor || '';
+    const room = loc.room || '';
+    const title = a.detected_element || 'مخالفة سلامة مرصودة بالذكاء الاصطناعي';
+    const risk_level = a.risk_level || 'متوسط';
+    const standard_reference = a.standard_reference || 'CBAHI / NFPA';
+    const description = formatViolationDescription(a);
+    const image = imageBase64 || '';
+    const timestamp = Date.now();
+
+    return {
+      building,
+      floor,
+      room,
+      title,
+      risk_level,
+      standard_reference,
+      description,
+      image,
+      timestamp
+    };
+  }
+
+  /**
+   * تحضير بيانات الجولة التفتيشية الجديدة من الفحص البصري المستقل
+   * Prepare new inspection round payload from vision analysis
+   */
+  function prepareNewRoundFromVision(analysisData, locationData) {
+    const a = analysisData || {};
+    const loc = locationData || {};
+
+    const rawSubmode = (a.submode || loc.submode || '').toString().trim().toLowerCase();
+    let checklistType = 'all';
+
+    if (rawSubmode === 'extinguisher') {
+      checklistType = 'fex';
+    } else if (rawSubmode === 'emergency_exit' || rawSubmode === 'exit') {
+      checklistType = 'ext';
+    } else if (rawSubmode === 'hazard') {
+      checklistType = 'all';
+    } else if (rawSubmode === 'general') {
+      checklistType = 'all';
+    } else {
+      checklistType = 'all';
+    }
+
+    const notes = a.findings_summary || a.detected_element || '';
+
+    return {
+      building: loc.building || '',
+      floor: loc.floor || '',
+      checklistType,
+      notes,
+      timestamp: Date.now()
+    };
+  }
+
   return {
     getReticleSvg,
     getSubmodeList,
@@ -654,6 +755,8 @@
     formatSpecializedAssetCard,
     updateAssetInspectionState,
     mapVisionToChecklistFields,
+    prepareViolationFromVision,
+    prepareNewRoundFromVision,
     GUIDANCE_MAP
   };
 });

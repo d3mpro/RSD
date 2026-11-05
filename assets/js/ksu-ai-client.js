@@ -2779,7 +2779,16 @@
               <span class="material-symbols-outlined text-base text-amber-300">task_alt</span>
               <span>✅ تطبيق وتعبئة بنود الجولة آلياً</span>
             </button>
-          ` : ''}
+          ` : `
+            <button type="button" onclick="openViolationFromAI()" id="btn-vision-instant-violation" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800 text-white font-black text-xs shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95" title="إنشاء بلاغ مخالفة فوري وتحويل المعاينة البصرية لبلاغ معتمد">
+              <span class="material-symbols-outlined text-base text-amber-300">warning</span>
+              <span>🚨 إنشاء بلاغ مخالفة فوري</span>
+            </button>
+            <button type="button" onclick="startRoundFromAI()" id="btn-vision-start-round" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-black text-xs shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95" title="بدء جولة تفتيش جديدة لهذا الموقع مع ضبط نوع الفحص">
+              <span class="material-symbols-outlined text-base text-cyan-200">add_task</span>
+              <span>📋 بدء جولة جديدة لهذا الموقع</span>
+            </button>
+          `}
           <button type="button" onclick="approveAndUploadVisualViolation()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-700 hover:from-orange-700 hover:to-amber-800 text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95" title="اعتماد المخالفة وحفظ كارت الفحص بصيغة PDF في سجلات الأرشيف تلقائياً">
             <span class="material-symbols-outlined text-base">verified</span>
             <span>اعتماد ورفع المخالفة</span>
@@ -3023,6 +3032,214 @@
       statusMap,
       plan
     };
+  };
+
+  /**
+   * إنشاء بلاغ مخالفة فوري من المعاينة البصرية للراصد الذكي
+   * 1-Click Instant Violation Report Dispatch from Standalone Vision Scan
+   */
+  window.openViolationFromAI = function(customData, customLoc, customImg) {
+    const d = customData || window.lastVisionAnalysisData || lastVisionAnalysisData || {};
+    const loc = customLoc || window.lastVisionLocation || {
+      building: (typeof document !== 'undefined' && document.getElementById('sel-vision-building')?.value) || 'المستشفى',
+      floor: (typeof document !== 'undefined' && document.getElementById('inp-vision-floor')?.value) || '',
+      room: (typeof document !== 'undefined' && document.getElementById('inp-vision-room')?.value) || ''
+    };
+    const img = customImg || window.lastVisionAnalysisImage || lastVisionAnalysisImage || (window.lastVisionAnalysisImages && window.lastVisionAnalysisImages[0]) || '';
+
+    const helper = (typeof KSUReticleHelper !== 'undefined')
+      ? KSUReticleHelper
+      : (typeof require === 'function' ? (function() { try { return require('./vision-reticle-helper.js'); } catch(e) { return {}; } })() : {});
+
+    const prepFn = (helper && helper.prepareViolationFromVision) ||
+                   (typeof prepareViolationFromVision === 'function' ? prepareViolationFromVision : null);
+
+    const payload = prepFn ? prepFn(d, loc, img) : {
+      building: loc.building || 'المستشفى',
+      floor: loc.floor || '',
+      room: loc.room || '',
+      title: d.detected_element || 'مخالفة سلامة مرصودة بالذكاء الاصطناعي',
+      risk_level: d.risk_level || 'متوسط',
+      standard_reference: d.standard_reference || 'CBAHI / NFPA',
+      description: d.findings_summary || '',
+      image: img || '',
+      timestamp: Date.now()
+    };
+
+    if (typeof document !== 'undefined') {
+      // 1. Pre-fill violation modal inputs
+      const inpBuilding = document.getElementById('inp-violation-building');
+      if (inpBuilding) inpBuilding.value = payload.building || '';
+
+      const inpFloor = document.getElementById('inp-violation-floor');
+      if (inpFloor) inpFloor.value = payload.floor || '';
+
+      const inpLoc = document.getElementById('inp-violation-location');
+      if (inpLoc) {
+        const parts = [payload.building, payload.floor, payload.room].filter(Boolean);
+        inpLoc.value = parts.length > 0 ? parts.join(' - ') : (payload.building || '');
+      }
+
+      const inpDesc = document.getElementById('inp-violation-desc');
+      if (inpDesc) inpDesc.value = payload.description || '';
+
+      // Set violation image preview
+      const imgPreview = document.getElementById('violation-image-preview') || 
+                         document.getElementById('inp-violation-image-preview') ||
+                         document.getElementById('img-violation-preview');
+      if (imgPreview) {
+        if (imgPreview.tagName === 'IMG') {
+          imgPreview.src = payload.image || '';
+        } else {
+          const innerImg = imgPreview.querySelector('img');
+          if (innerImg) {
+            innerImg.src = payload.image || '';
+          } else {
+            imgPreview.innerHTML = payload.image ? `<img src="${payload.image}" alt="صورة المخالفة" class="max-h-48 rounded-xl object-contain border border-slate-300" />` : '';
+          }
+        }
+        if (imgPreview.classList && imgPreview.classList.remove) {
+          imgPreview.classList.remove('hidden');
+        }
+      }
+      const imgContainer = document.getElementById('violation-image-preview-container');
+      if (imgContainer && imgContainer.classList && imgContainer.classList.remove) {
+        imgContainer.classList.remove('hidden');
+      }
+
+      // Also prefill existing safety violation inputs (inp-sv-) if present
+      const svLoc = document.getElementById('inp-sv-location');
+      if (svLoc && (!svLoc.value || svLoc.value.trim() === '')) {
+        svLoc.value = [payload.building, payload.floor].filter(Boolean).join(' - ') || payload.building;
+      }
+      const svRoom = document.getElementById('inp-sv-room');
+      if (svRoom && payload.room && (!svRoom.value || svRoom.value.trim() === '')) {
+        svRoom.value = payload.room;
+      }
+      const svDir = document.getElementById('inp-sv-directive');
+      if (svDir && payload.description && (!svDir.value || svDir.value.trim() === '')) {
+        svDir.value = payload.description;
+      }
+
+      // 2. Close AI vision modal
+      const visionModal = document.getElementById('ksu-ai-vision-modal');
+      if (visionModal) {
+        visionModal.remove();
+      }
+
+      // 3. Open violation modal
+      if (typeof openNewSafetyViolationModal === 'function') {
+        try { openNewSafetyViolationModal(); } catch (e) { console.warn(e); }
+      }
+      const violModal = document.getElementById('violationModal') || 
+                         document.getElementById('newSafetyViolationModal') || 
+                         document.getElementById('modal-violation');
+      if (violModal) {
+        if (violModal.classList && violModal.classList.remove) {
+          violModal.classList.remove('hidden');
+        }
+        if (violModal.classList && violModal.classList.add) {
+          violModal.classList.add('flex');
+        }
+      }
+    }
+
+    if (typeof showToast === 'function') {
+      showToast('تم إعداد بلاغ المخالفة وتعبئة البيانات من المعاينة البصرية بنجاح 🚨', 'success');
+    }
+
+    return payload;
+  };
+
+  /**
+   * بدء جولة تفتيش جديدة لهذا الموقع بناءً على نتائج التحليل البصري
+   * 1-Click Start New Round Dispatch from Standalone Vision Scan
+   */
+  window.startRoundFromAI = function(customData, customLoc) {
+    const d = customData || window.lastVisionAnalysisData || lastVisionAnalysisData || {};
+    const loc = customLoc || window.lastVisionLocation || {
+      building: (typeof document !== 'undefined' && document.getElementById('sel-vision-building')?.value) || '',
+      floor: (typeof document !== 'undefined' && document.getElementById('inp-vision-floor')?.value) || '',
+      room: (typeof document !== 'undefined' && document.getElementById('inp-vision-room')?.value) || ''
+    };
+
+    const helper = (typeof KSUReticleHelper !== 'undefined')
+      ? KSUReticleHelper
+      : (typeof require === 'function' ? (function() { try { return require('./vision-reticle-helper.js'); } catch(e) { return {}; } })() : {});
+
+    const prepFn = (helper && helper.prepareNewRoundFromVision) ||
+                   (typeof prepareNewRoundFromVision === 'function' ? prepareNewRoundFromVision : null);
+
+    const roundPayload = prepFn ? prepFn(d, loc) : {
+      building: loc.building || '',
+      floor: loc.floor || '',
+      checklistType: 'all',
+      notes: d.findings_summary || '',
+      timestamp: Date.now()
+    };
+
+    if (typeof document !== 'undefined') {
+      // 1. Close AI vision modal
+      const visionModal = document.getElementById('ksu-ai-vision-modal');
+      if (visionModal) {
+        visionModal.remove();
+      }
+
+      // 2. Open new round modal via application function if available
+      if (typeof openNewRoundModal === 'function') {
+        try {
+          openNewRoundModal(roundPayload.checklistType, roundPayload.building);
+        } catch (e) {
+          console.warn(e);
+        }
+      }
+
+      // 3. Pre-fill round modal inputs
+      const bldEl = document.getElementById('inp-round-building');
+      if (bldEl && roundPayload.building) {
+        bldEl.value = roundPayload.building;
+      }
+
+      const flrEl = document.getElementById('inp-round-floor');
+      if (flrEl && roundPayload.floor) {
+        flrEl.value = roundPayload.floor;
+      }
+
+      const typeEl = document.getElementById('inp-round-form-type');
+      if (typeEl && roundPayload.checklistType) {
+        typeEl.value = roundPayload.checklistType;
+      }
+
+      const notesEl = document.getElementById('inp-round-notes');
+      if (notesEl && roundPayload.notes && !notesEl.value) {
+        notesEl.value = roundPayload.notes;
+      }
+
+      // 4. Ensure round modal is visible
+      const roundModal = document.getElementById('newRoundModal') || document.getElementById('modal-new-round');
+      if (roundModal) {
+        if (roundModal.classList && roundModal.classList.remove) {
+          roundModal.classList.remove('hidden');
+        }
+        if (roundModal.classList && roundModal.classList.add) {
+          roundModal.classList.add('flex');
+        }
+      }
+
+      // Update state current draft if present
+      if (typeof window !== 'undefined' && window.state && window.state.currentRoundDraft) {
+        if (roundPayload.building) window.state.currentRoundDraft.building = roundPayload.building;
+        if (roundPayload.floor) window.state.currentRoundDraft.floor = roundPayload.floor;
+        if (roundPayload.checklistType) window.state.currentRoundDraft.formType = roundPayload.checklistType;
+        if (roundPayload.notes) window.state.currentRoundDraft.notes = roundPayload.notes;
+      }
+    }
+
+    if (typeof showToast === 'function') {
+      showToast('تم تجهيز الجولة التفتيشية وضبط الموقع ونوع الفحص بنجاح 📋', 'success');
+    }
+
+    return roundPayload;
   };
 
   // اعتماد ورفع المخالفة وحفظها تلقائياً بصيغة PDF في الأرشيف الشامل بنفس تصميم كارت الفحص

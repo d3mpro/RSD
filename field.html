@@ -3292,6 +3292,22 @@
           </div>
         </div>
 
+        <!-- Location & Facility Details (Compatible with AI Vision Dispatch) -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="font-bold text-on-surface block mb-1">المبنى / المنشأة</label>
+            <input id="inp-violation-building" type="text" placeholder="مثال: المبنى الرئيسي" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
+          </div>
+          <div>
+            <label class="font-bold text-on-surface block mb-1">الدور / الجناح</label>
+            <input id="inp-violation-floor" type="text" placeholder="مثال: الدور الأرضي" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
+          </div>
+          <div>
+            <label class="font-bold text-on-surface block mb-1">الإدارة / موقع المخالفة</label>
+            <input id="inp-violation-location" type="text" placeholder="مثال: قسم السجلات الطبية" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
+          </div>
+        </div>
+
         <!-- Location -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -3301,6 +3317,23 @@
           <div>
             <label class="font-bold text-on-surface block mb-1">غرفة رقم</label>
             <input id="inp-sv-room" type="text" placeholder="مثال: 304" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none">
+          </div>
+        </div>
+
+        <!-- Violation Detailed Description & Findings -->
+        <div>
+          <label class="font-bold text-on-surface block mb-1">تقرير ووصف المخالفة التفصيلي</label>
+          <textarea id="inp-violation-desc" rows="3" placeholder="تفاصيل المخالفة والملاحظات المرصودة..." class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none text-xs font-semibold leading-relaxed"></textarea>
+        </div>
+
+        <!-- Vision Scanned Image Evidence Preview -->
+        <div id="violation-image-preview-container" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col gap-2">
+          <span class="font-bold text-primary text-xs flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm text-rose-600">image</span>
+            <span>صورة المخالفة المرصودة بالذكاء الاصطناعي:</span>
+          </span>
+          <div class="flex items-center justify-center bg-slate-900/5 rounded-lg p-2 max-h-52 overflow-hidden">
+            <img id="violation-image-preview" src="" alt="صورة المخالفة المرصودة" class="max-h-48 rounded-lg object-contain shadow-sm border border-slate-300">
           </div>
         </div>
 
