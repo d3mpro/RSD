@@ -1934,6 +1934,7 @@
     let modal = document.getElementById('ksu-ai-vision-modal');
     if (modal) modal.remove();
 
+    window.activeVisionAssetId = options.assetId || (options.asset && options.asset.id) || null;
     visionImagesList = [];
     currentActivePreviewIndex = 0;
 
@@ -2674,6 +2675,19 @@
     const resultsArea = document.getElementById('vision-results-area');
     if (!resultsArea) return;
 
+    window.lastVisionAnalysisData = d;
+    lastVisionAnalysisData = d;
+
+    const roundModal = (typeof document !== 'undefined')
+      ? (document.getElementById('modal-new-round') || document.getElementById('newRoundModal'))
+      : null;
+    const isRoundModalVisible = roundModal && (!roundModal.classList.contains('hidden') && roundModal.style.display !== 'none');
+    const isRoundActive = Boolean(
+      (typeof window !== 'undefined' && window.currentActiveRound) ||
+      isRoundModalVisible ||
+      (typeof window !== 'undefined' && window.state && window.state.currentRoundDraft && isRoundModalVisible)
+    );
+
     const risk = d.risk_level || 'متوسط';
     const engineBadge = d.ai_engine_source || 'Qwen2.5-VL / Gemini Vision';
     const isCritical = risk === 'عالي جداً' || risk === 'عالي' || d.compliance_status === 'غير مطابق' || d.hazard_detected;
@@ -2760,6 +2774,12 @@
       <!-- Direct 1-Click Action Bar -->
       <div class="p-3 rounded-2xl bg-slate-100 border border-slate-200 flex flex-wrap items-center justify-between gap-2">
         <div class="flex flex-wrap items-center gap-2">
+          ${isRoundActive ? `
+            <button type="button" onclick="applyVisionToActiveRound()" id="btn-apply-vision-round" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95 animate-pulse" title="تطبيق نتائج الفحص البصري على الأصل وتحديث بنود الجولة الحالية آلياً">
+              <span class="material-symbols-outlined text-base text-amber-300">task_alt</span>
+              <span>✅ تطبيق وتعبئة بنود الجولة آلياً</span>
+            </button>
+          ` : ''}
           <button type="button" onclick="approveAndUploadVisualViolation()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-700 hover:from-orange-700 hover:to-amber-800 text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95" title="اعتماد المخالفة وحفظ كارت الفحص بصيغة PDF في سجلات الأرشيف تلقائياً">
             <span class="material-symbols-outlined text-base">verified</span>
             <span>اعتماد ورفع المخالفة</span>
@@ -2788,6 +2808,222 @@
     resultsArea.classList.remove('hidden');
     resultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+
+  /**
+   * تطبيق وتعبئة بنود الجولة آلياً بناءً على نتائج التحليل البصري الذكي
+   * In-Round Asset-Level State Updating & Checklist Auto-Fill
+   */
+  window.applyVisionToActiveRound = function(targetAssetId, customInspectionData) {
+    const d = customInspectionData || window.lastVisionAnalysisData || lastVisionAnalysisData || {};
+
+    const helper = (typeof KSUReticleHelper !== 'undefined')
+      ? KSUReticleHelper
+      : (typeof require === 'function' ? (function() { try { return require('./vision-reticle-helper.js'); } catch(e) { return {}; } })() : {});
+
+    const updateStateFn = (helper && helper.updateAssetInspectionState) ||
+                          (typeof updateAssetInspectionState === 'function' ? updateAssetInspectionState : null);
+    const mapFieldsFn = (helper && helper.mapVisionToChecklistFields) ||
+                        (typeof mapVisionToChecklistFields === 'function' ? mapVisionToChecklistFields : null);
+
+    // 1. Resolve Target Asset ID
+    let assetId = targetAssetId || window.activeVisionAssetId || window.activeInspectionAssetId ||
+                  (window.currentActiveInspectionAsset && window.currentActiveInspectionAsset.id) ||
+                  (window.state && window.state.currentRoundDraft && window.state.currentRoundDraft.activeAssetId);
+
+    const currentStatus = (window.state && window.state.currentRoundDraft && window.state.currentRoundDraft.floorAssetsStatus) ||
+                          (window.currentActiveRound && window.currentActiveRound.floorAssetsStatus);
+
+    if (!assetId) {
+      if (currentStatus && typeof currentStatus === 'object') {
+        const keys = Object.keys(currentStatus);
+        const pendingKey = keys.find(k => currentStatus[k] === 'pending' || (currentStatus[k] && !currentStatus[k].inspected));
+        assetId = pendingKey || keys[0] || 'FE-01';
+      } else {
+        assetId = 'FE-01';
+      }
+    }
+
+    // 2. Update Floor Assets Status Map with updateAssetInspectionState
+    let statusMap = currentStatus || {};
+    if (typeof updateStateFn === 'function') {
+      statusMap = updateStateFn(statusMap, assetId, d);
+    } else {
+      const passed = !d.hazard_detected && d.compliance_status === 'مطابق';
+      statusMap = {
+        ...statusMap,
+        [assetId]: {
+          inspected: true,
+          passed: Boolean(passed),
+          gauge_status: d.gauge_status || 'unknown',
+          tag_last_date: d.tag_last_date || '',
+          tag_valid: d.tag_valid !== false,
+          pin_and_seal_intact: d.pin_and_seal_intact !== false,
+          door_wedged: !!d.door_wedged,
+          exit_obstruction_percent: d.exit_obstruction_percent || 0,
+          submode: d.submode || 'general',
+          summary: d.findings_summary || '',
+          timestamp: Date.now()
+        }
+      };
+    }
+
+    if (window.state && window.state.currentRoundDraft) {
+      window.state.currentRoundDraft.floorAssetsStatus = statusMap;
+      if (typeof renderFloorAssetsReconciliation === 'function') {
+        renderFloorAssetsReconciliation();
+      }
+    }
+    if (window.currentActiveRound) {
+      window.currentActiveRound.floorAssetsStatus = statusMap;
+    }
+
+    // 3. Map Vision Findings to Checklist Action Plan with mapVisionToChecklistFields
+    let plan = { compliantItems: [], nonCompliantItems: [], notesText: '' };
+    if (typeof mapFieldsFn === 'function') {
+      plan = mapFieldsFn(d);
+    } else {
+      const isPassing = !d.hazard_detected && d.compliance_status === 'مطابق';
+      plan = {
+        compliantItems: isPassing ? ['general'] : [],
+        nonCompliantItems: isPassing ? [] : ['general'],
+        notesText: d.findings_summary || ''
+      };
+    }
+
+    // 4. Update Checklist Radio Items in Modal / State
+    const roundModal = (typeof document !== 'undefined')
+      ? (document.getElementById('modal-new-round') || document.getElementById('newRoundModal'))
+      : null;
+
+    if (window.state && window.state.currentRoundDraft && Array.isArray(window.state.currentRoundDraft.items)) {
+      window.state.currentRoundDraft.items.forEach(item => {
+        const title = (item.title || '').toLowerCase();
+        const desc = (item.desc || '').toLowerCase();
+        const code = (item.code || '').toUpperCase();
+        const text = `${title} ${desc} ${code}`;
+
+        let shouldPass = null;
+
+        // Extinguishers items
+        if (code === 'KSU-FEX-02' || text.includes('gauge') || text.includes('الضغط') || text.includes('pin') || text.includes('مسمار')) {
+          const hasFailure = plan.nonCompliantItems.includes('pressure_gauge') || plan.nonCompliantItems.includes('pin');
+          const hasPass = plan.compliantItems.includes('pressure_gauge') || plan.compliantItems.includes('pin');
+          if (hasFailure) shouldPass = false;
+          else if (hasPass) shouldPass = true;
+        } else if (code === 'KSU-FEX-06' || text.includes('tag') || text.includes('بطاقة') || text.includes('صيانة')) {
+          if (plan.nonCompliantItems.includes('tag')) shouldPass = false;
+          else if (plan.compliantItems.includes('tag')) shouldPass = true;
+        }
+
+        // Emergency Exit items
+        if (code === 'KSU-EXT-01' || text.includes('أبواب') || text.includes('door') || text.includes('وتد') || text.includes('wedge')) {
+          if (plan.nonCompliantItems.includes('door_wedged')) shouldPass = false;
+          else if (plan.compliantItems.includes('door_wedged')) shouldPass = true;
+        } else if (code === 'KSU-EXT-03' || text.includes('مسالك') || text.includes('ممرات') || text.includes('obstruction') || text.includes('عوائق')) {
+          if (plan.nonCompliantItems.includes('exit_obstruction')) shouldPass = false;
+          else if (plan.compliantItems.includes('exit_obstruction')) shouldPass = true;
+        }
+
+        // Electrical / Hazard items
+        if (text.includes('36') || text.includes('خلو') || text.includes('clearance')) {
+          if (plan.nonCompliantItems.includes('clearance_36in')) shouldPass = false;
+          else if (plan.compliantItems.includes('clearance_36in')) shouldPass = true;
+        }
+
+        if (shouldPass !== null) {
+          const resultVal = shouldPass ? 'compliant' : 'violation';
+          item.result = resultVal;
+          if (typeof updateChecklistResult === 'function') {
+            updateChecklistResult(item.id, resultVal);
+          }
+        }
+      });
+    }
+
+    if (roundModal) {
+      // Set DOM radio elements by state item IDs
+      if (window.state && window.state.currentRoundDraft && Array.isArray(window.state.currentRoundDraft.items)) {
+        window.state.currentRoundDraft.items.forEach(item => {
+          const compRadio = roundModal.querySelector(`#opt-comp-${item.id}, input[name="chk-item-${item.id}"][value="compliant"], input[name="chk-item-${item.id}"][value="pass"]`);
+          const violRadio = roundModal.querySelector(`#opt-viol-${item.id}, input[name="chk-item-${item.id}"][value="violation"], input[name="chk-item-${item.id}"][value="fail"]`);
+          if (item.result === 'compliant' && compRadio) {
+            compRadio.checked = true;
+            compRadio.dispatchEvent(new Event('change', { bubbles: true }));
+          } else if (item.result === 'violation' && violRadio) {
+            violRadio.checked = true;
+            violRadio.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+      }
+
+      // Direct selector fallback for mock / custom checklist elements
+      plan.nonCompliantItems.forEach(itemKey => {
+        const sel = `input[name*="${itemKey}"][value="violation"], input[name*="${itemKey}"][value="fail"], input[name*="${itemKey}"][value="no"], input[data-item*="${itemKey}"][value="fail"]`;
+        const radio = roundModal.querySelector(sel);
+        if (radio) {
+          radio.checked = true;
+          radio.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+
+      plan.compliantItems.forEach(itemKey => {
+        const sel = `input[name*="${itemKey}"][value="compliant"], input[name*="${itemKey}"][value="pass"], input[name*="${itemKey}"][value="yes"], input[data-item*="${itemKey}"][value="pass"]`;
+        const radio = roundModal.querySelector(sel);
+        if (radio) {
+          radio.checked = true;
+          radio.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+
+      if (typeof updateChecklistScorePreview === 'function') {
+        updateChecklistScorePreview();
+      }
+    }
+
+    // 5. Append findings to round notes
+    const notesText = plan.notesText || d.findings_summary || '';
+    if (notesText) {
+      const notesEl = (roundModal && roundModal.querySelector('#inp-round-notes')) || (typeof document !== 'undefined' ? document.getElementById('inp-round-notes') : null);
+      const appendStr = `[فحص بصري ذكي]: ${notesText}`;
+      if (notesEl) {
+        const oldVal = (notesEl.value || '').trim();
+        notesEl.value = oldVal ? `${oldVal} | ${appendStr}` : appendStr;
+        notesEl.dispatchEvent(new Event('input', { bubbles: true }));
+        notesEl.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (window.state && window.state.currentRoundDraft) {
+        const oldVal = (window.state.currentRoundDraft.notes || '').trim();
+        window.state.currentRoundDraft.notes = oldVal ? `${oldVal} | ${appendStr}` : appendStr;
+      }
+      if (window.currentActiveRound) {
+        const oldVal = (window.currentActiveRound.notes || '').trim();
+        window.currentActiveRound.notes = oldVal ? `${oldVal} | ${appendStr}` : appendStr;
+      }
+    }
+
+    // 6. Displays a success toast: "تم فحص الأصل وتحديث بنود الجولة بنجاح ✅"
+    const toastMsg = 'تم فحص الأصل وتحديث بنود الجولة بنجاح ✅';
+    if (typeof window.showToast === 'function') {
+      window.showToast(toastMsg, 'success');
+    } else if (typeof showToast === 'function') {
+      showToast(toastMsg, 'success');
+    }
+
+    // 7. Closes the vision modal
+    if (typeof document !== 'undefined') {
+      const visionModal = document.getElementById('ksu-ai-vision-modal');
+      if (visionModal) {
+        visionModal.remove();
+      }
+    }
+
+    return {
+      success: true,
+      assetId,
+      statusMap,
+      plan
+    };
+  };
 
   // اعتماد ورفع المخالفة وحفظها تلقائياً بصيغة PDF في الأرشيف الشامل بنفس تصميم كارت الفحص
   window.approveAndUploadVisualViolation = function() {

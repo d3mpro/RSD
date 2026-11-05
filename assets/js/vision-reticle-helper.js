@@ -511,6 +511,138 @@
     return '';
   }
 
+  /**
+   * Pure state updater for in-round asset-level inspection tracking
+   * @param {Object} floorAssetsStatus - Existing floor assets status map
+   * @param {string} assetId - Target asset ID
+   * @param {Object} inspectionData - Results from vision inspection
+   * @returns {Object} Updated copy of floorAssetsStatus preserving all other assets
+   */
+  function updateAssetInspectionState(floorAssetsStatus, assetId, inspectionData = {}) {
+    const existingStatus = (floorAssetsStatus && typeof floorAssetsStatus === 'object') ? { ...floorAssetsStatus } : {};
+    if (!assetId) return existingStatus;
+
+    const data = inspectionData || {};
+    const passed = !data.hazard_detected && data.compliance_status === 'مطابق';
+
+    const assetRecord = {
+      inspected: true,
+      passed: Boolean(passed),
+      gauge_status: data.gauge_status || 'unknown',
+      tag_last_date: data.tag_last_date || '',
+      tag_valid: data.tag_valid !== false,
+      pin_and_seal_intact: data.pin_and_seal_intact !== false,
+      door_wedged: !!data.door_wedged,
+      exit_obstruction_percent: typeof data.exit_obstruction_percent === 'number' ? data.exit_obstruction_percent : (Number(data.exit_obstruction_percent) || 0),
+      submode: data.submode || 'general',
+      summary: data.findings_summary || '',
+      timestamp: (typeof data.timestamp === 'number' && data.timestamp > 0) ? data.timestamp : Date.now()
+    };
+
+    return {
+      ...existingStatus,
+      [assetId]: assetRecord
+    };
+  }
+
+  /**
+   * Pure mapping helper from vision analysis output to checklist action plan
+   * @param {Object} inspectionData - Results from vision inspection
+   * @returns {{ compliantItems: string[], nonCompliantItems: string[], notesText: string }}
+   */
+  function mapVisionToChecklistFields(inspectionData = {}) {
+    const data = inspectionData || {};
+    const submode = String(data.submode || '').trim().toLowerCase();
+
+    const compliantItems = [];
+    const nonCompliantItems = [];
+
+    // Extinguisher checks
+    const hasExtinguisherSignals = submode === 'extinguisher' || data.gauge_status !== undefined || data.tag_valid !== undefined || data.pin_and_seal_intact !== undefined;
+    if (hasExtinguisherSignals) {
+      // Pressure gauge: compliant if gauge_status === 'green', else non_compliant
+      if (data.gauge_status === 'green') {
+        compliantItems.push('pressure_gauge');
+      } else {
+        nonCompliantItems.push('pressure_gauge');
+      }
+
+      // Tag: compliant if tag_valid === true, else non_compliant
+      if (data.tag_valid === true) {
+        compliantItems.push('tag');
+      } else {
+        nonCompliantItems.push('tag');
+      }
+
+      // Pin: compliant if pin_and_seal_intact === true, else non_compliant
+      if (data.pin_and_seal_intact === true) {
+        compliantItems.push('pin');
+      } else {
+        nonCompliantItems.push('pin');
+      }
+    }
+
+    // Emergency Exits checks
+    const hasExitSignals = submode === 'emergency_exit' || submode === 'exit' || data.door_wedged !== undefined || data.exit_obstruction_percent !== undefined;
+    if (hasExitSignals) {
+      // Door wedges: non_compliant if door_wedged === true
+      if (data.door_wedged === true) {
+        nonCompliantItems.push('door_wedged');
+      } else {
+        compliantItems.push('door_wedged');
+      }
+
+      // Obstruction: non_compliant if exit_obstruction_percent > 0
+      const obsPct = typeof data.exit_obstruction_percent === 'number' ? data.exit_obstruction_percent : (Number(data.exit_obstruction_percent) || 0);
+      if (obsPct > 0) {
+        nonCompliantItems.push('exit_obstruction');
+      } else {
+        compliantItems.push('exit_obstruction');
+      }
+    }
+
+    // Hazard checks (if hazard submode or explicit hazard clearance flags)
+    const hasHazardSignals = submode === 'hazard' || data.clearance_violation_36in !== undefined;
+    if (hasHazardSignals) {
+      if (data.clearance_violation_36in === true) {
+        nonCompliantItems.push('clearance_36in');
+      } else {
+        compliantItems.push('clearance_36in');
+      }
+
+      if (Array.isArray(data.detected_devices) && data.detected_devices.length > 0) {
+        nonCompliantItems.push('prohibited_devices');
+      } else {
+        compliantItems.push('prohibited_devices');
+      }
+    }
+
+    // General checks if no other specialized submode matched
+    if (!hasExtinguisherSignals && !hasExitSignals && !hasHazardSignals) {
+      const isPassing = !data.hazard_detected && data.compliance_status === 'مطابق';
+      if (isPassing) {
+        compliantItems.push('general_compliance');
+      } else {
+        nonCompliantItems.push('general_compliance');
+      }
+    }
+
+    let notesText = data.findings_summary || '';
+    if (!notesText) {
+      if (nonCompliantItems.length > 0) {
+        notesText = `تم رصد ملاحظات عدم مطابقة: ${nonCompliantItems.join(', ')}`;
+      } else {
+        notesText = 'فحص بصري سليم ومطابق لكافة المتطلبات';
+      }
+    }
+
+    return {
+      compliantItems,
+      nonCompliantItems,
+      notesText
+    };
+  }
+
   return {
     getReticleSvg,
     getSubmodeList,
@@ -520,6 +652,8 @@
     formatExitBadge,
     formatHazardBadge,
     formatSpecializedAssetCard,
+    updateAssetInspectionState,
+    mapVisionToChecklistFields,
     GUIDANCE_MAP
   };
 });
