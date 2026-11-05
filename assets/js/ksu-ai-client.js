@@ -272,11 +272,12 @@
      * 1. التدقيق البصري الذكي للصور والمخالفات الميدانية
      * (الأولوية: جسر الفايربيس اللحظي web.app -> وكيل أوراكل المباشر -> Qwen السحابي -> تدوير مفاتيح Gemini -> المحرك الاسترشادي)
      */
-    async analyzeInspectionImage({ image, images, checklistType, itemLabel, facility, building, floor, notes }) {
+    async analyzeInspectionImage({ image, images, checklistType, itemLabel, facility, building, floor, notes, submode }) {
       const allImages = (images && Array.isArray(images) && images.length) ? images : (image ? [image] : []);
       const payload = {
         image: allImages[0] || '',
         checklistType: checklistType || 'general',
+        submode: submode || undefined,
         itemLabel: itemLabel || '',
         facility: facility || 'المدينة الطبية (KSUMC)',
         building: building || '',
@@ -322,6 +323,7 @@
           const qwenRes = await this.callQwenDirectly({
             images: allImages,
             checklistType,
+            submode,
             itemLabel,
             facility,
             building,
@@ -339,6 +341,7 @@
         return await this.callGeminiDirectly({
           images: allImages,
           checklistType,
+          submode,
           itemLabel,
           facility,
           building,
@@ -362,7 +365,7 @@
     /**
      * الاستدعاء المباشر لنموذج كوين البصري Qwen2.5-VL (OpenRouter / Alibaba DashScope)
      */
-    async callQwenDirectly({ images, checklistType, itemLabel, facility, building, floor, notes }) {
+    async callQwenDirectly({ images, checklistType, submode, itemLabel, facility, building, floor, notes }) {
       const keys = (this.qwenApiKey || '').split(',').map(k => k.trim()).filter(Boolean);
       if (!keys.length) throw new Error('لم يتم ضبط مفتاح Qwen API');
 
@@ -437,7 +440,7 @@
     /**
      * الاستدعاء السحابي المباشر لنموذج Google Gemini 2.5 Flash (مع دعم تدوير عدة مفاتيح)
      */
-    async callGeminiDirectly({ images, checklistType, itemLabel, facility, building, floor, notes }) {
+    async callGeminiDirectly({ images, checklistType, submode, itemLabel, facility, building, floor, notes }) {
       const keyPool = (this.geminiApiKey || '')
         .split(',')
         .map(k => k.trim())
@@ -579,7 +582,7 @@
     /**
      * محرك الفحص الاسترشادي الذكي عند انقطاع الاتصال (Offline Heuristic Engine)
      */
-    heuristicVisualAnalysis({ checklistType, itemLabel, facility, building, floor, notes, fallbackReason }) {
+    heuristicVisualAnalysis({ checklistType, submode, itemLabel, facility, building, floor, notes, fallbackReason }) {
       const type = checklistType || 'general';
       const desc = notes || itemLabel || 'فحص ميداني';
       let element = 'معدة / ممر سلامة ميداني';
@@ -611,6 +614,7 @@
       return {
         success: true,
         data: {
+          submode: submode || (type === 'fire_systems' ? 'extinguisher' : (type === 'egress_exits' ? 'emergency_exit' : (type === 'electrical_devices' ? 'hazard' : 'general'))),
           hazard_detected: status !== 'مطابق',
           compliance_status: status,
           risk_level: risk,
@@ -1896,6 +1900,8 @@
   let lastVisionAnalysisImages = [];
   let visionImagesList = [];
   let currentActivePreviewIndex = 0;
+  let currentVisionSubmode = 'extinguisher';
+  let isReticleGuideVisible = true;
 
   /**
    * فتح نافذة التدقيق البصري الذكي الشاملة لصور السلامة (Multimodal Vision Modal)
@@ -1974,12 +1980,42 @@
             
             <!-- Left: Image Picker & Live Multi-Image Preview (7 cols) -->
             <div class="md:col-span-7 flex flex-col gap-3">
+              <!-- Submode Selection Tabs & Reticle Viewfinder Controls -->
+              <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-100 rounded-2xl border border-slate-200">
+                <div class="flex items-center gap-1.5 overflow-x-auto py-0.5" id="vision-submode-tabs-container">
+                  <button type="button" class="vision-submode-tab active" data-submode="extinguisher" onclick="setVisionSubmode('extinguisher')">
+                    <span>🧯</span>
+                    <span>طفايات حريق</span>
+                  </button>
+                  <button type="button" class="vision-submode-tab" data-submode="emergency_exit" onclick="setVisionSubmode('emergency_exit')">
+                    <span>🚪</span>
+                    <span>مخارج وطوارئ</span>
+                  </button>
+                  <button type="button" class="vision-submode-tab" data-submode="hazard" onclick="setVisionSubmode('hazard')">
+                    <span>⚡</span>
+                    <span>مخاطر كهربائية</span>
+                  </button>
+                  <button type="button" class="vision-submode-tab" data-submode="general" onclick="setVisionSubmode('general')">
+                    <span>🔍</span>
+                    <span>فحص عام</span>
+                  </button>
+                </div>
+
+                <div class="flex items-center gap-1 shrink-0">
+                  <button type="button" id="btn-toggle-reticle-guide" onclick="toggleVisionReticleGuide()" title="إخفاء / إظهار شبكة التوجيه البصرية" class="px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-all shadow-xs">
+                    <span class="material-symbols-outlined text-sm text-[#004B87]">center_focus_weak</span>
+                    <span id="text-reticle-guide-toggle">شبكة التوجيه: مفعّلة</span>
+                  </button>
+                </div>
+              </div>
+
               <div class="p-4 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-300 hover:border-[#004B87] transition-all text-center relative overflow-hidden group" id="vision-dropzone">
                 <input type="file" id="inp-vision-camera" accept="image/*" capture="environment" class="hidden" onchange="handleVisionModalFileSelected(event)">
                 <input type="file" id="inp-vision-gallery" accept="image/*" multiple class="hidden" onchange="handleVisionModalFileSelected(event)">
 
                 <!-- Empty State (No photos added yet) -->
-                <div id="vision-empty-state" class="py-6 flex flex-col items-center justify-center gap-3">
+                <div id="vision-empty-state" class="py-6 flex flex-col items-center justify-center gap-3 relative">
+                  <div id="vision-empty-reticle-container" class="ksu-reticle-overlay opacity-30 pointer-events-none"></div>
                   <div class="w-14 h-14 rounded-2xl bg-blue-100 text-[#004B87] flex items-center justify-center shadow-xs">
                     <span class="material-symbols-outlined text-3xl">add_a_photo</span>
                   </div>
@@ -2002,8 +2038,11 @@
                 <!-- Preview State (Shown when 1 or more photos exist) -->
                 <div id="vision-preview-state" class="hidden flex flex-col gap-2.5">
                   <!-- Main Image Screen -->
-                  <div class="relative rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center min-h-[220px] max-h-[300px] border border-slate-800">
+                  <div class="relative rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center min-h-[220px] max-h-[300px] border border-slate-800" id="vision-screen-container">
                     <img id="img-vision-preview" class="max-h-[290px] w-auto max-w-full object-contain mx-auto transition-all" src="" alt="معاينة الصورة">
+                    
+                    <!-- Dynamic Camera Guided Reticle Viewfinder Overlay -->
+                    <div id="vision-reticle-overlay-container" class="ksu-reticle-overlay pointer-events-none"></div>
                     
                     <!-- Navigation Chevrons (shown if multiple images) -->
                     <button type="button" id="btn-vision-prev" onclick="prevVisionImage()" title="الصورة السابقة" class="hidden absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/90 text-white flex items-center justify-center cursor-pointer transition-all z-10">
@@ -2175,7 +2214,114 @@
     if (options.initialImage) {
       processVisionModalFile(options.initialImage);
     }
+
+    const selVisionType = document.getElementById('sel-vision-type');
+    if (selVisionType) {
+      selVisionType.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (val === 'fire_systems') setVisionSubmode('extinguisher');
+        else if (val === 'egress_exits' || val === 'fire_doors') setVisionSubmode('emergency_exit');
+        else if (val === 'electrical_devices') setVisionSubmode('hazard');
+        else if (val === 'general') setVisionSubmode('general');
+      });
+    }
+
+    let initialSubmode = options.submode || 'extinguisher';
+    if (!options.submode && options.checklistType) {
+      const c = String(options.checklistType).toLowerCase();
+      if (c.includes('exit') || c.includes('مخرج') || c.includes('طوارئ') || c.includes('egress') || c.includes('doors')) {
+        initialSubmode = 'emergency_exit';
+      } else if (c.includes('hazard') || c.includes('كهرب') || c.includes('electrical')) {
+        initialSubmode = 'hazard';
+      } else if (c.includes('extinguisher') || c.includes('طفاية') || c.includes('إطفاء')) {
+        initialSubmode = 'extinguisher';
+      } else {
+        initialSubmode = 'general';
+      }
+    }
+    setVisionSubmode(initialSubmode);
   };
+
+  /**
+   * ضبط النمط الفرعي للرؤية البصرية (Submode Selector) وتحديث شبكة التوجيه (Reticle)
+   */
+  window.setVisionSubmode = function(submode) {
+    if (!submode) return;
+    currentVisionSubmode = submode;
+    window.currentVisionSubmode = submode;
+
+    const tabs = document.querySelectorAll('.vision-submode-tab');
+    tabs.forEach(tab => {
+      if (tab.getAttribute('data-submode') === submode) {
+        tab.classList.add('active');
+      } else {
+        tab.classList.remove('active');
+      }
+    });
+
+    const typeSelect = document.getElementById('sel-vision-type');
+    if (typeSelect) {
+      if (submode === 'extinguisher') {
+        typeSelect.value = 'fire_systems';
+      } else if (submode === 'emergency_exit' || submode === 'exit') {
+        typeSelect.value = 'egress_exits';
+      } else if (submode === 'hazard') {
+        typeSelect.value = 'electrical_devices';
+      } else if (submode === 'general') {
+        typeSelect.value = 'general';
+      }
+    }
+
+    renderVisionReticleOverlay();
+  };
+  const setVisionSubmode = window.setVisionSubmode;
+
+  /**
+   * إخفاء أو إظهار شبكة التوجيه البصرية الذكية
+   */
+  window.toggleVisionReticleGuide = function() {
+    isReticleGuideVisible = !isReticleGuideVisible;
+    const overlay = document.getElementById('vision-reticle-overlay-container');
+    const emptyOverlay = document.getElementById('vision-empty-reticle-container');
+    const btnText = document.getElementById('text-reticle-guide-toggle');
+
+    if (overlay) overlay.style.display = isReticleGuideVisible ? 'block' : 'none';
+    if (emptyOverlay) emptyOverlay.style.display = isReticleGuideVisible ? 'block' : 'none';
+    if (btnText) {
+      btnText.textContent = isReticleGuideVisible ? 'شبكة التوجيه: مفعّلة' : 'شبكة التوجيه: معطلة';
+    }
+  };
+  const toggleVisionReticleGuide = window.toggleVisionReticleGuide;
+
+  /**
+   * إعادة رسم شبكة التوجيه (SVG Reticle Overlay) بناءً على النمط النشط وحالة العرض
+   */
+  function renderVisionReticleOverlay() {
+    const overlay = document.getElementById('vision-reticle-overlay-container');
+    const emptyOverlay = document.getElementById('vision-empty-reticle-container');
+
+    if (!isReticleGuideVisible) {
+      if (overlay) overlay.style.display = 'none';
+      if (emptyOverlay) emptyOverlay.style.display = 'none';
+      return;
+    }
+
+    const helper = (typeof window !== 'undefined' && window.KSUReticleHelper)
+      ? window.KSUReticleHelper
+      : (typeof KSUReticleHelper !== 'undefined' ? KSUReticleHelper : null);
+
+    if (helper && typeof helper.getReticleSvg === 'function') {
+      const svgMarkup = helper.getReticleSvg(currentVisionSubmode);
+      if (overlay) {
+        overlay.style.display = 'block';
+        overlay.innerHTML = svgMarkup;
+      }
+      if (emptyOverlay) {
+        emptyOverlay.style.display = 'block';
+        emptyOverlay.innerHTML = svgMarkup;
+      }
+    }
+  }
 
   function handleVisionPaste(e) {
     const modal = document.getElementById('ksu-ai-vision-modal');
@@ -2258,6 +2404,7 @@
 
     if (emptyState) emptyState.classList.add('hidden');
     if (previewState) previewState.classList.remove('hidden');
+    renderVisionReticleOverlay();
 
     if (imgEl) {
       imgEl.src = visionImagesList[currentActivePreviewIndex];
@@ -2378,12 +2525,14 @@
     const room = document.getElementById('inp-vision-room')?.value || '';
     const type = document.getElementById('sel-vision-type')?.value || 'general';
     const notes = document.getElementById('inp-vision-notes')?.value || '';
+    const activeSubmode = currentVisionSubmode || 'general';
 
     try {
       const res = await KSUAI.analyzeInspectionImage({
         image: visionImagesList[0],
         images: visionImagesList,
         checklistType: type,
+        submode: activeSubmode,
         itemLabel: room ? `${floor} - ${room}` : floor,
         facility: 'المدينة الطبية (KSUMC)',
         building: building,
@@ -2393,19 +2542,21 @@
 
       const d = res.data || {};
       d.images_count = visionImagesList.length;
+      d.submode = activeSubmode;
       lastVisionAnalysisData = d;
       lastVisionAnalysisImage = visionImagesList[0];
       lastVisionAnalysisImages = [...visionImagesList];
       window.lastVisionAnalysisData = d;
       window.lastVisionAnalysisImage = lastVisionAnalysisImage;
       window.lastVisionAnalysisImages = lastVisionAnalysisImages;
-      window.lastVisionLocation = { building, floor, room, type, notes };
+      window.lastVisionLocation = { building, floor, room, type, notes, submode: activeSubmode };
 
       renderVisionInspectionResults(d, building, floor, room);
     } catch (err) {
       console.warn('AI vision error caught, using expert heuristic analysis:', err);
       const fallbackRes = KSUAI.heuristicVisualAnalysis({
         checklistType: type,
+        submode: activeSubmode,
         itemLabel: room ? `${floor} - ${room}` : floor,
         facility: 'المدينة الطبية (KSUMC)',
         building: building,
@@ -2415,13 +2566,14 @@
       });
       const d = fallbackRes.data || {};
       d.images_count = visionImagesList.length;
+      d.submode = activeSubmode;
       lastVisionAnalysisData = d;
       lastVisionAnalysisImage = visionImagesList[0];
       lastVisionAnalysisImages = [...visionImagesList];
       window.lastVisionAnalysisData = d;
       window.lastVisionAnalysisImage = lastVisionAnalysisImage;
       window.lastVisionAnalysisImages = lastVisionAnalysisImages;
-      window.lastVisionLocation = { building, floor, room, type, notes };
+      window.lastVisionLocation = { building, floor, room, type, notes, submode: activeSubmode };
       renderVisionInspectionResults(d, building, floor, room);
     } finally {
       if (laser) laser.classList.add('hidden');

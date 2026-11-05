@@ -620,5 +620,124 @@ main.pb-24 {
   touch-action: manipulation !important;
 }
 
+/* ==========================================================================
+   KSUMC AI Vision Camera Guided Reticle (Viewfinder) & Submode Selector
+   ========================================================================== */
+.ksu-reticle-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none !important;
+  z-index: 15;
+  user-select: none;
+  transition: opacity 0.25s ease-in-out;
+}
+
+.reticle-pulse-glow {
+  animation: ksuReticleGlow 2.4s ease-in-out infinite;
+}
+
+@keyframes ksuReticleGlow {
+  0%, 100% {
+    opacity: 0.82;
+    filter: drop-shadow(0 0 2px rgba(56, 189, 248, 0.4));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 7px rgba(56, 189, 248, 0.8));
+  }
+}
+
+.gauge-target-circle {
+  stroke: #38bdf8;
+  stroke-width: 2.5;
+  stroke-dasharray: 6 3;
+  fill: rgba(56, 189, 248, 0.08);
+  transition: stroke 0.2s ease, fill 0.2s ease;
+}
+
+.tag-target-rect {
+  stroke: #fbbf24;
+  stroke-width: 2.2;
+  stroke-dasharray: 6 3;
+  fill: rgba(251, 191, 36, 0.08);
+  transition: stroke 0.2s ease, fill 0.2s ease;
+}
+
+.door-target-frame {
+  stroke: #34d399;
+  stroke-width: 2.5;
+  fill: rgba(52, 211, 153, 0.06);
+}
+
+.floor-target-path {
+  stroke: #38bdf8;
+  stroke-width: 2;
+  stroke-dasharray: 4 4;
+  fill: rgba(56, 189, 248, 0.12);
+}
+
+.hazard-target-grid {
+  stroke: #f87171;
+  stroke-width: 2;
+  stroke-dasharray: 8 4;
+  fill: rgba(248, 113, 113, 0.06);
+}
+
+.hazard-target-crosshair {
+  stroke: #f87171;
+}
+
+.reticle-corner {
+  stroke: #38bdf8;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+.reticle-crosshair {
+  stroke: #38bdf8;
+  stroke-width: 1.8;
+  fill: none;
+}
+
+.reticle-hint-badge {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+}
+
+/* Submode Selector Pill Tabs */
+.vision-submode-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1.5px solid #cbd5e1;
+  background-color: #f8fafc;
+  color: #475569;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.vision-submode-tab:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.vision-submode-tab.active {
+  background: linear-gradient(135deg, #004b87 0%, #002b49 100%) !important;
+  color: #ffffff !important;
+  border-color: #004b87 !important;
+  box-shadow: 0 4px 12px rgba(0, 75, 135, 0.25);
+}
+
+
 
 
