@@ -2565,18 +2565,7 @@
 
 
   <!-- ALL ORIGINAL MODALS FOR ROUNDS, QR, HAZARD, HOTWORK & REPORTS -->
-    <div class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-6 modal-backdrop" id="modal-new-round" data-alias="newRoundModal">
-    <script>
-      (function() {
-        if (typeof document !== 'undefined') {
-          const origGet = document.getElementById.bind(document);
-          document.getElementById = function(id) {
-            if (id === 'newRoundModal') return origGet('modal-new-round');
-            return origGet(id);
-          };
-        }
-      })();
-    </script>
+    <div class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-6 modal-backdrop" id="newRoundModal">
     <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden font-cairo text-slate-800 animate-in fade-in zoom-in-95 duration-200 my-auto">
       
       <!-- Modal Header (Royal Blue Gradient with Dynamic Form Title & Icon) -->
@@ -2693,9 +2682,6 @@
             <button type="button" onclick="openAIVisionInspectionModal({ checklistType: document.getElementById('inp-round-form-type')?.value || 'fex' })" id="btn-round-ai-vision" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-700 to-[#004B87] hover:from-indigo-700 hover:to-[#003B6B] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95 transition-all" title="فحص ذكي بالكاميرا بالذكاء الاصطناعي وتعبئة البنود آلياً">
               <span class="material-symbols-outlined text-sm text-amber-300">center_focus_strong</span>
               <span>🤖 فحص ذكي بالكاميرا (Vision AI)</span>
-            </button>
-              <span class="material-symbols-outlined text-sm text-slate-600">photo_library</span>
-              <span>🖼️ إضافة من الألبوم</span>
             </button>
           </div>
 

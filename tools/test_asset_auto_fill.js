@@ -226,7 +226,8 @@ test('applyVisionToActiveRound simulates end-to-end asset update, checklist fill
     remove() { this.removed = true; }
   }
 
-  const modalNewRound = new MockElement('modal-new-round');
+  const modalNewRound = new MockElement('newRoundModal');
+  mockElements.set('newRoundModal', modalNewRound);
   mockElements.set('modal-new-round', modalNewRound);
 
   const inpRoundNotes = new MockElement('inp-round-notes', 'input');
@@ -350,14 +351,18 @@ test('applyVisionToActiveRound simulates end-to-end asset update, checklist fill
   globalThis.localStorage = originalLocalStorage;
 });
 
-test('field.html contains modal-new-round container and in-round AI vision trigger button', () => {
+test('field.html contains round modal container and in-round AI vision trigger button without monkeypatching', () => {
   const fieldHtml = fs.readFileSync(fieldHtmlPath, 'utf8');
 
-  // Check modal ID supports modal-new-round
-  assert.ok(fieldHtml.includes('id="modal-new-round"') || fieldHtml.includes('modal-new-round'), 'field.html must have modal-new-round');
+  // Check modal container exists
+  assert.ok(fieldHtml.includes('id="newRoundModal"') || fieldHtml.includes('id="modal-new-round"'), 'field.html must have round modal container');
 
   // Check in-round AI vision trigger button exists
   assert.ok(fieldHtml.includes('openAIVisionInspectionModal'), 'field.html must contain openAIVisionInspectionModal');
+  assert.ok(fieldHtml.includes('id="btn-round-ai-vision"'), 'field.html must contain btn-round-ai-vision');
+
+  // Ensure no global document.getElementById monkeypatching script
+  assert.ok(!fieldHtml.includes('document.getElementById = function'), 'field.html must NOT monkeypatch document.getElementById');
 });
 
 test('Syntax check passes for modified JavaScript files', () => {
