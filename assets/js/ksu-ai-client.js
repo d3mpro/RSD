@@ -2107,42 +2107,11 @@
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button type="button" onclick="toggleVisionAgentSettingsPanel()" title="إعدادات خادم أوراكل ونموذج Qwen2.5-VL" class="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-amber-300 text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer border border-white/15">
-              <span class="material-symbols-outlined text-base">settings</span>
-              <span class="hidden sm:inline">وكيل أوراكل / Qwen</span>
-            </button>
-            <button onclick="document.getElementById('ksu-ai-vision-modal').remove()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer font-bold">✕</button>
-          </div>
-        </div>
-
-        <!-- Collapsible Oracle / Qwen2.5-VL Agent Configuration Panel -->
-        <div id="vision-agent-settings-panel" class="hidden px-5 py-3.5 bg-slate-900 text-white border-b border-slate-700 text-xs space-y-3">
-          <div class="flex items-center justify-between">
-            <div class="font-black text-amber-300 flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-base">dns</span>
-              <span>إعدادات وكيل خادم أوراكل ونموذج كوين البصري (Qwen2.5-VL Vision Agent)</span>
-            </div>
-            <span id="vision-agent-ping-badge" class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-bold">جاهز للضبط</span>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <div>
-              <label class="block text-[11px] text-slate-300 font-bold mb-1">رابط خادم وكيل أوراكل الجديد:</label>
-              <input id="inp-agent-oracle-url" type="text" dir="ltr" placeholder="http://localhost:8000 أو https://IP" value="${KSUAI.oracleAgentUrl || ''}" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-white text-xs outline-none focus:border-amber-400">
-            </div>
-            <div>
-              <label class="block text-[11px] text-slate-300 font-bold mb-1">مفتاح Qwen2.5-VL (OpenRouter / DashScope):</label>
-              <input id="inp-agent-qwen-key" type="password" dir="ltr" placeholder="sk-or-v1-..." value="${KSUAI.qwenApiKey || ''}" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-white text-xs outline-none focus:border-amber-400">
-            </div>
-            <div>
-              <label class="block text-[11px] text-slate-300 font-bold mb-1">نموذج الرؤية (Qwen Vision Model):</label>
-              <input id="inp-agent-qwen-model" type="text" dir="ltr" value="${KSUAI.qwenVisionModel || 'qwen/qwen2.5-vl-72b-instruct:free'}" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-white text-xs outline-none focus:border-amber-400">
-            </div>
-          </div>
-          <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
-            <span class="text-[10px] text-slate-400">اترك رابط أوراكل فارغاً على localhost ليستخدم تلقائياً <code>http://localhost:8000</code> عند تشغيل الوكيل المحلي.</span>
-            <div class="flex items-center gap-2">
-              <button type="button" onclick="testAndSaveVisionAgentConfig()" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs cursor-pointer transition-all">حفظ وفحص اتصال الوكيل</button>
-            </div>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-emerald-300 text-[11px] font-bold border border-white/15">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>الراصد الذكي جاهز</span>
+            </span>
+            <button onclick="document.getElementById('ksu-ai-vision-modal').remove()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer font-bold text-base" title="إغلاق النافذة">✕</button>
           </div>
         </div>
 
@@ -2196,14 +2165,14 @@
                     <h4 class="font-black text-sm text-[#002B49]">التقط صورة أو عدة صور للملاحظة أو المعدة الميدانية</h4>
                     <p class="text-xs text-slate-500 mt-1 max-w-md">يمكنك التقاط صور متتالية بالكاميرا أو اختيار عدة صور من المعرض دفعة واحدة ليقوم الذكاء الاصطناعي بفحصها وتدقيقها مجتمعة</p>
                   </div>
-                  <div class="flex flex-wrap items-center justify-center gap-2 pt-2">
-                    <button type="button" onclick="document.getElementById('inp-vision-camera').click()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#004B87] to-[#0A3D68] hover:from-[#003B6B] hover:to-[#082B49] text-white font-bold text-xs flex items-center gap-2 shadow-md cursor-pointer active:scale-95 transition-all">
-                      <span class="material-symbols-outlined text-base">photo_camera</span>
-                      <span>📷 فتح الكاميرا الميدانية</span>
+                  <div class="flex flex-wrap items-center justify-center gap-3 pt-3 relative z-10 w-full max-w-sm mx-auto">
+                    <button type="button" onclick="document.getElementById('inp-vision-camera').click()" class="flex-1 min-w-[140px] px-4 py-3 rounded-2xl bg-gradient-to-r from-[#004B87] to-[#002B49] hover:from-[#003B6B] hover:to-[#001E36] text-white font-black text-xs flex items-center justify-center gap-2 shadow-md hover:shadow-lg cursor-pointer active:scale-95 transition-all">
+                      <span class="material-symbols-outlined text-lg text-amber-300">photo_camera</span>
+                      <span>فتح الكاميرا الميدانية</span>
                     </button>
-                    <button type="button" onclick="document.getElementById('inp-vision-gallery').click()" class="px-4 py-2.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 font-bold text-xs flex items-center gap-2 shadow-xs cursor-pointer transition-all">
-                      <span class="material-symbols-outlined text-base text-slate-600">photo_library</span>
-                      <span>🖼️ اختيار من الألبوم (متعدد)</span>
+                    <button type="button" onclick="document.getElementById('inp-vision-gallery').click()" class="flex-1 min-w-[140px] px-4 py-3 rounded-2xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 shadow-xs hover:shadow-sm cursor-pointer active:scale-95 transition-all">
+                      <span class="material-symbols-outlined text-lg text-[#004B87]">photo_library</span>
+                      <span>اختيار من الألبوم</span>
                     </button>
                   </div>
                 </div>
@@ -2491,7 +2460,7 @@
       }
       if (emptyOverlay) {
         emptyOverlay.style.display = 'block';
-        emptyOverlay.innerHTML = svgMarkup;
+        emptyOverlay.innerHTML = helper.getReticleSvg(currentVisionSubmode, { showGuideText: false });
       }
     }
   }
@@ -2903,7 +2872,7 @@
             <span class="px-2.5 py-0.5 rounded-full ${badgeClass} text-[11px] font-black">${d.compliance_status || (isCritical ? 'غير مطابق' : 'مطابق')}</span>
             <span class="text-xs text-white/80 font-bold">${d.standard_reference || 'CBAHI FMS / NFPA 101'}</span>
             <span class="px-2 py-0.5 rounded-full bg-white/10 text-amber-300 text-[10px] font-black">دقة التحليل: ${d.confidence_score || 95}%</span>
-            <span class="px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-200 text-[10px] font-bold" dir="ltr">${engineBadge}</span>
+            <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] font-black">تدقيق ذكي معتمد ✅</span>
           </div>
           ${d.violation_name ? `
             <div class="mt-2 space-y-1">
