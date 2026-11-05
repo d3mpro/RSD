@@ -39,10 +39,10 @@
     },
     {
       id: 'general',
-      label: 'فحص عام',
+      label: 'رصد مخالفة عامة',
       icon: '🔍',
-      fullLabel: '🔍 فحص عام',
-      description: 'تدقيق بصري شامل لكافة متطلبات السلامة الميدانية'
+      fullLabel: '🔍 رصد مخالفة عامة',
+      description: 'تدقيق بصري شامل لكافة متطلبات ومخالفات السلامة الميدانية'
     }
   ];
 
@@ -50,7 +50,7 @@
     extinguisher: 'ضع عداد الضغط داخل الدائرة وبطاقة الصيانة داخل المستطيل',
     emergency_exit: 'حدد إطار الباب ومسار الخروج بالكامل',
     hazard: 'وجّه العدسة نحو اللوحة الكهربائية أو مصدر الخطر',
-    general: 'وجّه الكاميرا نحو العنصر المراد فحصه'
+    general: 'وجّه الكاميرا نحو العنصر المراد فحصه ورصد وتحديد المخالفة تلقائياً'
   };
 
   /**
@@ -64,13 +64,13 @@
    * Resolve human-readable Arabic title for a submode
    */
   function resolveSubmodeLabel(submode) {
-    if (!submode) return '🔍 فحص عام';
+    if (!submode) return '🔍 رصد مخالفة عامة';
     const s = String(submode).trim().toLowerCase();
     if (s === 'extinguisher') return '🧯 طفايات حريق';
     if (s === 'emergency_exit' || s === 'exit') return '🚪 مخارج وطوارئ';
     if (s === 'hazard') return '⚡ مخاطر كهربائية';
-    if (s === 'general') return '🔍 فحص عام';
-    return '🔍 فحص عام';
+    if (s === 'general') return '🔍 رصد مخالفة عامة';
+    return '🔍 رصد مخالفة عامة';
   }
 
   /**
@@ -650,6 +650,15 @@
     const a = analysis || {};
     const parts = [];
 
+    // 0. اسم وتصنيف المخالفة وبيانات الخطورة
+    const violHeader = [];
+    if (a.violation_name) violHeader.push(`• اسم المخالفة: ${a.violation_name}`);
+    if (a.violation_type) violHeader.push(`• نوع وتصنيف المخالفة: ${a.violation_type}`);
+    if (a.risk_level) violHeader.push(`• درجة الخطورة: ${a.risk_level}`);
+    if (violHeader.length > 0) {
+      parts.push(`بيانات المخالفة المرصودة:\n${violHeader.join('\n')}`);
+    }
+
     // 1. ملخص المعاينة
     const summary = a.findings_summary || a.detected_element || 'رصد ملاحظة ومخالفة سلامة ميدانية تستوجب التدخل والتصحيح.';
     parts.push(`ملخص المعاينة الميدانية:\n${summary}`);
@@ -690,7 +699,8 @@
     const building = loc.building || 'المستشفى';
     const floor = loc.floor || '';
     const room = loc.room || '';
-    const title = a.detected_element || 'مخالفة سلامة مرصودة بالذكاء الاصطناعي';
+    const title = a.violation_name || a.detected_element || 'مخالفة سلامة مرصودة بالذكاء الاصطناعي';
+    const violation_type = a.violation_type || '';
     const risk_level = a.risk_level || 'متوسط';
     const standard_reference = a.standard_reference || 'CBAHI / NFPA';
     const description = formatViolationDescription(a);
@@ -702,6 +712,7 @@
       floor,
       room,
       title,
+      violation_type,
       risk_level,
       standard_reference,
       description,

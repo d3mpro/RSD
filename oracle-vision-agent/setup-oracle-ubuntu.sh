@@ -71,6 +71,28 @@ sudo systemctl daemon-reload
 sudo systemctl enable ksumc-vision-agent
 sudo systemctl restart ksumc-vision-agent
 
+# 5.1 إنشاء خدمة جسر الفايربيس اللحظي لتمرير الطلبات وتجاوز حظر شبكة الجامعة
+sudo tee /etc/systemd/system/ksumc-firebase-bridge.service > /dev/null <<EOF
+[Unit]
+Description=KSUMC Firebase Realtime Queue Bridge Worker
+After=network.target ksumc-vision-agent.service
+
+[Service]
+User=$USER
+WorkingDirectory=$APP_DIR
+EnvironmentFile=$APP_DIR/.env
+ExecStart=$APP_DIR/venv/bin/python firebase_bridge.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable ksumc-firebase-bridge
+sudo systemctl restart ksumc-firebase-bridge
+
 # 6. إعداد Nginx كواجهة عكسية (Reverse Proxy) لدعم المسار /safety/api/
 sudo tee /etc/nginx/sites-available/ksumc-vision-agent > /dev/null <<'EOF'
 server {

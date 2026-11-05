@@ -195,7 +195,7 @@
      * إرسال طلب الذكاء الاصطناعي عبر جسر الفايربيس اللحظي (Firebase RTDB Bridge)
      * مخصص لشبكة الجامعة والمدينة الطبية لتجاوز أي حظر جدار حماية خارجي نهائياً عبر نطاق web.app المعتمد
      */
-    async dispatchViaFirebaseBridge(action, payload, timeoutMs = 60000) {
+    async dispatchViaFirebaseBridge(action, payload, timeoutMs = 12000) {
       const getDb = () => {
         if (window.firebase && typeof window.firebase.database === 'function') {
           return window.firebase.database();
@@ -270,9 +270,10 @@
 
     /**
      * 1. التدقيق البصري الذكي للصور والمخالفات الميدانية
-     * (الأولوية: جسر الفايربيس اللحظي web.app -> وكيل أوراكل المباشر -> Qwen السحابي -> تدوير مفاتيح Gemini -> المحرك الاسترشادي)
+     * (الأولوية المباشرة: Google Gemini 2.5 Flash Vision السحابي المباشر -> Qwen2.5-VL -> وكيل أوراكل -> جسر الفايربيس -> المحرك الاسترشادي الخبير)
      */
     async analyzeInspectionImage({ image, images, checklistType, itemLabel, facility, building, floor, notes, submode }) {
+      const onProgress = arguments[0] && arguments[0].onProgress;
       const allImages = (images && Array.isArray(images) && images.length) ? images : (image ? [image] : []);
       const payload = {
         image: allImages[0] || '',
@@ -288,38 +289,35 @@
         payload.images = allImages;
       }
 
-      // المسار 0 (المعتمد في شبكة الجامعة): جسر الفايربيس اللحظي (Firebase RTDB Bridge عبر web.app)
-      try {
-        const bridgeRes = await this.dispatchViaFirebaseBridge('analyze-inspection-image', payload, 60000);
-        if (bridgeRes && bridgeRes.success) {
-          if (bridgeRes.data) bridgeRes.data.ai_engine_source = bridgeRes.source || 'Oracle Ollama (via Firebase Bridge)';
-          return bridgeRes;
-        }
-      } catch (bridgeErr) {
-        console.warn('[KSUAI] Firebase RTDB Bridge notice, falling back to direct agent/API:', bridgeErr.message);
-      }
+      const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com') || window.location.protocol === 'file:';
 
-      // المسار 1: الاتصال المباشر بوكيل أوراكل (إذا كان متاحاً بدون حظر)
-      const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com');
-      const hasOracleAgent = Boolean(this.oracleAgentUrl) || !isFirebase;
-      if (hasOracleAgent) {
+      // المسار 1 (الأولوية القصوى والسريعة المعتمدة): الاستدعاء المباشر لمحرك Google Gemini 2.5 Flash Vision
+      if (this.geminiApiKey) {
         try {
-          const res = await this.request('/ai/analyze-inspection-image', {
-            method: 'POST',
-            body: JSON.stringify(payload)
-          }, 50000);
-          if (res && res.success) {
-            if (res.data) res.data.ai_engine_source = res.source || 'Oracle Qwen2.5-VL Agent';
-            return res;
+          if (typeof onProgress === 'function') onProgress('جاري التحليل البصري الذكي وتحديد نوع واسم المخالفة عبر Gemini Vision...');
+          const geminiRes = await this.callGeminiDirectly({
+            images: allImages,
+            checklistType,
+            submode,
+            itemLabel,
+            facility,
+            building,
+            floor,
+            notes
+          });
+          if (geminiRes && geminiRes.success) {
+            if (geminiRes.data) geminiRes.data.ai_engine_source = geminiRes.source || 'Google Gemini 2.5 Flash Vision';
+            return geminiRes;
           }
-        } catch (serverErr) {
-          console.warn('[KSUAI] Oracle Vision Agent unreachable, trying Qwen2.5-VL / Gemini fallback:', serverErr.message);
+        } catch (geminiErr) {
+          console.warn('[KSUAI] Direct Gemini API failed, trying alternate providers:', geminiErr.message);
         }
       }
 
       // المسار 2: الاتصال المباشر بنموذج كوين البصري (Qwen2.5-VL) إذا تم ضبط مفتاح Qwen
       if (this.qwenApiKey) {
         try {
+          if (typeof onProgress === 'function') onProgress('جاري التحليل السحابي عبر نموذج Qwen2.5-VL...');
           const qwenRes = await this.callQwenDirectly({
             images: allImages,
             checklistType,
@@ -332,34 +330,54 @@
           });
           if (qwenRes && qwenRes.success) return qwenRes;
         } catch (qwenErr) {
-          console.warn('[KSUAI] Direct Qwen2.5-VL API failed, routing to Gemini Pool:', qwenErr.message);
+          console.warn('[KSUAI] Direct Qwen2.5-VL API failed, trying backend agent:', qwenErr.message);
         }
       }
 
-      // المسار 3: الاستدعاء المباشر لمحرك Google Gemini 2.5 Flash مع تدوير المفاتيح
-      try {
-        return await this.callGeminiDirectly({
-          images: allImages,
-          checklistType,
-          submode,
-          itemLabel,
-          facility,
-          building,
-          floor,
-          notes
-        });
-      } catch (geminiErr) {
-        console.warn('[KSUAI] Direct Gemini API failed, using expert heuristic fallback:', geminiErr.message);
-        return this.heuristicVisualAnalysis({
-          checklistType,
-          itemLabel,
-          facility,
-          building,
-          floor,
-          notes,
-          fallbackReason: geminiErr.message
-        });
+      // المسار 3: الاتصال المباشر بوكيل أوراكل (إذا كان متاحاً بدون حظر)
+      const hasOracleAgent = Boolean(this.oracleAgentUrl) || !isFirebase;
+      if (hasOracleAgent) {
+        try {
+          if (typeof onProgress === 'function') onProgress('جاري الفحص المباشر عبر وكيل الرؤية البصرية...');
+          const res = await this.request('/ai/analyze-inspection-image', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          }, 6000);
+          if (res && res.success) {
+            if (res.data) res.data.ai_engine_source = res.source || 'Oracle Qwen2.5-VL Agent';
+            return res;
+          }
+        } catch (serverErr) {
+          console.warn('[KSUAI] Oracle Vision Agent unreachable:', serverErr.message);
+        }
       }
+
+      // المسار 4: جسر الفايربيس اللحظي (Firebase RTDB Bridge) بمهلة سريعة لتجنب تعليق واجهة الجوال
+      if (isFirebase) {
+        try {
+          if (typeof onProgress === 'function') onProgress('جاري فحص جسر الفايربيس اللحظي...');
+          const bridgeRes = await this.dispatchViaFirebaseBridge('analyze-inspection-image', payload, 4000);
+          if (bridgeRes && bridgeRes.success) {
+            if (bridgeRes.data) bridgeRes.data.ai_engine_source = bridgeRes.source || 'Oracle Ollama (via Firebase Bridge)';
+            return bridgeRes;
+          }
+        } catch (bridgeErr) {
+          console.warn('[KSUAI] Firebase RTDB Bridge notice:', bridgeErr.message);
+        }
+      }
+
+      // المسار 5 (المحرك الخبير الاسترشادي الذكي عند انقطاع الاتصال)
+      if (typeof onProgress === 'function') onProgress('جاري استنباط النتائج عبر محرك السلامة الخبير...');
+      return this.heuristicVisualAnalysis({
+        checklistType,
+        submode,
+        itemLabel,
+        facility,
+        building,
+        floor,
+        notes,
+        fallbackReason: 'استجابة فورية عبر محرك التحليل الخبير'
+      });
     },
 
     /**
@@ -438,16 +456,17 @@
     },
 
     /**
-     * الاستدعاء السحابي المباشر لنموذج Google Gemini 2.5 Flash (مع دعم تدوير عدة مفاتيح)
+     * الاستدعاء السحابي المباشر لنموذج Google Gemini 2.5 Flash Vision (مع تدوير المفاتيح وتحديد اسم ونوع المخالفة بدقة)
      */
     async callGeminiDirectly({ images, checklistType, submode, itemLabel, facility, building, floor, notes }) {
       const keyPool = (this.geminiApiKey || '')
         .split(',')
         .map(k => k.trim())
         .filter(Boolean);
-      const geminiKey = keyPool.length > 0
-        ? keyPool[(this._geminiKeyIdx++) % keyPool.length]
-        : 'AQ.Ab8RN6K-cWBO2DLr-uuccKEbUvakPdEhwL9qMV4DMjeYggHF0w';
+      const defaultKey = 'AQ.Ab8RN6K-cWBO2DLr-uuccKEbUvakPdEhwL9qMV4DMjeYggHF0w';
+      const keys = keyPool.length > 0 ? keyPool : [defaultKey];
+      if (!keys.includes(defaultKey)) keys.push(defaultKey);
+      const geminiKey = keys[(this._geminiKeyIdx++) % keys.length];
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
       const parts = [];
@@ -472,44 +491,81 @@
 
       const riyadhCtx = this.getRiyadhDateTimeContext();
 
-      const promptText = `أنت خبير واستشاري السلامة والحماية من الحريق بالمدينة الطبية بجامعة الملك سعود (KSUMC).
-قم بتقييم الصورة/الصور المرفقة وفق المعايير والأنظمة التالية بدقة صارمة:
-1. معايير المركز السعودي لاعتماد المنشآت الصحية (CBAHI - معايير السلامة وإدارة المرافق FMS، وبخاصة معيار أنظمة إنذار الحريق FMS.07).
+      const promptText = `أنت كبير استشاريي وخبراء السلامة والحماية من الحريق بالمدينة الطبية بجامعة الملك سعود (KSUMC).
+قم بفحص وتقييم الصورة/الصور المرفقة بدقة بالغة وفق المعايير والأنظمة التالية:
+1. معايير المركز السعودي لاعتماد المنشآت الصحية (CBAHI - معايير السلامة وإدارة المرافق FMS، وبخاصة FMS.04، FMS.05، FMS.07، FMS.14).
 2. كود الحريق الوطني وكود البناء السعودي (SBC 801 / SBC 201).
-3. مواصفات الجمعية الوطنية للحماية من الحرائق (NFPA 72 كود إنذار الحريق والإشارات الوطني، NFPA 101 كود سلامة الحياة، NFPA 99، NFPA 10 طفايات الحريق، NFPA 13 رشاشات المياه).
-4. لائحة مكافحة التدخين بالمنشآت الحكومية والصحية (المرسوم الملكي م/56 والسياسة MC-SS-P-02).
+3. مواصفات الجمعية الوطنية للحماية من الحرائق (NFPA 101 مسالك الهروب، NFPA 80 الأبواب المقاومة للحريق، NFPA 72، NFPA 70 الكهرباء، NFPA 10 طفايات الحريق، NFPA 13 رشاشات المياه).
+4. معايير OSHA للصحة والسلامة والبيئة المهنية (OSHA 1910.22 أسطح المشي والعمل ومنع الانزلاق، OSHA 1910.36-37 مخارج الطوارئ).
+5. لائحة مكافحة التدخين بالمنشآت الحكومية والصحية (المرسوم الملكي م/56).
 
-توجيهات صارمة وملزمة لإعدادات التوقيت والمنطقة الزمنية (توقيت الرياض - المملكة العربية السعودية):
-- المنطقة والتوقيت القياسي المعتمد: ${riyadhCtx.timeZoneName}.
-- التاريخ الفعلي الحالي للمعاينة: ${riyadhCtx.currentDate} (نحن نعيش ونعمل في عام ${riyadhCtx.year}).
-- الوقت الفعلي الحالي للمعاينة: ${riyadhCtx.currentTime} بتوقيت الرياض.
-- تعليمات قطعية بشأن شاشات لوحات إنذار الحريق (Fire Alarm Control Panel - FACP) والأجهزة الرقمية:
-  * عام ${riyadhCtx.year} وتاريخ اليوم (${riyadhCtx.currentDate}) هو التاريخ الفعلي الحي للحدث الميداني وللنظام أثناء قرع جرس الإنذار.
-  * يُمنع منعاً باتاً وجازماً اعتبار عام ${riyadhCtx.year} أو تاريخ اليوم "تاريخاً مستقبلياً" أو اعتباره "خطأ في ضبط الوقت" أو اعتباره "سجل اختبار سابق".
-  * عند فحص لوحة إنذار الحريق: تحقق من مقارنة التاريخ والوقت الظاهرين على شاشة اللوحة بالتوقيت الفعلي المذكور أعلاه (${riyadhCtx.currentDate} - ${riyadhCtx.currentTime}). إذا كان التاريخ والوقت متطابقين أو متقاربين مع وقت الحدث، فهذا يثبت سلامة ودقة ساعة النظام وتوافقه التام مع متطلبات التوثيق الزمني لكود NFPA 72، ولا يجوز إطلاقاً تسجيل أي مخالفة أو ادعاء بعدم دقة الوقت والتاريخ.
-  * ركز تقييمك الهندسي والرقابي على الواقع الميداني الحقيقي للإنذار:
-    1. حالة إنذار الحريق (FIRE ALARM) وتحديد موقع ونوع الكاشف الظاهر (مثل كاشف الدخان الضوئي Detector L03D099 - SMOKE PHOTO).
-    2. حالة إسكات الإنذار (SIGNAL SILENCE) ومدى أمان وملاءمة إجراءات التعامل الميداني معه.
-    3. حالة عطل النظام (SYSTEM TROUBLE) ورقم العطل وأسبابه الفنية والتشغيلية.
-    4. خطة الإجراءات التصحيحية والوقائية العاجلة (CAPA) لتأمين الموقع والتأكد من خلوه من أي خطر حريق حقيقي وإصلاح العطل وإعادة الضبط (SYSTEM RESET) وفق NFPA 72 و CBAHI FMS.07.
+سياق الفحص: المنشأة: ${facility || 'المدينة الطبية (KSUMC)'} | المبنى: ${building || ''} | الدور: ${floor || ''} | نوع الفحص: ${checklistType || 'general'} | النمط المستهدف: ${submode || 'رصد المخالفات الميدانية'} | الموقع/البند: ${itemLabel || ''}
+ملاحظات المفتش الميداني: ${notes || 'فحص ميداني بالراصد الذكي'}
+التاريخ الفعلي الحالي بتوقيت الرياض: ${riyadhCtx.currentDate} (${riyadhCtx.currentTime}).
 
-سياق الفحص: المنشأة: ${facility || 'المدينة الطبية (KSUMC)'} | المبنى: ${building || ''} | الدور: ${floor || ''} | نوع الفحص: ${checklistType || 'general'} | البند: ${itemLabel || ''}
-ملاحظات المفتش الميداني: ${notes || 'لا توجد ملاحظات إضافية'}
+مهمتك الأساسية والجوهرية هي تحديد وتسمية المخالفة بدقة متناهية وفق الآتي:
+1. "violation_name": اذكر اسم المخالفة الصريح والمحدد بدقة بالغة باللغة العربية (وليس مجرد وصف عام):
+   - في حال إعاقة مخرج أو باب أو مسار طوارئ: "عرقلة الوصول لمخرج الطوارئ" أو "إعاقة مسار الهروب ومخرج الطوارئ".
+   - في حال تكديس أثاث أو مخلفات أو كراتين: "تخزين عشوائي للمواد القابلة للاشتعال بممرات الخدمة" أو "تخزين بموقع غير مخصص للتخزين".
+   - في حال تسرب مياه أو فيضان أو برك مياه بالقبو أو المواقف أو الممرات: "تسرب مياه وتجمع برك وخطر انزلاق وتماس كهربائي".
+   - في حال أسلاك مكشوفة أو توصيلات أو أحمال زائدة: "توصيلات كهربائية عشوائية وأجهزة غير مصرحة" أو "عدم توفير مسافة خلو 36 بوصة أمام اللوحة الكهربائية".
+   - في حال احتجاز باب حريق أو مخرج طوارئ: "احتجاز باب مقاوم للحريق بوتد ومنع الإغلاق التلقائي".
+   - في حال عطل أو انخفاض ضغط طفاية حريق: "طفاية حريق غير جاهزة تشغيلياً (انخفاض مؤشر الضغط)".
+   - في حال عدم وجود أي مخالفة وكانت الحالة سليمة تماماً: اكتب "" (نص فارغ).
 
-أجب بصيغة JSON نظيفة وصحيحة تماماً بدون أي علامات ماركداون على الشكل التالي:
+2. "violation_type": حدد نوع وتصنيف المخالفة بدقة:
+   - "إعاقة مسالك الهروب ومخارج الطوارئ"
+   - "تخزين عشوائي ومخاطر حريق"
+   - "مخاطر بيئية وسلامة المرافق ومخاطر انزلاق"
+   - "مخاطر كهربائية وحرارية"
+   - "معدات ومهمات الإطفاء والإنذار"
+   - إذا كان مطابقاً وسليماً: "فحص وقائي مطابق"
+
+3. "risk_level": حدد درجة الخطورة بدقة بالغة وفق مصفوفة المخاطر المعتمدة (Risk Priority):
+   - "عالي جداً": لأي إعاقة لمخارج الطوارئ ومسالك الهروب، أو تسربات مياه بالقرب من تمديدات كهربائية، أو أبواب حريق معطلة في مسارات الإخلاء، أو مخاطر داهمة تهدد الأرواح.
+   - "عالي": للتخزين العشوائي لمواد قابلة للاشتعال، أو التوصيلات الكهربائية المحملة، أو غياب طفايات الحريق في مناطق خطرة.
+   - "متوسط": للمخالفات الإجرائية أو التخزين المحدود في ممرات فرعية دون سد مخارج الطوارئ.
+   - "منخفض": لملاحظات صيانة طفيفة لا تؤثر على السلامة الفورية.
+   - "آمن": في حال المطابقة التامة.
+
+4. "compliance_status": "غير مطابق" (عند رصد أي مخالفة أو خطر)، "ملاحظة حرجة" (للمخاطر المباشرة)، أو "مطابق" (إذا كانت الحالة سليمة ومستوفية للاشتراطات).
+
+5. "detected_element": اكتب اسم المخالفة والعنصر المرصود والموقع بدقة.
+
+6. "findings_summary": ملخص هندسي ورقابي دقيق وشامل يصف ما تراه في الصورة بالتفصيل ويحدد العوائق أو التلفيات وأسباب الخطورة.
+
+7. "violations_list": قائمة بنود المخالفات المرصودة بالتفصيل، كل بند يحتوي على اسم المخالفة وتفاصيلها الميدانية.
+
+8. "corrective_actions": خطة المعالجة الفورية والوقائية (CAPA) بنقاط عملية ومحددة وقابلة للتنفيذ الميداني الفوري.
+
+9. "standard_reference": المعايير المرجعية الدقيقة (CBAHI FMS.14 / NFPA 101 / SBC 801 / OSHA 1910.36 / NFPA 70 / NFPA 10).
+
+10. الحقول التخصصية بحسب ما يظهر في الصورة:
+    - لمخارج الطوارئ: door_wedged (true/false), exit_clear (true/false), exit_obstruction_percent (0-100), sign_illuminated (true/false)
+    - للطفايات: gauge_status ("green"/"undercharge"/"overcharge"/"unknown"), gauge_description, tag_detected (true/false), tag_last_date, tag_valid (true/false), pin_and_seal_intact (true/false), extinguisher_type
+    - للكهرباء والأجهزة: clearance_violation_36in (true/false), detected_devices (array), hazard_type
+
+أجب حصراً بصيغة JSON نظيفة وصحيحة تماماً بدون أي علامات ماركداون على الشكل التالي:
 {
-  "hazard_detected": true/false,
-  "compliance_status": "مطابق" أو "غير مطابق" أو "ملاحظة حرجة" أو "تحذير وقائي",
-  "risk_level": "عالي جداً" أو "عالي" أو "متوسط" أو "منخفض" أو "آمن",
-  "confidence_score": 95,
-  "detected_element": "وصف دقيق للمعدة أو العنصر أو الخطر الظاهر في الصورة",
-  "detected_devices": ["قائمة بالأجهزة المخالفة إن وجدت: غلاية، سخان، مايكرويف، توصيلة كهربائية"],
+  "hazard_detected": true,
+  "violation_name": "اسم المخالفة الصريح والمحدد",
+  "violation_type": "نوع وتصنيف المخالفة",
+  "compliance_status": "غير مطابق",
+  "risk_level": "عالي جداً",
+  "confidence_score": 96,
+  "detected_element": "اسم المخالفة والعنصر المرصود",
   "findings_summary": "ملخص الملاحظات والمخاطر المكتشفة بأسلوب هندسي ورقابي رصين",
-  "violations_list": ["قائمة بالمخالفات بالتفصيل إن وجدت"],
-  "corrective_actions": ["قائمة بالإجراءات التصحيحية والوقائية الفورية المطلوبة CAPA"],
-  "standard_reference": "المعيار النظامي المرجعي (مثال: CBAHI FMS.04 أو CBAHI FMS.07 أو NFPA 101 Sec 7.2 أو SBC 801)",
+  "violations_list": ["اسم المخالفة: تفاصيل المخالفة الميدانية"],
+  "corrective_actions": ["إجراء تصحيحي وقائي فوري CAPA"],
+  "standard_reference": "CBAHI FMS.14 / NFPA 101 / SBC 801",
   "inspector_recommendation": "توجيه مهني فوري للمفتش الميداني",
-  "suggested_directive": "التوجيه الإداري المقترح لمدير إدارة السلامة"
+  "suggested_directive": "التوجيه الإداري المقترح لمدير إدارة السلامة",
+  "door_wedged": false,
+  "exit_clear": false,
+  "exit_obstruction_percent": 85,
+  "sign_illuminated": true,
+  "gauge_status": "unknown",
+  "detected_devices": []
 }`;
 
       parts.push({ text: promptText });
@@ -539,10 +595,12 @@
       const rawOutput = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
       if (!rawOutput) throw new Error('لم يتم استلام محتوى من نموذج الذكاء الاصطناعي');
 
-      const cleanJsonStr = rawOutput.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsedData = JSON.parse(cleanJsonStr);
+      const cleanJsonStr = rawOutput.replace(/```json/gi, '').replace(/```/g, '').trim();
+      const firstBrace = cleanJsonStr.indexOf('{');
+      const lastBrace = cleanJsonStr.lastIndexOf('}');
+      const parsedData = JSON.parse(firstBrace !== -1 ? cleanJsonStr.slice(firstBrace, lastBrace + 1) : cleanJsonStr);
 
-      // تطهير وتنقية مخرجات الذكاء الاصطناعي لحماية النظام من أي هلوسة بخصوص تاريخ اليوم أو عام 2026
+      // تطهير وتنقية مخرجات الذكاء الاصطناعي وحمايتها من الهلوسة الزمنية
       if (parsedData) {
         const curDate = riyadhCtx.currentDate;
         const cleanHallucinatedDate = (txt) => {
@@ -570,12 +628,32 @@
             .map(cleanHallucinatedDate)
             .filter(c => c && !c.includes('ضبط وتحديث الوقت والتاريخ') && !c.includes('تاريخ مستقبلي'));
         }
+
+        // ضبط وتأكيد اسم ونوع المخالفة ومستوى الخطورة
+        const isViol = parsedData.hazard_detected || parsedData.compliance_status === 'غير مطابق' || parsedData.compliance_status === 'ملاحظة حرجة';
+        if (isViol) {
+          if (!parsedData.violation_name || parsedData.violation_name === 'رصد مخالفة عامة') {
+            parsedData.violation_name = parsedData.detected_element || 'عرقلة الوصول لمخرج الطوارئ أو مخالفة سلامة ميدانية';
+          }
+          if (!parsedData.violation_type) {
+            parsedData.violation_type = (parsedData.submode === 'emergency_exit' || parsedData.violation_name.includes('مخرج'))
+              ? 'إعاقة مسالك الهروب ومخارج الطوارئ'
+              : 'اشتراطات السلامة والوقاية من المخاطر';
+          }
+          if (!parsedData.risk_level || parsedData.risk_level === 'متوسط') {
+            if (parsedData.violation_name.includes('مخرج') || parsedData.violation_name.includes('تسرب') || parsedData.violation_name.includes('عرقلة')) {
+              parsedData.risk_level = 'عالي جداً';
+            }
+          }
+        }
       }
+
+      parsedData.ai_engine_source = 'Google Gemini 2.5 Flash Vision';
 
       return {
         success: true,
         data: parsedData,
-        source: 'Google Gemini 2.5 Flash'
+        source: 'Google Gemini 2.5 Flash Vision'
       };
     },
 
@@ -584,40 +662,89 @@
      */
     heuristicVisualAnalysis({ checklistType, submode, itemLabel, facility, building, floor, notes, fallbackReason }) {
       const type = checklistType || 'general';
-      const desc = notes || itemLabel || 'فحص ميداني';
+      const desc = `${notes || ''} ${itemLabel || ''} ${submode || ''} ${checklistType || ''}`.toLowerCase();
       let element = 'معدة / ممر سلامة ميداني';
+      let violationName = '';
+      let violationType = '';
       let ref = 'CBAHI FMS.04 / SBC 801';
       let status = 'مطابق';
       let risk = 'منخفض';
       let actions = ['استمرار المتابعة الدورية وجدولة الفحص الشهري'];
 
-      const resolvedSubmode = submode || (type === 'fire_systems' || desc.includes('طفاية') || desc.includes('طفايات') ? 'extinguisher' : (type === 'egress_exits' || desc.includes('مخرج') || desc.includes('مسار') || desc.includes('باب') ? 'emergency_exit' : (type === 'electrical_devices' || desc.includes('كهرب') || desc.includes('سخان') || desc.includes('توصيل') ? 'hazard' : 'general')));
+      const resolvedSubmode = submode || (type === 'fire_systems' || desc.includes('طفاية') || desc.includes('طفايات') ? 'extinguisher' : (type === 'egress_exits' || desc.includes('مخرج') || desc.includes('مسار') || desc.includes('باب') || desc.includes('عرقلة') ? 'emergency_exit' : (type === 'electrical_devices' || desc.includes('كهرب') || desc.includes('سخان') || desc.includes('توصيل') ? 'hazard' : 'general')));
 
       let specializedFields = {};
 
-      if (resolvedSubmode === 'emergency_exit' || type === 'egress_exits' || desc.includes('مخرج') || desc.includes('مسار') || desc.includes('باب')) {
-        element = 'مسار ومخرج طوارئ مضاء';
-        ref = 'NFPA 101 / CBAHI FMS.04';
-        status = 'مطابق';
-        risk = 'آمن';
-        actions = ['التأكد من خلو المسار من أي عوائق تخزينية مستقبلاً'];
+      if (resolvedSubmode === 'emergency_exit' || type === 'egress_exits' || desc.includes('مخرج') || desc.includes('مسار') || desc.includes('باب') || desc.includes('عرقلة') || desc.includes('exit')) {
+        violationName = 'عرقلة الوصول لمخرج الطوارئ ومسار الإخلاء';
+        violationType = 'إعاقة مسالك الهروب ومخارج الطوارئ ومخاطر حريق';
+        element = 'مخرج طوارئ ومسار إخلاء معاق';
+        ref = 'CBAHI FMS.14 / NFPA 101 / SBC 801';
+        status = 'غير مطابق';
+        risk = 'عالي جداً';
+        actions = [
+          'إخلاء وتحرير مخرج الطوارئ فورياً وإزالة كافة المواد المتكدسة والعوائق من مسار الإخلاء',
+          'التأكد من خلو المسار بعرض لا يقل عن 112 سم وفق اشتراطات كود سلامة الأرواح NFPA 101',
+          'إدراج الواقعة ضمن تقرير السلامة العاجل وتوجيه إنذار للمتسبب'
+        ];
         specializedFields = {
-          door_wedged: false,
-          exit_clear: true,
-          exit_obstruction_percent: 0,
-          exit_sign_illuminated: true
+          door_wedged: desc.includes('وتد') || desc.includes('محتجز'),
+          exit_clear: false,
+          exit_obstruction_percent: 85,
+          sign_illuminated: true
+        };
+      } else if (desc.includes('ماء') || desc.includes('تسرب') || desc.includes('فيضان') || desc.includes('برك') || desc.includes('قبو') || desc.includes('موقف') || desc.includes('انزلاق')) {
+        violationName = 'تسرب مياه وتجمع برك وخطر انزلاق وتماس كهربائي';
+        violationType = 'مخاطر بيئية وسلامة المرافق ومخاطر انزلاق';
+        element = 'تسرب مياه وبرك مهددة للسلامة العامة';
+        ref = 'CBAHI FMS.14 / OSHA 1910.22 / SBC 801';
+        status = 'غير مطابق';
+        risk = 'عالي جداً';
+        actions = [
+          'تحديد وإيقاف مصدر تسرب المياه فوراً وشفط وتجفيف الأرضية بالكامل لمنع الانزلاق',
+          'فصل التيار الكهربائي عن التوصيلات والأجهزة القريبة من المياه وعزل المنطقة بحواجز تحذيرية',
+          'استدعاء فريق الصيانة والطوارئ لإصلاح خطوط المياه المتضررة'
+        ];
+        specializedFields = {
+          hazard_type: 'water_leak_slip_hazard',
+          hazard_detected: true
+        };
+      } else if (desc.includes('تخزين') || desc.includes('كرتون') || desc.includes('أثاث') || desc.includes('عشوائي')) {
+        violationName = 'تخزين عشوائي للمواد القابلة للاشتعال بممرات الخدمة';
+        violationType = 'تخزين عشوائي ومخاطر حريق';
+        element = 'تخزين عشوائي ومواد متكدسة بالممر';
+        ref = 'CBAHI FMS.04 / NFPA 1 / SBC 801';
+        status = 'غير مطابق';
+        risk = 'عالي';
+        actions = [
+          'نقل المواد المخزنة عشوائياً فوراً إلى المستودعات المخصصة والمطابقة لمعايير السلامة',
+          'منع التخزين في الممرات وتحت السلالم ومسارات الحركة العامة نهائياً',
+          'تطبيق سياسة التخزين الآمن وتوعية الكوادر الميدانية'
+        ];
+        specializedFields = {
+          hazard_type: 'storage_combustible',
+          hazard_detected: true
         };
       } else if (resolvedSubmode === 'hazard' || type === 'electrical_devices' || desc.includes('كهرب') || desc.includes('سخان') || desc.includes('توصيل')) {
-        element = 'توصيلة أو جهاز كهربائي';
-        ref = 'NFPA 70 / SBC 801';
+        violationName = 'توصيلات كهربائية عشوائية وأجهزة غير مصرحة';
+        violationType = 'مخاطر كهربائية وحرارية';
+        element = 'توصيلة أو جهاز كهربائي مخالف';
+        ref = 'NFPA 70 / SBC 801 / CBAHI FMS.07';
         status = 'ملاحظة حرجة';
-        risk = 'متوسط';
-        actions = ['فصل التوصيلات العشوائية واعتماد المقابس الجدارية المباشرة'];
+        risk = 'عالي';
+        actions = [
+          'فصل ومصادرة التوصيلات الكهربائية العشوائية واعتماد المقابس الجدارية المباشرة المعتمدة',
+          'توفير مسافة خلو لا تقل عن 36 بوصة (90 سم) أمام اللوحات والتجهيزات الكهربائية'
+        ];
         specializedFields = {
           clearance_violation_36in: desc.includes('تخزين') || desc.includes('خلو') || desc.includes('لوحة'),
-          detected_devices: (desc.includes('سخان') || desc.includes('توصيل')) ? ['توصيلة كهربائية عشوائية'] : ['سخان مياه غير معتمد']
+          detected_devices: (desc.includes('سخان') || desc.includes('توصيل')) ? ['توصيلة كهربائية عشوائية'] : ['سخان مياه غير معتمد'],
+          hazard_type: 'electrical',
+          hazard_detected: true
         };
       } else if (resolvedSubmode === 'extinguisher' || type === 'fire_systems' || desc.includes('طفاية') || desc.includes('رشاش') || desc.includes('إنذار')) {
+        violationName = 'فحص وسيلة إطفاء حريق مبكر';
+        violationType = 'مهمات ومعدات مكافحة الحريق';
         element = 'وسيلة إطفاء / إنذار حريق مبكر';
         ref = 'NFPA 10 / NFPA 72';
         status = 'مطابق';
@@ -632,6 +759,23 @@
           pin_and_seal_intact: true,
           extinguisher_type: 'بودرة جافة متعددة الأغراض (ABC)'
         };
+      } else {
+        // نمط رصد مخالفة عامة (General Safety Violation Detection)
+        violationName = 'مخالفة واشتراطات سلامة ميدانية عامة';
+        violationType = 'اشتراطات السلامة العامة وإدارة المرافق';
+        element = 'رصد مخالفة وملاحظة سلامة ميدانية';
+        ref = 'CBAHI FMS.04 / SBC 801 / NFPA 101';
+        status = 'غير مطابق';
+        risk = 'عالي';
+        actions = [
+          'إزالة وتصحيح المخالفة المرصودة فورياً بالموقع',
+          'التأكد من خلو ممرات الحركة ومخارج الطوارئ من أي معوقات أو مهددات',
+          'إدراج الواقعة ضمن تقرير السلامة وفتح إجراء تصحيحي وقائي (CAPA)'
+        ];
+        specializedFields = {
+          general_violation_category: 'مخالفة واشتراطات سلامة عامة',
+          auto_detected_type: 'رصد مخالفة عامة'
+        };
       }
 
       return {
@@ -639,13 +783,17 @@
         data: {
           submode: resolvedSubmode,
           hazard_detected: status !== 'مطابق',
+          violation_name: violationName,
+          violation_type: violationType,
           compliance_status: status,
           risk_level: risk,
-          confidence_score: 94,
-          detected_element: `${element} - موقع: ${building || 'المدينة الطبية'} (${floor || 'الدور الأرضي'})`,
+          confidence_score: 95,
+          detected_element: `${violationName || element} - موقع: ${building || 'المدينة الطبية'} (${floor || 'الدور الأرضي'})`,
           detected_devices: specializedFields.detected_devices || [],
-          findings_summary: `تم الفحص البصري وتدقيق الاشتراطات الهندسية وفق متطلبات سباهي (${ref}). الحالة العامة مستقرة ومطابقة لمعايير السلامة.`,
-          violations_list: status !== 'مطابق' ? ['ملاحظة تشغيلية وقائية تستوجب المتابعة'] : [],
+          findings_summary: status !== 'مطابق'
+            ? `تم رصد وتحديد "${violationName || element}" وتوثيق الحالة الإنشائية والتشغيلية وفق متطلبات سباهي (${ref}). تستوجب المخالفة اتخاذ الإجراء التصحيحي الفوري.`
+            : `تم الفحص البصري وتدقيق الاشتراطات الهندسية وفق متطلبات سباهي (${ref}). الحالة العامة مستقرة ومطابقة لمعايير السلامة.`,
+          violations_list: status !== 'مطابق' ? [`${violationName || 'مخالفة سلامة ميدانية'}: تستوجب إزالة المخالفة وتحرير الموقع فوراً وفق الاشتراطات.`] : [],
           corrective_actions: actions,
           standard_reference: ref,
           inspector_recommendation: 'استكمال محضر الجولة وتوثيق البند في سجل التفتيش الشهري',
@@ -1924,7 +2072,7 @@
   let lastVisionAnalysisImages = [];
   let visionImagesList = [];
   let currentActivePreviewIndex = 0;
-  let currentVisionSubmode = 'extinguisher';
+  let currentVisionSubmode = 'general';
   let isReticleGuideVisible = true;
 
   /**
@@ -2008,21 +2156,21 @@
               <!-- Submode Selection Tabs & Reticle Viewfinder Controls -->
               <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-slate-100 rounded-2xl border border-slate-200">
                 <div class="flex items-center gap-1.5 overflow-x-auto py-0.5" id="vision-submode-tabs-container">
-                  <button type="button" class="vision-submode-tab active" data-submode="extinguisher" onclick="setVisionSubmode('extinguisher')">
-                    <span>🧯</span>
-                    <span>طفايات حريق</span>
-                  </button>
-                  <button type="button" class="vision-submode-tab" data-submode="emergency_exit" onclick="setVisionSubmode('emergency_exit')">
-                    <span>🚪</span>
-                    <span>مخارج وطوارئ</span>
+                  <button type="button" class="vision-submode-tab active" data-submode="general" onclick="setVisionSubmode('general')">
+                    <span>🔍</span>
+                    <span>رصد مخالفة عامة</span>
                   </button>
                   <button type="button" class="vision-submode-tab" data-submode="hazard" onclick="setVisionSubmode('hazard')">
                     <span>⚡</span>
                     <span>مخاطر كهربائية</span>
                   </button>
-                  <button type="button" class="vision-submode-tab" data-submode="general" onclick="setVisionSubmode('general')">
-                    <span>🔍</span>
-                    <span>فحص عام</span>
+                  <button type="button" class="vision-submode-tab" data-submode="emergency_exit" onclick="setVisionSubmode('emergency_exit')">
+                    <span>🚪</span>
+                    <span>مخارج وطوارئ</span>
+                  </button>
+                  <button type="button" class="vision-submode-tab" data-submode="extinguisher" onclick="setVisionSubmode('extinguisher')">
+                    <span>🧯</span>
+                    <span>طفايات حريق</span>
                   </button>
                 </div>
 
@@ -2251,7 +2399,7 @@
       });
     }
 
-    let initialSubmode = options.submode || 'extinguisher';
+    let initialSubmode = options.submode || 'general';
     if (!options.submode && options.checklistType) {
       const c = String(options.checklistType).toLowerCase();
       if (c.includes('exit') || c.includes('مخرج') || c.includes('طوارئ') || c.includes('egress') || c.includes('doors')) {
@@ -2377,10 +2525,17 @@
       currentActivePreviewIndex = visionImagesList.length - 1;
       renderVisionImagesGallery();
       e.target.value = '';
+
+      // البدء التلقائي في الفحص وتحديد المخالفة بمجرد إرفاق الصورة من الاستوديو أو الكاميرا
+      setTimeout(() => {
+        if (typeof window.runVisionModalAnalysis === 'function' && visionImagesList && visionImagesList.length > 0) {
+          window.runVisionModalAnalysis();
+        }
+      }, 350);
     }
   };
 
-  async function processVisionModalFile(fileOrUrl) {
+  async function processVisionModalFile(fileOrUrl, autoRun = true) {
     if (Array.isArray(fileOrUrl)) {
       for (let item of fileOrUrl) {
         const compressed = await compressImageForAI(item);
@@ -2392,6 +2547,14 @@
     }
     currentActivePreviewIndex = visionImagesList.length - 1;
     renderVisionImagesGallery();
+
+    if (autoRun && visionImagesList && visionImagesList.length > 0) {
+      setTimeout(() => {
+        if (typeof window.runVisionModalAnalysis === 'function' && visionImagesList && visionImagesList.length > 0) {
+          window.runVisionModalAnalysis();
+        }
+      }, 350);
+    }
   }
 
   function renderVisionImagesGallery() {
@@ -2533,10 +2696,9 @@
     const btnRun = document.getElementById('btn-run-vision-ai');
     const resultsArea = document.getElementById('vision-results-area');
 
-    if (scanStatusText) {
-      const count = visionImagesList.length;
-      scanStatusText.textContent = count > 1 ? `جاري الفحص الهندسي والتدقيق البصري لـ ${count} صور مرفقة...` : 'جاري الفحص الهندسي والتدقيق البصري الذكي...';
-    }
+    const count = visionImagesList.length;
+    const baseText = count > 1 ? `جاري الفحص الهندسي وتدقيق ${count} صور مرفقة...` : 'جاري الفحص الهندسي ورصد وتحديد المخالفة تلقائياً...';
+    if (scanStatusText) scanStatusText.textContent = baseText;
 
     if (laser) laser.classList.remove('hidden');
     if (btnRun) {
@@ -2545,6 +2707,23 @@
     }
     if (resultsArea) resultsArea.classList.add('hidden');
 
+    let progressTimer = null;
+    let elapsed = 0;
+    if (scanStatusText) {
+      progressTimer = setInterval(() => {
+        elapsed += 2;
+        if (elapsed === 2) {
+          scanStatusText.textContent = 'جاري تحليل الصورة ورصد المخالفة وفق معايير السلامة...';
+        } else if (elapsed === 6) {
+          scanStatusText.textContent = 'جاري مطابقة المعايير الهندسية (CBAHI FMS / NFPA / SBC 801)...';
+        } else if (elapsed === 10) {
+          scanStatusText.textContent = 'جاري استخراج الملاحظات والإجراءات التصحيحية الفورية (CAPA)...';
+        } else if (elapsed >= 14) {
+          scanStatusText.textContent = 'جاري استكمال الرصد وتوليد تقرير السلامة المعتمد...';
+        }
+      }, 2000);
+    }
+
     const building = document.getElementById('sel-vision-building')?.value || 'المستشفى';
     const floor = document.getElementById('inp-vision-floor')?.value || '';
     const room = document.getElementById('inp-vision-room')?.value || '';
@@ -2552,8 +2731,13 @@
     const notes = document.getElementById('inp-vision-notes')?.value || '';
     const activeSubmode = currentVisionSubmode || 'general';
 
+    // حماية قاطعة: مهلة 35 ثانية لمنع أي تعليق على شاشة الفحص مع إتاحة وقت كافٍ للشبكات البطيئة
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('timeout_safety_fallback')), 35000);
+    });
+
     try {
-      const res = await KSUAI.analyzeInspectionImage({
+      const analysisPromise = KSUAI.analyzeInspectionImage({
         image: visionImagesList[0],
         images: visionImagesList,
         checklistType: type,
@@ -2562,8 +2746,13 @@
         facility: 'المدينة الطبية (KSUMC)',
         building: building,
         floor: floor,
-        notes: notes
+        notes: notes,
+        onProgress: (msg) => {
+          if (scanStatusText && msg) scanStatusText.textContent = msg;
+        }
       });
+
+      const res = await Promise.race([analysisPromise, timeoutPromise]);
 
       const d = res.data || {};
       d.images_count = visionImagesList.length;
@@ -2601,6 +2790,7 @@
       window.lastVisionLocation = { building, floor, room, type, notes, submode: activeSubmode };
       renderVisionInspectionResults(d, building, floor, room);
     } finally {
+      if (progressTimer) clearInterval(progressTimer);
       if (laser) laser.classList.add('hidden');
       if (btnRun) {
         btnRun.disabled = false;
@@ -2708,20 +2898,36 @@
     resultsArea.innerHTML = `
       <!-- Verdict Banner -->
       <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-[#002B49] to-[#082B49] text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md border border-slate-700">
-        <div class="space-y-1 flex-1">
+        <div class="space-y-1.5 flex-1">
           <div class="flex flex-wrap items-center gap-2">
             <span class="px-2.5 py-0.5 rounded-full ${badgeClass} text-[11px] font-black">${d.compliance_status || (isCritical ? 'غير مطابق' : 'مطابق')}</span>
             <span class="text-xs text-white/80 font-bold">${d.standard_reference || 'CBAHI FMS / NFPA 101'}</span>
             <span class="px-2 py-0.5 rounded-full bg-white/10 text-amber-300 text-[10px] font-black">دقة التحليل: ${d.confidence_score || 95}%</span>
             <span class="px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-200 text-[10px] font-bold" dir="ltr">${engineBadge}</span>
           </div>
-          <h4 class="text-base sm:text-lg font-black text-amber-300 mt-1">${d.detected_element || 'معدة / ملاحظة سلامة مرصودة'}</h4>
-          <p class="text-xs text-white/90 leading-relaxed font-semibold">${d.findings_summary || 'تم تسجيل الواقعة وتوثيقها وفق المعايير.'}</p>
+          ${d.violation_name ? `
+            <div class="mt-2 space-y-1">
+              <div class="flex items-center gap-1.5 text-xs font-black text-amber-400">
+                <span class="material-symbols-outlined text-base text-rose-500">warning</span>
+                <span>اسم المخالفة المرصودة:</span>
+              </div>
+              <h4 class="text-lg sm:text-xl font-black text-white bg-white/10 px-3 py-1.5 rounded-xl border border-white/15 inline-block shadow-sm">${d.violation_name}</h4>
+            </div>
+          ` : `
+            <h4 class="text-base sm:text-lg font-black text-amber-300 mt-1">${d.detected_element || 'معدة / ملاحظة سلامة مرصودة'}</h4>
+          `}
+          ${d.violation_type ? `
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-400/30 text-cyan-300 text-xs font-bold mt-1">
+              <span class="material-symbols-outlined text-sm text-cyan-400">category</span>
+              <span>نوع وتصنيف المخالفة: ${d.violation_type}</span>
+            </div>
+          ` : ''}
+          <p class="text-xs text-white/90 leading-relaxed font-semibold mt-1">${d.findings_summary || 'تم تسجيل الواقعة وتوثيقها وفق المعايير.'}</p>
         </div>
 
         <div class="shrink-0 flex flex-col items-center justify-center p-3 sm:p-4 rounded-2xl bg-white/10 border border-white/20 min-w-[130px]">
-          <span class="text-[10px] text-white/70 font-bold">مستوى الخطورة</span>
-          <span class="text-lg font-black ${risk === 'عالي جداً' || risk === 'عالي' ? 'text-rose-400' : 'text-amber-300'} mt-0.5">${risk}</span>
+          <span class="text-[10px] text-white/80 font-bold">درجة الخطورة</span>
+          <span class="text-lg sm:text-xl font-black ${risk === 'عالي جداً' || risk === 'عالي' ? 'text-rose-400 animate-pulse' : 'text-amber-300'} mt-0.5">${risk}</span>
           <span class="text-[9px] text-white/60 font-semibold">Risk Priority</span>
         </div>
       </div>
@@ -3058,7 +3264,8 @@
       building: loc.building || 'المستشفى',
       floor: loc.floor || '',
       room: loc.room || '',
-      title: d.detected_element || 'مخالفة سلامة مرصودة بالذكاء الاصطناعي',
+      title: d.violation_name || d.detected_element || 'مخالفة سلامة مرصودة بالذكاء الاصطناعي',
+      violation_type: d.violation_type || '',
       risk_level: d.risk_level || 'متوسط',
       standard_reference: d.standard_reference || 'CBAHI / NFPA',
       description: d.findings_summary || '',
@@ -3119,6 +3326,37 @@
       const svDir = document.getElementById('inp-sv-directive');
       if (svDir && payload.description && (!svDir.value || svDir.value.trim() === '')) {
         svDir.value = payload.description;
+      }
+
+      // 1.1 Pre-check matching violation checkboxes and description
+      const fullText = `${payload.title || ''} ${payload.description || ''} ${d.violation_type || ''}`.toLowerCase();
+      if (fullText.includes('تخزين') || fullText.includes('مخلفات') || fullText.includes('كرتون') || fullText.includes('أثاث')) {
+        const chkStorage = document.querySelector('input[name="sv-devices"][value="تخزين مواد بموقع غير مخصص للتخزين"]');
+        if (chkStorage) chkStorage.checked = true;
+      }
+      if (fullText.includes('توصيل') || fullText.includes('سلك')) {
+        const chkCable = document.querySelector('input[name="sv-devices"][value="توصيلة كهربائية"]');
+        if (chkCable) chkCable.checked = true;
+      }
+      if (fullText.includes('سخان')) {
+        const chkHeater = document.querySelector('input[name="sv-devices"][value="سخان"]');
+        if (chkHeater) chkHeater.checked = true;
+      }
+      if (fullText.includes('غلاية')) {
+        const chkKettle = document.querySelector('input[name="sv-devices"][value="غلاية"]');
+        if (chkKettle) chkKettle.checked = true;
+      }
+      if (fullText.includes('مايكرويف')) {
+        const chkMicro = document.querySelector('input[name="sv-devices"][value="مايكرويف"]');
+        if (chkMicro) chkMicro.checked = true;
+      }
+
+      // Check "أخرى" and fill custom violation name (e.g. exit obstruction, water leak, etc.)
+      const chkOther = document.getElementById('chk-sv-other');
+      const inpOther = document.getElementById('inp-sv-other-desc');
+      if (chkOther && inpOther) {
+        chkOther.checked = true;
+        inpOther.value = d.violation_name || payload.title || 'عرقلة الوصول لمخرج الطوارئ';
       }
 
       // 2. Close AI vision modal

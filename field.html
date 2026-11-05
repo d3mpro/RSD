@@ -329,7 +329,7 @@
         <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3">
           
           <!-- Card 0: Multimodal Safety Vision AI (الراصد البصري الذكي) -->
-          <div onclick="openAIVisionInspectionModal()" class="ksu-bento-card border-indigo-300 hover:border-indigo-600 text-indigo-700 bg-gradient-to-br from-indigo-50/80 via-blue-50/40 to-white shadow-xs hover:shadow-md cursor-pointer transition-all">
+          <div onclick="openAIVisionInspectionModal({ submode: 'general', checklistType: 'general' })" class="ksu-bento-card border-indigo-300 hover:border-indigo-600 text-indigo-700 bg-gradient-to-br from-indigo-50/80 via-blue-50/40 to-white shadow-xs hover:shadow-md cursor-pointer transition-all">
             <div class="flex items-center justify-between mb-3">
               <div class="w-10 h-10 rounded-xl bg-gradient-to-r from-[#004B87] to-[#082B49] text-white flex items-center justify-center shadow-sm">
                 <span class="material-symbols-outlined text-xl text-amber-300">center_focus_strong</span>
@@ -337,7 +337,7 @@
             </div>
             <div>
               <h4 class="text-xs sm:text-sm font-black text-indigo-950 leading-tight">الراصد البصري الذكي</h4>
-              <p class="text-[10px] text-gray-500 mt-1">فحص وتحليل المخاطر بالكاميرا</p>
+              <p class="text-[10px] text-gray-500 mt-1">رصد مخالفة عامة وتدقيق المخاطر بالكاميرا</p>
             </div>
           </div>
 
@@ -2545,7 +2545,7 @@
 
     <!-- Elevated Floating AI Smart Vision Center Button (الراصد الذكي) -->
     <div class="ksu-nav-ai-center">
-      <button type="button" onclick="openAIVisionInspectionModal()" id="bnav-ai-vision" class="ai-btn" title="الراصد الذكي - فحص وتحليل المخاطر بالكاميرا" aria-label="الراصد الذكي">
+      <button type="button" onclick="openAIVisionInspectionModal({ submode: 'general', checklistType: 'general' })" id="bnav-ai-vision" class="ai-btn" title="الراصد الذكي - رصد مخالفة عامة وتدقيق المخاطر بالكاميرا" aria-label="الراصد الذكي">
         <span class="material-symbols-outlined text-white">center_focus_strong</span>
         <span class="ai-pulse-dot"></span>
       </button>
@@ -4394,8 +4394,8 @@
   <script src="assets/js/ksu-official-card.js?v=6.6.3" charset="UTF-8"></script>
   <script src="assets/js/app.js?v=8.0.0" charset="UTF-8"></script>
   <script src="assets/js/ksu-integrations.js?v=6.0" charset="UTF-8"></script>
-  <script src="assets/js/vision-reticle-helper.js?v=7.0.0" charset="UTF-8"></script>
-  <script src="assets/js/ksu-ai-client.js?v=7.0.0" charset="UTF-8"></script>
+  <script src="assets/js/vision-reticle-helper.js?v=7.1.0" charset="UTF-8"></script>
+  <script src="assets/js/ksu-ai-client.js?v=7.1.0" charset="UTF-8"></script>
 
   <!-- Service Worker Registration for PWA Offline Functionality -->
   <script>

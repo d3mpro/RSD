@@ -77,6 +77,8 @@ function buildExtinguisherPrompt(opts = {}) {
 أجب حصراً بكائن JSON نظيف وبدون أي نصوص مسبقة أو لاحقة:
 {
   "submode": "extinguisher",
+  "violation_name": "",
+  "violation_type": "مهمات ومعدات مكافحة الحريق",
   "gauge_status": "green" | "undercharge" | "overcharge" | "unknown",
   "gauge_description": "وصف دقيق لمؤشر مقياس الضغط",
   "tag_detected": true,
@@ -129,6 +131,8 @@ function buildExitPrompt(opts = {}) {
 أجب حصراً بكائن JSON نظيف وصحيح:
 {
   "submode": "emergency_exit",
+  "violation_name": "عرقلة الوصول لمخرج الطوارئ",
+  "violation_type": "إعاقة مسالك الهروب ومخارج الطوارئ",
   "door_wedged": false,
   "exit_clear": true,
   "exit_obstruction_percent": 0,
@@ -181,6 +185,8 @@ function buildHazardPrompt(opts = {}) {
 أجب حصراً بكائن JSON نظيف:
 {
   "submode": "hazard",
+  "violation_name": "توصيلات كهربائية عشوائية وأجهزة غير مصرحة",
+  "violation_type": "مخاطر كهربائية وحرارية",
   "hazard_type": "electrical",
   "hazard_detected": true,
   "clearance_violation_36in": false,
@@ -223,6 +229,8 @@ function buildGeneralPrompt(opts = {}) {
 أجب بصيغة JSON نظيفة وصحيحة فقط على الشكل التالي:
 {
   "submode": "general",
+  "violation_name": "اسم المخالفة الصريح والمحدد",
+  "violation_type": "نوع وتصنيف المخالفة",
   "hazard_detected": false,
   "compliance_status": "مطابق",
   "risk_level": "منخفض",
@@ -297,6 +305,13 @@ function sanitizeVisionOutput(parsedData = {}, riyadhCtx = {}, submode = 'genera
 
   // Base universal fallbacks
   result.submode = targetSubmode;
+  if (!result.violation_name) {
+    result.violation_name = (result.compliance_status === "غير مطابق" || (result.violations_list && result.violations_list.length > 0))
+      ? (result.detected_element || "مخالفة سلامة ميدانية مرصودة") : "";
+  }
+  if (!result.violation_type) {
+    result.violation_type = targetSubmode === "emergency_exit" ? "إعاقة مسالك الهروب ومخارج الطوارئ" : (targetSubmode === "extinguisher" ? "مهمات ومعدات مكافحة الحريق" : (targetSubmode === "hazard" ? "مخاطر كهربائية وحرارية" : "اشتراطات السلامة العامة"));
+  }
   if (!result.compliance_status) result.compliance_status = result.violations_list.length > 0 ? 'غير مطابق' : 'مطابق';
   if (!result.risk_level) result.risk_level = result.violations_list.length > 0 ? 'متوسط' : 'منخفض';
   if (typeof result.confidence_score !== 'number') result.confidence_score = 95;
