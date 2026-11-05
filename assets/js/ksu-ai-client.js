@@ -2768,67 +2768,9 @@
     }
   };
 
-  window.toggleVisionAgentSettingsPanel = function() {
-    const panel = document.getElementById('vision-agent-settings-panel');
-    if (panel) panel.classList.toggle('hidden');
-  };
-
-  window.testAndSaveVisionAgentConfig = async function() {
-    const oracleUrl = document.getElementById('inp-agent-oracle-url')?.value || '';
-    const qwenKey = document.getElementById('inp-agent-qwen-key')?.value || '';
-    const qwenModel = document.getElementById('inp-agent-qwen-model')?.value || 'qwen/qwen2.5-vl-72b-instruct:free';
-    const badge = document.getElementById('vision-agent-ping-badge');
-
-    KSUAI.saveAgentConfig({
-      oracleAgentUrl: oracleUrl,
-      qwenApiKey: qwenKey,
-      qwenVisionModel: qwenModel
-    });
-
-    if (badge) {
-      badge.textContent = 'جاري فحص الاتصال...';
-      badge.className = 'px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold';
-    }
-
-    try {
-      // محاولة دفع الإعدادات إلى خادم الوكيل إذا كان متصلاً
-      if (qwenKey) {
-        try {
-          await KSUAI.request('/ai/config', {
-            method: 'POST',
-            body: JSON.stringify({
-              qwen_keys: [qwenKey],
-              qwen_vision_model: qwenModel
-            })
-          }, 6000);
-        } catch (_) {}
-      }
-
-      const statusRes = await KSUAI.getStatus();
-      if (statusRes && statusRes.status === 'online') {
-        const ollamaTag = statusRes.ollama_online ? ` + Ollama (${statusRes.ollama_vision_model})` : '';
-        if (badge) {
-          badge.textContent = `متصل بوكيل أوراكل ✅${ollamaTag}`;
-          badge.className = 'px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold';
-        }
-      } else if (qwenKey) {
-        if (badge) {
-          badge.textContent = `تم حفظ مفتاح Qwen2.5-VL بنجاح ✅`;
-          badge.className = 'px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold';
-        }
-      } else {
-        if (badge) {
-          badge.textContent = `تم الحفظ (وكيل أوراكل غير متصل حالياً)`;
-          badge.className = 'px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold';
-        }
-      }
-    } catch (e) {
-      if (badge) {
-        badge.textContent = 'تم الحفظ محلياً';
-        badge.className = 'px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-bold';
-      }
-    }
-  };
+  // No-op for legacy calls if any
+  window.toggleVisionAgentSettingsPanel = function() {};
+  window.testAndSaveVisionAgentConfig = async function() {};
 
   function renderVisionInspectionResults(d, building, floor, room) {
     const resultsArea = document.getElementById('vision-results-area');
