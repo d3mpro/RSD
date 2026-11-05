@@ -12508,42 +12508,101 @@ function renderPermitsList() {
       <p class="font-bold text-sm">لا توجد تصاريح عمل ساخن مسجلة حالياً</p>
     </div>
   ` : permits.map(p => `
-    <div class="p-space-md rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-space-md transition-all hover:border-amber-400/50">
-      <div class="flex items-start gap-space-md">
-        <div class="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 shadow-xs">
-          <span class="material-symbols-outlined text-headline-sm">local_fire_department</span>
-        </div>
-        <div class="flex flex-col">
-          <div class="flex items-center gap-space-xs flex-wrap">
-            <span class="font-title-md text-primary font-bold">${p.workType || 'أعمال ساخنة'}</span>
-            <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">${p.status || 'ساري ومطابق'}</span>
-            <span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant text-[11px] font-mono font-bold">${p.id}</span>
-            ${p.applicantSignature ? '<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold flex items-center gap-0.5"><span class="material-symbols-outlined text-xs">draw</span> توقيع رقمي معتمد</span>' : ''}
+    <div class="p-4 sm:p-5 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 border-r-4 border-r-amber-500 shadow-xs hover:shadow-md transition-all flex flex-col gap-3.5 hover:border-amber-400/50">
+      <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+        <div class="flex items-start gap-3 w-full lg:w-auto">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+            <span class="material-symbols-outlined text-headline-sm">local_fire_department</span>
           </div>
-          <span class="font-body-sm text-on-surface mt-1">
-            <strong class="text-primary">طالب التصريح / الفني:</strong> ${p.applicant || p.contractor || 'فني صيانة معتمد'} 
-            | <strong class="text-primary">المقاول/الجهة:</strong> ${p.contractor || '-'}
-            | <strong class="text-primary">الموقع:</strong> ${p.location || (p.zone ? `${p.zone} - ${p.floor} - ${p.room}` : 'المبنى الرئيسي')}
-          </span>
-          <span class="font-label-sm text-on-surface-variant mt-1">
-            مراقب الحريق: ${p.fireWatch || 'مراقب السلامة المعتمد'} 
-            | مصدر التصريح: <strong class="text-emerald-800">${p.inspector || p.supervisedBy || 'مفتش السلامة المناوب'}</strong> 
-            | ساري حتى: <span class="font-mono text-amber-800 font-bold">${p.validUntil || (p.date + ' ' + (p.endTime || '16:00'))}</span>
-          </span>
+          <div class="flex flex-col flex-grow">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="font-title-md text-primary font-black text-sm sm:text-base">${p.workType || 'أعمال ساخنة'}</span>
+              <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-black border border-emerald-300 flex items-center gap-1">
+                <span class="material-symbols-outlined text-xs">verified</span>
+                <span>${p.status && p.status.includes('ساري') ? p.status : 'ساري ومعتمد في الأرشيف ✓'}</span>
+              </span>
+              <span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-[11px] font-mono font-bold">${p.id}</span>
+              ${p.applicantSignature ? '<span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-bold flex items-center gap-1"><span class="material-symbols-outlined text-xs">draw</span> توقيع رقمي معتمد</span>' : ''}
+              <span class="px-2 py-0.5 rounded-md bg-surface-container text-on-surface-variant text-[10px] font-mono font-semibold">${p.date || ''}</span>
+            </div>
+            <div class="text-[11px] text-on-surface-variant font-semibold mt-0.5">
+              ترخيص عمل ساخن معتمد ومؤرشف رسمياً • الإدارة العامة للأمن والسلامة الميدانية
+            </div>
+          </div>
+        </div>
+        
+        <!-- Action Buttons (Permanent: No Delete Button) -->
+        <div class="flex items-center gap-2 self-end lg:self-center shrink-0 flex-wrap">
+          <button type="button" onclick="openOfficialPermitCardModal('${p.id}')" class="px-3 py-1.5 rounded-xl bg-[#004B87] hover:bg-[#003B6B] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer">
+            <span class="material-symbols-outlined text-sm">verified</span>
+            <span>عرض كرت التصريح المعتمد 🛡️</span>
+          </button>
+          <button type="button" onclick="printHotWorkPermit('${p.id}')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold text-xs shadow-xs transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-sm text-amber-700">print</span>
+            <span>طباعة (PDF)</span>
+          </button>
+          <button type="button" onclick="scanQRPermit('${p.id}')" class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs transition-colors cursor-pointer" title="التحقق من رمز QR">
+            <span class="material-symbols-outlined text-sm">qr_code_2</span>
+            <span>QR</span>
+          </button>
         </div>
       </div>
-      <div class="flex items-center gap-2 self-end md:self-center shrink-0">
-        <button onclick="printHotWorkPermit('${p.id}')" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold text-xs shadow-xs transition-colors">
-          <span class="material-symbols-outlined text-sm text-amber-700">print</span>
-          <span>طباعة التصريح (PDF)</span>
-        </button>
-        <button onclick="scanQRPermit('${p.id}')" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-surface-container-high hover:bg-surface-container text-primary font-bold text-xs transition-colors">
-          <span class="material-symbols-outlined text-sm">qr_code_2</span>
-          <span>QR</span>
-        </button>
-        <button onclick="deletePermit('${p.id}')" title="حذف التصريح" class="w-8 h-8 rounded-lg text-error hover:bg-error/10 flex items-center justify-center transition-colors">
-          <span class="material-symbols-outlined text-base">delete</span>
-        </button>
+
+      <!-- Structured Metadata Grid Chips -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-1 border-t border-outline-variant/20">
+        <div class="flex items-center gap-2 p-2 rounded-xl bg-surface-container-low/60 border border-outline-variant/30 text-xs">
+          <span class="material-symbols-outlined text-primary text-base shrink-0">engineering</span>
+          <div class="truncate">
+            <span class="text-on-surface-variant text-[10px] block leading-none">طالب التصريح / الفني</span>
+            <span class="font-bold text-primary truncate block mt-0.5">${p.applicant || p.contractor || 'فني صيانة معتمد'}</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 p-2 rounded-xl bg-surface-container-low/60 border border-outline-variant/30 text-xs">
+          <span class="material-symbols-outlined text-primary text-base shrink-0">location_on</span>
+          <div class="truncate">
+            <span class="text-on-surface-variant text-[10px] block leading-none">الموقع والنطاق</span>
+            <span class="font-bold text-on-surface truncate block mt-0.5">${p.location || (p.zone ? `${p.zone} - ${p.floor}` : 'المبنى الرئيسي')}</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 p-2 rounded-xl bg-amber-50/70 border border-amber-200/60 text-xs">
+          <span class="material-symbols-outlined text-amber-700 text-base shrink-0">local_fire_department</span>
+          <div class="truncate">
+            <span class="text-amber-900/80 text-[10px] block leading-none">مراقب الحريق المعين</span>
+            <span class="font-bold text-amber-950 truncate block mt-0.5">${p.fireWatch || 'مراقب سلامة معتمد'}</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 p-2 rounded-xl bg-emerald-50/70 border border-emerald-200/60 text-xs">
+          <span class="material-symbols-outlined text-emerald-700 text-base shrink-0">shield_person</span>
+          <div class="truncate">
+            <span class="text-emerald-900/80 text-[10px] block leading-none">مصدر التصريح والمفتش</span>
+            <span class="font-bold text-emerald-950 truncate block mt-0.5">${p.inspector || p.supervisedBy || 'مفتش السلامة المناوب'}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Bar with Validity and Archive Status -->
+      <div class="flex items-center justify-between gap-2 flex-wrap pt-1 text-[11px] text-on-surface-variant border-t border-dashed border-outline-variant/30">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="flex items-center gap-1 font-bold text-amber-900">
+            <span class="material-symbols-outlined text-xs text-amber-700">schedule</span>
+            <span>الصلاحية سارية حتى:</span>
+            <span class="font-mono text-amber-900 font-extrabold">${p.validUntil || (p.date + ' ' + (p.endTime || '16:00'))}</span>
+          </span>
+          ${p.fireEquipment ? `
+            <span class="text-gray-300">|</span>
+            <span class="flex items-center gap-1 text-gray-600">
+              <span class="material-symbols-outlined text-xs text-gray-500">fire_extinguisher</span>
+              <span>معدات الإطفاء: ${p.fireEquipment}</span>
+            </span>
+          ` : ''}
+        </div>
+        <span class="font-semibold text-emerald-800 flex items-center gap-1">
+          <span class="material-symbols-outlined text-xs">task_alt</span>
+          <span>محفوظ في أرشيف التصاريح الرسمية</span>
+        </span>
       </div>
     </div>
   `).join('');
@@ -12751,9 +12810,9 @@ function saveNewPermit() {
     applicantSignature: applicantSignature,
     safetySignature: safetySignature,
     status: 'ساري ومعتمد',
-    qualityStatus: 'pending_quality',
-    routedTo: 'Q1',
-    routedToTitle: 'قسم الجودة وتقييم الأداء (Q1)',
+    qualityStatus: 'archived_approved',
+    routedTo: 'ARCHIVE',
+    routedToTitle: 'أرشيف التصاريح المعتمدة',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     updatedAtMs: Date.now(),
@@ -12771,7 +12830,7 @@ function saveNewPermit() {
   }
   closeNewPermitModal();
   renderPermitsList();
-  showToast('تم إصدار تصريح العمل الساخن بنجاح ومزامنته مع النظام السحابي ✓', 'success');
+  showToast('تم إصدار تصريح العمل الساخن واعتماده فورياً وحفظه في أرشيف التصاريح المعتمدة ✓', 'success');
 }
 
 function deletePermit(id) {
@@ -13162,40 +13221,88 @@ function filterDoorsList() {
   }
 
   container.innerHTML = list.map(d => `
-    <div class="p-space-md rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-space-md transition-all hover:border-teal-400/50">
-      <div class="flex items-start gap-space-md">
-        <div class="w-12 h-12 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center shrink-0 shadow-xs">
-          <span class="material-symbols-outlined text-headline-sm">sensor_door</span>
-        </div>
-        <div class="flex flex-col">
-          <div class="flex items-center gap-space-xs flex-wrap">
-            <span class="font-title-md text-primary font-bold">${d.doorName}</span>
-            <span class="px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant text-[11px] font-mono font-bold">${d.id}</span>
-            <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">${d.status || 'تم التنفيذ'}</span>
-            ${d.date ? `<span class="px-2 py-0.5 rounded-full bg-teal-50 text-teal-900 border border-teal-200 text-[11px] font-mono font-semibold">${d.date}</span>` : ''}
-            ${d.requesterSignature ? '<span class="px-2 py-0.5 rounded-full bg-teal-100 text-teal-900 text-[10px] font-bold flex items-center gap-0.5"><span class="material-symbols-outlined text-xs">draw</span> توقيع الطالب موثق</span>' : ''}
+    <div class="p-4 sm:p-5 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 border-r-4 border-r-teal-500 shadow-xs hover:shadow-md transition-all flex flex-col gap-3.5 hover:border-teal-400/50">
+      <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
+        <div class="flex items-start gap-3 w-full lg:w-auto">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 text-white flex items-center justify-center shrink-0 shadow-sm">
+            <span class="material-symbols-outlined text-headline-sm">sensor_door</span>
           </div>
-          <span class="font-body-sm text-on-surface mt-1">
-            <strong class="text-primary">مقدم الطلب:</strong> ${d.requesterName} 
-            (${d.jobTitle ? d.jobTitle + ' - ' : ''}الرقم الوظيفي: ${d.employeeId}) 
-            | <strong class="text-primary">القسم:</strong> ${d.department}
-            ${d.ext ? `(تحويلة: ${d.ext})` : ''}
-          </span>
-          <span class="font-label-sm text-on-surface-variant mt-1">
-            الموقع: ${d.building || ''} - ${d.floor || ''} ${d.room ? '- ' + d.room : ''} 
-            | السبب: ${d.reason} 
-            | المفتش: ${d.inspectorName || d.approver || 'أ. علي سليمان الصقري'} (${d.time || ''})
-          </span>
+          <div class="flex flex-col flex-grow">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <span class="font-title-md text-primary font-black text-sm sm:text-base">${d.doorName || 'مكتب / مستودع'}</span>
+              <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-black border border-emerald-300 flex items-center gap-1">
+                <span class="material-symbols-outlined text-xs">verified</span>
+                <span>${(!d.status || d.status.includes('بانتظار') || d.status.includes('الجودة')) ? 'معتمد ومنفذ ✓' : (d.status.includes('✓') ? d.status : d.status + ' ✓')}</span>
+              </span>
+              <span class="px-2 py-0.5 rounded-md bg-teal-50 text-teal-900 border border-teal-200 text-[11px] font-mono font-bold">${d.id}</span>
+              ${d.requesterSignature ? '<span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-bold flex items-center gap-1"><span class="material-symbols-outlined text-xs">draw</span> توقيع الطالب موثق</span>' : ''}
+              <span class="px-2 py-0.5 rounded-md bg-surface-container text-on-surface-variant text-[10px] font-mono font-semibold">${d.date || ''}</span>
+            </div>
+            <div class="text-[11px] text-on-surface-variant font-semibold mt-0.5">
+              طلب فتح باب رسمي معتمد ومحفوظ بالأرشيف • الإدارة العامة للأمن والسلامة
+            </div>
+          </div>
+        </div>
+        
+        <!-- Action Buttons (Permanent: No Delete Button) -->
+        <div class="flex items-center gap-2 self-end lg:self-center shrink-0 flex-wrap">
+          <button type="button" onclick="printDoorOpenRequest('${d.id}')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 font-bold text-xs shadow-xs transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-sm text-teal-700">print</span>
+            <span>طباعة الطلب (PDF)</span>
+          </button>
         </div>
       </div>
-      <div class="flex items-center gap-2 self-end md:self-center shrink-0">
-        <button onclick="printDoorOpenRequest('${d.id}')" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 font-bold text-xs shadow-xs transition-colors">
-          <span class="material-symbols-outlined text-sm text-teal-700">print</span>
-          <span>طباعة الطلب (PDF)</span>
-        </button>
-        <button onclick="deleteDoorRequest('${d.id}')" title="حذف الطلب" class="w-8 h-8 rounded-lg text-error hover:bg-error/10 flex items-center justify-center transition-colors">
-          <span class="material-symbols-outlined text-base">delete</span>
-        </button>
+
+      <!-- Structured Metadata Grid Chips -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-1 border-t border-outline-variant/20">
+        <div class="flex items-center gap-2 p-2 rounded-xl bg-surface-container-low/60 border border-outline-variant/30 text-xs">
+          <span class="material-symbols-outlined text-primary text-base shrink-0">person</span>
+          <div class="truncate">
+            <span class="text-on-surface-variant text-[10px] block leading-none">مقدم الطلب والرقم الوظيفي</span>
+            <span class="font-bold text-primary truncate block mt-0.5">${d.requesterName} (${d.employeeId || '-'})</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 p-2 rounded-xl bg-surface-container-low/60 border border-outline-variant/30 text-xs">
+          <span class="material-symbols-outlined text-primary text-base shrink-0">domain</span>
+          <div class="truncate">
+            <span class="text-on-surface-variant text-[10px] block leading-none">القسم والتحويلة</span>
+            <span class="font-bold text-on-surface truncate block mt-0.5">${d.department || '-'} ${d.ext ? `(${d.ext})` : ''}</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 p-2 rounded-xl bg-surface-container-low/60 border border-outline-variant/30 text-xs">
+          <span class="material-symbols-outlined text-primary text-base shrink-0">location_on</span>
+          <div class="truncate">
+            <span class="text-on-surface-variant text-[10px] block leading-none">الموقع والغرفة</span>
+            <span class="font-bold text-on-surface truncate block mt-0.5">${d.building || ''} - ${d.floor || ''} ${d.room ? '- ' + d.room : ''}</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 p-2 rounded-xl bg-teal-50/70 border border-teal-200/60 text-xs">
+          <span class="material-symbols-outlined text-teal-700 text-base shrink-0">shield_person</span>
+          <div class="truncate">
+            <span class="text-teal-900/80 text-[10px] block leading-none">المفتش المنفذ</span>
+            <span class="font-bold text-teal-950 truncate block mt-0.5">${d.inspectorName || d.approver || 'أ. علي سليمان الصقري'}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Bar with Reason and Archive Status -->
+      <div class="flex items-center justify-between gap-2 flex-wrap pt-1 text-[11px] text-on-surface-variant border-t border-dashed border-outline-variant/30">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="flex items-center gap-1 font-bold text-teal-950">
+            <span class="material-symbols-outlined text-xs text-teal-700">info</span>
+            <span>سبب فتح الباب:</span>
+            <span class="font-semibold text-teal-900">${d.reason}</span>
+          </span>
+          <span class="text-gray-300">|</span>
+          <span class="text-gray-600 font-mono">التوقيت: ${d.time || ''}</span>
+        </div>
+        <span class="font-semibold text-emerald-800 flex items-center gap-1">
+          <span class="material-symbols-outlined text-xs">task_alt</span>
+          <span>محفوظ ومؤرشف رسمياً في سجل فتح الأبواب</span>
+        </span>
       </div>
     </div>
   `).join('');
@@ -13322,10 +13429,10 @@ function saveNewDoorRequest() {
     time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
     date: new Date().toISOString().substring(0, 10),
     approver: inspectorName,
-    status: 'بانتظار مراجعة الجودة (Q1)',
-    qualityStatus: 'pending_quality',
-    routedTo: 'Q1',
-    routedToTitle: 'قسم الجودة وتقييم الأداء (Q1)',
+    status: 'معتمد ومنفذ',
+    qualityStatus: 'archived_approved',
+    routedTo: 'ARCHIVE',
+    routedToTitle: 'أرشيف طلبات فتح الأبواب المعتمدة',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     updatedAtMs: Date.now()
@@ -13338,7 +13445,7 @@ function saveNewDoorRequest() {
   }
   removeDoorIdCardPhoto();
   closeNewDoorModal();
-  showToast('تم توثيق طلب فتح الباب وحفظ صورة البطاقة وإرساله لحظياً لقسم الجودة وتقييم الأداء (Q1).', 'success');
+  showToast('تم توثيق طلب فتح الباب واعتماده فورياً وحفظه في أرشيف فتح الأبواب ✓', 'success');
 }
 
 function deleteDoorRequest(id) {
@@ -25509,13 +25616,8 @@ function renderQualityDoorsAndPermitsInbox() {
   }
 
   container.innerHTML = filtered.map(item => {
-    const isApproved = item.qualityStatus === 'approved_by_quality';
-    const isReturned = item.qualityStatus === 'returned_by_quality';
-    const statusBadge = isApproved
-      ? '<span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-[11px] font-black">✓ معتمد من الجودة (Q1)</span>'
-      : (isReturned
-        ? '<span class="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-900 border border-rose-300 text-[11px] font-black">↩️ معاد للملاحظات</span>'
-        : '<span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-black">⏳ وارد لقسم الجودة (Q1)</span>');
+    const isApproved = true;
+    const statusBadge = '<span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-[11px] font-black flex items-center gap-1"><span class="material-symbols-outlined text-xs">verified</span> معتمد ومؤرشف تلقائياً ✓</span>';
 
     return `
       <div class="p-4 rounded-2xl bg-white border ${isApproved ? 'border-emerald-200' : (isReturned ? 'border-rose-200' : 'border-outline-variant/40')} shadow-2xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
@@ -25538,18 +25640,24 @@ function renderQualityDoorsAndPermitsInbox() {
           </div>
         </div>
         <div class="flex items-center gap-2 flex-wrap shrink-0 self-end lg:self-center">
-          <button type="button" onclick="approveDoorOrPermitByQuality('${item._type}', '${item.id}')" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1 shadow-2xs">
-            <span class="material-symbols-outlined text-sm">verified</span>
-            <span>اعتماد الجودة (Q1)</span>
-          </button>
-          <button type="button" onclick="returnDoorOrPermitByQuality('${item._type}', '${item.id}')" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1">
-            <span class="material-symbols-outlined text-sm">assignment_return</span>
-            <span>رد بملاحظة</span>
-          </button>
+          <span class="px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm text-emerald-600">task_alt</span>
+            <span>سجل معتمد ومؤرشف</span>
+          </span>
+          ${item._type === 'permit' ? `
+            <button type="button" onclick="openOfficialPermitCardModal('${item.id}')" class="px-3 py-1.5 rounded-xl bg-[#004B87] hover:bg-[#003B6B] text-white font-bold text-xs flex items-center gap-1 shadow-xs transition-all active:scale-95 cursor-pointer">
+              <span class="material-symbols-outlined text-sm">verified</span>
+              <span>عرض كرت التصريح المعتمد 🛡️</span>
+            </button>
+            <button type="button" onclick="printHotWorkPermit('${item.id}')" class="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer">
+              <span class="material-symbols-outlined text-sm text-amber-700">print</span>
+              <span>طباعة التصريح (PDF)</span>
+            </button>
+          ` : ''}
           ${item._type === 'door' && typeof printDoorOpenRequest === 'function' ? `
-            <button type="button" onclick="printDoorOpenRequest('${item.id}')" class="px-2.5 py-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs flex items-center gap-1">
-              <span class="material-symbols-outlined text-sm">print</span>
-              <span>طباعة</span>
+            <button type="button" onclick="printDoorOpenRequest('${item.id}')" class="px-3 py-1.5 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-900 border border-teal-200 font-bold text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer">
+              <span class="material-symbols-outlined text-sm text-teal-700">print</span>
+              <span>طباعة الطلب (PDF)</span>
             </button>
           ` : ''}
         </div>

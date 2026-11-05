@@ -2806,14 +2806,16 @@
                   <span>عرض التفاصيل</span>
                 </button>
               ` : `
-                <button type="button" onclick="approveDoorOrPermitByQuality('${item._type}', '${item.id}')" class="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1 shadow-xs transition-all cursor-pointer">
-                  <span class="material-symbols-outlined text-sm">verified</span>
-                  <span>اعتماد الجودة (Q1)</span>
-                </button>
-                <button type="button" onclick="returnDoorOrPermitByQuality('${item._type}', '${item.id}')" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer">
-                  <span class="material-symbols-outlined text-sm">assignment_return</span>
-                  <span>رد بملاحظة</span>
-                </button>
+                <span class="px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1">
+                  <span class="material-symbols-outlined text-sm text-emerald-600">task_alt</span>
+                  <span>معتمد ومؤرشف رسمياً</span>
+                </span>
+                ${item._type === 'permit' ? `
+                  <button type="button" onclick="openOfficialPermitCardModal('${item.id}')" class="px-3 py-1.5 rounded-xl bg-[#004B87] hover:bg-[#003B6B] text-white font-bold text-xs flex items-center gap-1 shadow-xs transition-all active:scale-95 cursor-pointer">
+                    <span class="material-symbols-outlined text-sm">verified</span>
+                    <span>عرض كرت التصريح 🛡️</span>
+                  </button>
+                ` : ''}
                 ${item._type === 'door' && typeof printDoorOpenRequest === 'function' ? `
                   <button type="button" onclick="printDoorOpenRequest('${item.id}')" class="px-2.5 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center gap-1 border border-outline-variant/30 cursor-pointer">
                     <span class="material-symbols-outlined text-sm">print</span>

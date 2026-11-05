@@ -402,10 +402,11 @@
       const item = {
         id: permit.id || 'HWP-' + (list.length + 101),
         date: permit.date || new Date().toISOString().split('T')[0],
-        status: permit.status || 'ساري',
+        status: permit.status || 'ساري ومعتمد',
         shift: permit.shift || (userObj && userObj.shift) || 'الوردية 1 (صباحي)',
-        routedTo: 'Q1',
-        routedToTitle: 'قسم الجودة وتقييم الأداء (Q1)',
+        qualityStatus: 'archived_approved',
+        routedTo: 'ARCHIVE',
+        routedToTitle: 'أرشيف التصاريح المعتمدة',
         updatedAt: new Date().toISOString(),
         updatedAtMs: Date.now(),
         ...permit

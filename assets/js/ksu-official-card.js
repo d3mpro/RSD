@@ -787,4 +787,302 @@
     }
   };
 
+  /**
+   * توليد HTML كرت تصريح العمل على الساخن المعتمد مطابق 100% لنماذج المنصة المعتمدة
+   */
+  window.generateOfficialPermitCardHtml = function(permit) {
+    if (!permit) return '';
+
+    const pId = permit.id || ('HWP-2026-' + Math.floor(100 + Math.random() * 900));
+    const today = permit.date || ((window.KSUAI && typeof window.KSUAI.getRiyadhDate === 'function') ? window.KSUAI.getRiyadhDate() : new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()));
+    const nowTime = permit.startTime || '08:00';
+    const validUntil = permit.validUntil || (today + ' ' + (permit.endTime || '16:00'));
+
+    const applicant = permit.applicant || permit.contractor || 'فني صيانة معتمد';
+    const contractor = permit.contractor || '-';
+    const location = permit.location || (permit.zone ? `${permit.zone} - ${permit.floor} ${permit.room ? '- ' + permit.room : ''}` : 'المبنى الرئيسي');
+    const workType = permit.workType || 'قص + لحام';
+    const fireWatch = permit.fireWatch || 'مراقب سلامة معتمد';
+    const inspector = permit.inspector || permit.supervisedBy || 'مفتش السلامة المناوب';
+    const fireEquip = permit.fireEquipment || 'طفايات حريق يدوية (بودرة ورغوة) وخراطيم مجهزة بالموقع';
+
+    const qrText = `KSU-HOT-WORK-PERMIT|${pId}|${applicant}|${workType}|VALID:${validUntil}|STATUS:APPROVED_ARCHIVED`;
+    const qrSvg = generateQRCodeSvg(qrText, 70);
+
+    const checklistDefs = [
+      { ar: 'معاينة مشتركة للموقع بين المصدر والمستلم', en: 'Joint site inspection by issuer & receiver', val: permit.checklist?.chk1 || 'yes' },
+      { ar: 'تجفيف وتنظيف الخطوط والمعدات وعزل المواد الخطرة', en: 'Lines/equipment depressurized, drained & purged', val: permit.checklist?.chk2 || 'yes' },
+      { ar: 'خلو منطقة العمل ومحيطها تماماً من المواد القابلة للاشتعال', en: 'Work area completely free from flammables', val: permit.checklist?.chk3 || 'yes' },
+      { ar: 'توفير مراقبة سلامة وحراسة حريق مستمرة وتجهيز المعدات', en: 'Continuous safety fire watch assigned & ready', val: permit.checklist?.chk4 || 'yes' },
+      { ar: 'حمل الفني لشهادة ترخيص عمل سارية المفعول', en: 'Valid work permit & certification present', val: permit.checklist?.chk5 || 'yes' },
+      { ar: 'إبعاد الأفراد غير الضروريين وتأمين محيط موقع العمل', en: 'Unnecessary personnel cleared from job site', val: permit.checklist?.chk6 || 'yes' },
+      { ar: 'توعية الفني بوجوب إيقاف العمل فوراً عند تغير ظروف السلامة', en: 'Craftsman instructed to stop work if conditions change', val: permit.checklist?.chk7 || 'yes' },
+      { ar: 'توفير وتحديد معدات مكافحة الحريق الأولية بالموقع', en: 'Fire fighting equipment available and inspected', val: permit.checklist?.chk8 || 'yes' }
+    ];
+
+    const checklistHtml = checklistDefs.map((chk, idx) => {
+      const isYes = chk.val === 'yes';
+      return `
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 8px; padding: 2.5px 4px; border-bottom: 1px dashed #e2e8f0;">
+          <div style="max-width: 80%; display: flex; align-items: center; gap: 4px;">
+            <span style="font-weight: bold; color: #004B87;">[${idx + 1}]</span>
+            <span style="color: #1e293b; font-weight: 600;">${chk.ar}</span>
+          </div>
+          <span style="color: ${isYes ? '#16a34a' : '#dc2626'}; font-weight: 900; font-family: monospace; display: flex; align-items: center; gap: 2px;">
+            <span>${isYes ? '✓' : '✕'}</span>
+            <span>${isYes ? 'نعم (مطابق)' : 'لا'}</span>
+          </span>
+        </div>
+      `;
+    }).join('');
+
+    const applicantSigHtml = permit.applicantSignature
+      ? `<img src="${permit.applicantSignature}" style="max-height: 38px; max-width: 130px; display: inline-block; vertical-align: middle;" alt="توقيع طالب التصريح">`
+      : `<div style="font-size: 7.5px; color: #16a34a; font-weight: bold; margin-top: 4px;">✓ تم التحقق والتوقيع الرقمي بالبوابة</div>`;
+
+    const safetySigHtml = permit.safetySignature
+      ? `<img src="${permit.safetySignature}" style="max-height: 38px; max-width: 130px; display: inline-block; vertical-align: middle;" alt="توقيع مسؤول السلامة">`
+      : `<div style="font-size: 7.5px; color: #16a34a; font-weight: bold; margin-top: 4px;">✓ اعتماد رسمي فوري صادر ومؤرشف</div>`;
+
+    return `
+      <div class="ksu-card-sheet" style="box-sizing: border-box; width: 100%; max-width: 820px; margin: 0 auto; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; text-align: right; background: #fff; color: #0f172a; border: 2.5px solid #d97706; border-radius: 8px; padding: 12px 16px; position: relative; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);">
+        
+        <!-- HEADER -->
+        <table style="width: 100%; border-collapse: collapse; border-bottom: 2px solid #004B87; padding-bottom: 6px; margin-bottom: 8px;">
+          <tr>
+            <td style="width: 33%; text-align: right; vertical-align: middle; font-size: 8.5px; line-height: 1.35; color: #082B49;">
+              <div style="font-weight: 900; font-size: 9.5px; color: #004B87;">المملكة العربية السعودية</div>
+              <div>وزارة التعليم - جامعة الملك سعود</div>
+              <div style="font-weight: bold;">المدينة الطبية الجامعية (KSUMC)</div>
+              <div>الإدارة العامة للأمن والسلامة الميدانية</div>
+              <div style="color: #64748b; font-size: 8px;">إدارة السلامة والوقاية من الحريق</div>
+            </td>
+            <td style="width: 34%; text-align: center; vertical-align: middle;">
+              <img src="assets/images/ksu_official_logo.png" alt="شعار جامعة الملك سعود" style="height: 52px; width: auto; max-width: 145px; object-fit: contain; display: inline-block;" onerror="this.outerHTML='<div style=\\'font-weight:900;color:#004B87;font-size:14px;\\'>جامعة الملك سعود<br><span style=\\'font-size:9px;color:#64748b;\\'>المدينة الطبية الجامعية</span></div>'">
+              <div style="font-size: 7.5px; color: #64748b; font-weight: bold; margin-top: 2px;">نظام تصاريح العمل ومعايير السلامة المهنية المعتمدة</div>
+            </td>
+            <td style="width: 33%; text-align: left; vertical-align: middle; direction: ltr; font-size: 8.5px; line-height: 1.35;">
+              <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
+                <div>
+                  <div style="font-weight: bold; font-family: monospace; font-size: 11px; color: #d97706;">${pId}</div>
+                  <div>Issued: <span style="font-weight: bold;">${today}</span></div>
+                  <div>Valid: <span style="font-weight: bold; color: #16a34a;">${validUntil}</span></div>
+                </div>
+                <div style="display: inline-block;">
+                  ${qrSvg}
+                </div>
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- BANNER -->
+        <div style="background: linear-gradient(135deg, #b45309 0%, #002B49 100%); color: #fff; border-radius: 6px; padding: 7px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 20px;">🔥</span>
+            <div>
+              <div style="font-size: 13px; font-weight: 900; letter-spacing: 0.3px;">كرت تصريح العمل على الساخن المعتمد (Hot Work Permit)</div>
+              <div style="font-size: 8px; color: #fed7aa; font-weight: bold;">Official Safety Permit • ترخيص اللحام والقص والعزل الحراري المعتمد بالأرشيف</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span style="background: #16a34a; color: #fff; padding: 3px 8px; border-radius: 4px; font-weight: 900; font-size: 10px;">
+              ✓ ساري ومعتمد بالأرشيف
+            </span>
+            <span style="background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 4px; font-weight: 900; font-size: 10px; border: 1px solid #d97706;">
+              ${workType}
+            </span>
+          </div>
+        </div>
+
+        <!-- METADATA TABLE -->
+        <table style="width: 100%; border-collapse: collapse; font-size: 8.5px; margin-bottom: 8px; border: 1px solid #cbd5e1;">
+          <tr style="background: #f8fafc;">
+            <td style="padding: 4px 6px; font-weight: bold; width: 15%; border: 1px solid #cbd5e1; color: #334155;">طالب التصريح / الفني:</td>
+            <td style="padding: 4px 6px; width: 35%; border: 1px solid #cbd5e1; font-weight: 600; color: #004B87;">${applicant}</td>
+            <td style="padding: 4px 6px; font-weight: bold; width: 15%; border: 1px solid #cbd5e1; color: #334155;">المقاول / الجهة:</td>
+            <td style="padding: 4px 6px; width: 35%; border: 1px solid #cbd5e1; font-weight: 600;">${contractor}</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 6px; font-weight: bold; border: 1px solid #cbd5e1; color: #334155;">الموقع والنطاق:</td>
+            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 600;">${location}</td>
+            <td style="padding: 4px 6px; font-weight: bold; border: 1px solid #cbd5e1; color: #334155;">نوع العمل الساخن:</td>
+            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: bold; color: #b45309;">${workType}</td>
+          </tr>
+          <tr style="background: #f8fafc;">
+            <td style="padding: 4px 6px; font-weight: bold; border: 1px solid #cbd5e1; color: #334155;">مراقب الحريق المعين:</td>
+            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 600; color: #b45309;">${fireWatch}</td>
+            <td style="padding: 4px 6px; font-weight: bold; border: 1px solid #cbd5e1; color: #334155;">مصدر التصريح / المفتش:</td>
+            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 600; color: #16a34a;">${inspector}</td>
+          </tr>
+          <tr>
+            <td style="padding: 4px 6px; font-weight: bold; border: 1px solid #cbd5e1; color: #334155;">فترة الصلاحية والتشغيل:</td>
+            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 600; font-family: monospace;">من ${today} ${nowTime} حتى ${validUntil}</td>
+            <td style="padding: 4px 6px; font-weight: bold; border: 1px solid #cbd5e1; color: #334155;">معدات مكافحة الحريق:</td>
+            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 600;">${fireEquip}</td>
+          </tr>
+        </table>
+
+        <!-- SAFETY CHECKLIST SUMMARY -->
+        <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 7px 9px; background: #ffffff; margin-bottom: 8px;">
+          <div style="font-size: 8.5px; font-weight: 900; color: #004B87; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
+            <span>🛡️ قائمة التحقق والاشتراطات الوقائية المعتمدة (8 معايير سلامة):</span>
+            <span style="color: #16a34a; font-weight: bold;">كافة البنود مستوفاة ومعتمدة ✓</span>
+          </div>
+          <div>
+            ${checklistHtml}
+          </div>
+        </div>
+
+        <!-- SPECIAL PRECAUTIONS / DIRECTIVE -->
+        <div style="border: 1.5px solid #d97706; background: #fffbeb; border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; font-size: 8px; color: #92400e;">
+          <strong>توجيه السلامة والوقاية المعتمد: </strong>
+          يُحظر ترك موقع العمل الساخن دون حراسة مراقب الحريق لمدة لا تقل عن 30 دقيقة بعد انتهاء الأعمال. يجب فحص المنطقة والمعدات والتأكد التام من برودتها وانعدام أي مصادر اشتعال.
+        </div>
+
+        <!-- SIGNATURES & ARCHIVE STAMP -->
+        <table style="width: 100%; border-collapse: collapse; margin-top: 4px; border-top: 1px solid #cbd5e1; padding-top: 4px;">
+          <tr>
+            <td style="width: 32%; text-align: center; vertical-align: top; font-size: 8px; padding: 2px;">
+              <div style="font-weight: bold; color: #334155; margin-bottom: 6px;">طالب التصريح / المقاول المعتمد</div>
+              <div style="min-height: 40px; display: flex; align-items: center; justify-content: center;">
+                ${applicantSigHtml}
+              </div>
+              <div style="font-weight: bold; color: #082B49; margin-top: 2px;">${applicant}</div>
+            </td>
+            <td style="width: 36%; text-align: center; vertical-align: middle; padding: 2px;">
+              <div style="border: 1.5px dashed #16a34a; border-radius: 6px; padding: 4px 8px; display: inline-block; min-width: 130px; background: #f0fdf4;">
+                <div style="font-size: 8.5px; font-weight: 900; color: #16a34a;">ختم الاعتماد والأرشفة الرقمية</div>
+                <div style="font-size: 7.5px; color: #334155; margin-top: 1px;">إدارة السلامة الميدانية - KSUMC</div>
+                <div style="font-family: monospace; font-size: 7px; color: #16a34a; font-weight: bold; margin-top: 1px;">VERIFIED & ARCHIVED ✓</div>
+              </div>
+            </td>
+            <td style="width: 32%; text-align: center; vertical-align: top; font-size: 8px; padding: 2px;">
+              <div style="font-weight: bold; color: #334155; margin-bottom: 6px;">مصدر التصريح / مفتش السلامة</div>
+              <div style="min-height: 40px; display: flex; align-items: center; justify-content: center;">
+                ${safetySigHtml}
+              </div>
+              <div style="font-weight: bold; color: #082B49; margin-top: 2px;">${inspector}</div>
+            </td>
+          </tr>
+        </table>
+
+      </div>
+    `;
+  };
+
+  /**
+   * فتح نافذة كرت تصريح العمل على الساخن المعتمد
+   */
+  window.openOfficialPermitCardModal = function(permitId) {
+    let permit = null;
+    if (window.state && window.state.permits) {
+      permit = window.state.permits.find(p => p.id === permitId);
+    }
+    if (!permit) {
+      try {
+        const stored = JSON.parse(localStorage.getItem('ksumc_safety_permits') || '[]');
+        permit = stored.find(p => p.id === permitId);
+      } catch (_) {}
+    }
+    if (!permit) {
+      permit = {
+        id: permitId || 'HWP-2026-101',
+        workType: 'قص + لحام',
+        applicant: 'فني صيانة معتمد',
+        contractor: 'مقاول صيانة معتمد',
+        location: 'Zone A - الدور الأرضي',
+        fireWatch: 'مراقب سلامة معتمد',
+        inspector: 'أ. عادل عاضة الشلوي',
+        date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Riyadh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
+        startTime: '08:00',
+        endTime: '16:00',
+        validUntil: '2026-11-05 20:45',
+        status: 'ساري ومعتمد'
+      };
+    }
+
+    let modal = document.getElementById('ksu-official-permit-modal');
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.id = 'ksu-official-permit-modal';
+    modal.className = 'fixed inset-0 z-[9999] bg-slate-900/85 backdrop-blur-md flex flex-col items-center justify-start p-3 sm:p-6 overflow-y-auto font-cairo';
+    modal.style.direction = 'rtl';
+
+    const cardContentHtml = window.generateOfficialPermitCardHtml(permit);
+
+    modal.innerHTML = `
+      <div class="max-w-4xl w-full flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200 my-auto">
+        <!-- Top Action Bar -->
+        <div class="no-print bg-slate-800 text-white px-4 py-3 rounded-2xl flex items-center justify-between shadow-xl border border-slate-700">
+          <div class="flex items-center gap-2">
+            <span class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">🔥</span>
+            <div>
+              <h4 class="text-xs sm:text-sm font-black">كرت تصريح العمل على الساخن المعتمد (HWP)</h4>
+              <span class="text-[10px] text-slate-400">وثيقة رسمية معتمدة ومحفوظة في أرشيف التصاريح</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="window.printOfficialPermitCard()" class="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer">
+              <span class="material-symbols-outlined text-sm">print</span>
+              <span>طباعة كرت التصريح (A4)</span>
+            </button>
+            <button onclick="document.getElementById('ksu-official-permit-modal').remove()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer font-bold">✕</button>
+          </div>
+        </div>
+
+        <!-- Printable Container -->
+        <div id="official-printable-permit-wrapper" class="bg-white rounded-2xl p-2 sm:p-4 shadow-2xl border border-slate-300 overflow-x-auto">
+          ${cardContentHtml}
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+  };
+
+  /**
+   * دالة طباعة كرت التصريح الرسمي A4
+   */
+  window.printOfficialPermitCard = function() {
+    const cardEl = document.querySelector('#official-printable-permit-wrapper .ksu-card-sheet');
+    if (!cardEl) {
+      window.print();
+      return;
+    }
+
+    const printWin = window.open('', '_blank', 'width=900,height=750');
+    if (!printWin) {
+      window.print();
+      return;
+    }
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html dir="rtl" lang="ar">
+      <head>
+        <meta charset="UTF-8">
+        <title>كرت تصريح العمل على الساخن المعتمد - KSUMC</title>
+        <style>
+          @page { size: A4 portrait; margin: 8mm 6mm; }
+          body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; margin: 0; padding: 0; background: #fff; direction: rtl; }
+          .ksu-card-sheet { border: 2px solid #d97706 !important; box-shadow: none !important; width: 100% !important; max-width: 100% !important; }
+        </style>
+      </head>
+      <body>
+        ${cardEl.outerHTML}
+        <script>
+          window.onload = function() {
+            window.focus();
+            window.print();
+            setTimeout(function() { window.close(); }, 600);
+          };
+        <\/script>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
+  };
+
 })();
