@@ -269,9 +269,70 @@ function buildVisionPrompt(arg1, arg2) {
   }
 }
 
+const VISION_SYSTEM_PROMPT = `أنت كبير مفتشي السلامة في المدينة الطبية بجامعة الملك سعود (KSUMC). افحص الصورة الميدانية بدقة عينيه، ويُمنع منعاً باتاً كتابة عبارات عامة مثل "مخالفة سلامة عامة". يجب أن تصف الأجسام المرئية في الصورة بدقة (مثال: وجود كراتين مكدسة أمام طفاية حريق، أو باب طوارئ مثبت بمانع، أو سلك كهربائي مكشوف).
+
+أخرج النتيجة بصيغة JSON فقط بالمفاتيح التالية:
+{
+  "status": "غير مطابق" أو "مطابق",
+  "pattern": "اختر واحداً: [extinguisher, emergency_exit, hazard, slip_leak, storage, alarm_sprinkler, medgas_hazmat, smoking, general]",
+  "confidence": رقم بين 88 و 99,
+  "risk": "عالي" أو "متوسط" أو "منخفض",
+  "title": "اسم دقيق للمخالفة في 4 إلى 6 كلمات يصف ما في الصورة مباشرة",
+  "summary": "فقرة موجزة من سطرين تشرح الحالة المرصودة في الصورة بدقة وسبب مخالفتها للمعيار",
+  "observations": [
+    "نقطة 1: وصف عيني دقيق للمخالفة الأساسية ومكانها في الصورة",
+    "نقطة 2: وصف تفصيلي للخطر الناتج أو العائق المرصود في الموقع"
+  ],
+  "capa_actions": [
+    "إجراء فوري: خطوة عملية محددة لإزالة المخالفة الظاهرة في الصورة فوراً",
+    "إجراء تصحيحي: خطوة فنية لمعالجة السبب الجذري في الموقع",
+    "إجراء وقائي (CAPA): إجراء لمنع تكرار هذه الحالة مستقبلاً"
+  ],
+  "directive": "توجيه ميداني مختصر من سطر واحد خاص بهذه الحالة"
+}`;
+
+const STATIC_REFERENCE_MAP = {
+  extinguisher: {
+    standard_reference: 'CBAHI FMS.04 / NFPA 10 / SBC 801',
+    category_name: 'مهمات ومعدات إطفاء الحريق'
+  },
+  emergency_exit: {
+    standard_reference: 'CBAHI FMS.14 / NFPA 101 / NFPA 80 / SBC 801 / OSHA 1910.36',
+    category_name: 'مسالك الهروب ومخارج الطوارئ'
+  },
+  hazard: {
+    standard_reference: 'CBAHI FMS.07 / NFPA 70 / SBC 801 / SBC 401',
+    category_name: 'المخاطر والتمديدات الكهربائية'
+  },
+  slip_leak: {
+    standard_reference: 'CBAHI FMS.14 / OSHA 1910.22 / SBC 801',
+    category_name: 'سلامة أسطح المشي ومخاطر الانزلاق'
+  },
+  storage: {
+    standard_reference: 'CBAHI FMS.04 / NFPA 1 / SBC 801',
+    category_name: 'التخزين العشوائي والمواد القابلة للاشتعال'
+  },
+  alarm_sprinkler: {
+    standard_reference: 'NFPA 72 / NFPA 13 / CBAHI FMS.07',
+    category_name: 'أنظمة الإنذار المبكر والرش الآلي'
+  },
+  medgas_hazmat: {
+    standard_reference: 'CBAHI FMS.11 / NFPA 99 / SBC 801',
+    category_name: 'إدارة المواد الخطرة والغازات الطبية'
+  },
+  smoking: {
+    standard_reference: 'المرسوم الملكي م/56 / سياسة MC-SS-P-02',
+    category_name: 'مخالفات لائحة منع التدخين'
+  },
+  general: {
+    standard_reference: 'CBAHI FMS.05 / SBC 201 / NFPA 101',
+    category_name: 'اشتراطات السلامة العامة وإدارة المرافق'
+  }
+};
+
 function sanitizeVisionOutput(parsedData = {}, riyadhCtx = {}, submode = 'general') {
   const curDate = (riyadhCtx && riyadhCtx.currentDate) || new Date().toISOString().split('T')[0];
-  const targetSubmode = resolveSubmode(submode || parsedData.submode, parsedData.checklistType);
+  const targetSubmode = resolveSubmode(parsedData.pattern || submode || parsedData.submode, parsedData.checklistType);
 
   function cleanTxt(txt) {
     if (!txt || typeof txt !== 'string') return txt;
@@ -283,43 +344,53 @@ function sanitizeVisionOutput(parsedData = {}, riyadhCtx = {}, submode = 'genera
 
   const result = { ...parsedData };
 
-  if (result.findings_summary) {
-    result.findings_summary = cleanTxt(result.findings_summary);
-  }
+  let patternKey = String(result.pattern || targetSubmode || 'general').trim().toLowerCase();
+  if (!STATIC_REFERENCE_MAP[patternKey]) patternKey = targetSubmode || 'general';
+  if (!STATIC_REFERENCE_MAP[patternKey]) patternKey = 'general';
+  const mappedRef = STATIC_REFERENCE_MAP[patternKey];
 
-  if (Array.isArray(result.violations_list)) {
-    result.violations_list = result.violations_list
+  if (result.summary) result.summary = cleanTxt(result.summary);
+  if (result.findings_summary) result.findings_summary = cleanTxt(result.findings_summary);
+
+  const rawObs = Array.isArray(result.observations) ? result.observations : result.violations_list;
+  if (Array.isArray(rawObs)) {
+    result.violations_list = rawObs
       .filter(v => v && !String(v).includes('عدم دقة الوقت والتاريخ') && !String(v).includes('تاريخ مستقبلي'))
       .map(cleanTxt);
   } else {
     result.violations_list = [];
   }
+  result.observations = result.violations_list;
 
-  if (Array.isArray(result.corrective_actions)) {
-    result.corrective_actions = result.corrective_actions
+  const rawCapa = Array.isArray(result.capa_actions) ? result.capa_actions : result.corrective_actions;
+  if (Array.isArray(rawCapa) && rawCapa.length) {
+    result.corrective_actions = rawCapa
       .filter(c => c && !String(c).includes('ضبط وتحديث الوقت والتاريخ') && !String(c).includes('تاريخ مستقبلي'))
       .map(cleanTxt);
   } else {
     result.corrective_actions = ['استمرار المتابعة الدورية وتوثيق الفحص'];
   }
+  result.capa_actions = result.corrective_actions;
 
-  // Base universal fallbacks
+  // Base universal fallbacks + new schema keys
   result.submode = targetSubmode;
-  if (!result.violation_name) {
-    result.violation_name = (result.compliance_status === "غير مطابق" || (result.violations_list && result.violations_list.length > 0))
-      ? (result.detected_element || "مخالفة سلامة ميدانية مرصودة") : "";
-  }
-  if (!result.violation_type) {
-    result.violation_type = targetSubmode === "emergency_exit" ? "إعاقة مسالك الهروب ومخارج الطوارئ" : (targetSubmode === "extinguisher" ? "مهمات ومعدات مكافحة الحريق" : (targetSubmode === "hazard" ? "مخاطر كهربائية وحرارية" : "اشتراطات السلامة العامة"));
-  }
-  if (!result.compliance_status) result.compliance_status = result.violations_list.length > 0 ? 'غير مطابق' : 'مطابق';
-  if (!result.risk_level) result.risk_level = result.violations_list.length > 0 ? 'متوسط' : 'منخفض';
-  if (typeof result.confidence_score !== 'number') result.confidence_score = 95;
-  if (!result.detected_element) result.detected_element = 'عنصر / معدة سلامة ميدانية';
-  if (!result.findings_summary) {
-    result.findings_summary = 'تم فحص الموقع وتدقيق الاشتراطات الهندسية وفق معايير CBAHI FMS و NFPA.';
-  }
-  if (!result.standard_reference) result.standard_reference = 'CBAHI FMS / SBC 801 / NFPA';
+  result.pattern = patternKey;
+  result.standard_reference = result.standard_reference || mappedRef.standard_reference;
+  result.category_name = result.category_name || mappedRef.category_name;
+  result.status = result.status || result.compliance_status || (result.violations_list.length > 0 ? 'غير مطابق' : 'مطابق');
+  result.compliance_status = result.status;
+  result.risk = result.risk || result.risk_level || (result.status !== 'مطابق' ? 'عالي' : 'منخفض');
+  result.risk_level = result.risk;
+  result.confidence = typeof result.confidence === 'number' ? result.confidence : (typeof result.confidence_score === 'number' ? result.confidence_score : 95);
+  result.confidence_score = result.confidence;
+  result.title = result.title || result.violation_name || result.detected_element || mappedRef.category_name;
+  result.violation_name = result.title;
+  result.violation_type = result.category_name;
+  result.detected_element = result.detected_element || result.title;
+  result.summary = result.summary || result.findings_summary || 'تم فحص الموقع وتدقيق الاشتراطات الهندسية وفق معايير CBAHI FMS و NFPA.';
+  result.findings_summary = result.summary;
+  result.directive = result.directive || result.suggested_directive || 'التأكيد على استدامة الجاهزية التشغيلية وخلو الموقع من المخاطر.';
+  result.suggested_directive = result.directive;
 
   // Submode specific and safe cross-defaults
   if (targetSubmode === 'extinguisher') {
@@ -330,19 +401,16 @@ function sanitizeVisionOutput(parsedData = {}, riyadhCtx = {}, submode = 'genera
     result.tag_valid = Boolean(result.tag_valid);
     result.pin_and_seal_intact = result.pin_and_seal_intact !== undefined ? Boolean(result.pin_and_seal_intact) : true;
     if (!result.extinguisher_type) result.extinguisher_type = 'بودرة جافة (Dry Powder)';
-    result.standard_reference = result.standard_reference || 'CBAHI FMS.04 / NFPA 10 / SBC 801';
   } else if (targetSubmode === 'emergency_exit') {
     result.door_wedged = Boolean(result.door_wedged);
     result.exit_clear = result.exit_clear !== undefined ? Boolean(result.exit_clear) : !result.door_wedged;
     result.exit_obstruction_percent = typeof result.exit_obstruction_percent === 'number' ? result.exit_obstruction_percent : (result.door_wedged ? 25 : 0);
     if (result.sign_illuminated === undefined) result.sign_illuminated = 'unknown';
-    result.standard_reference = result.standard_reference || 'CBAHI FMS.14 / NFPA 101 / NFPA 80 / SBC 801';
   } else if (targetSubmode === 'hazard') {
     result.hazard_detected = result.hazard_detected !== undefined ? Boolean(result.hazard_detected) : (result.violations_list.length > 0);
     result.clearance_violation_36in = Boolean(result.clearance_violation_36in);
     if (!Array.isArray(result.detected_devices)) result.detected_devices = [];
     if (!result.hazard_type) result.hazard_type = 'other';
-    result.standard_reference = result.standard_reference || 'CBAHI FMS.07 / NFPA 70 / SBC 801';
   }
 
   // Cross-default guarantees so callers can safely destructure or access
@@ -361,6 +429,8 @@ function sanitizeVisionOutput(parsedData = {}, riyadhCtx = {}, submode = 'genera
 }
 
 module.exports = {
+  VISION_SYSTEM_PROMPT,
+  STATIC_REFERENCE_MAP,
   resolveSubmode,
   buildExtinguisherPrompt,
   buildExitPrompt,

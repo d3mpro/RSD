@@ -87,8 +87,8 @@ CONFIG = {
     "ollama_timeout": int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "90")),
     "gemini_keys": [k.strip() for k in os.getenv("GEMINI_API_KEYS", "").split(",") if k.strip()],
     "gemini_model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-    "max_image_dim": int(os.getenv("MAX_IMAGE_DIMENSION", "1024")),
-    "jpeg_quality": int(os.getenv("JPEG_QUALITY", "78")),
+    "max_image_dim": int(os.getenv("MAX_IMAGE_DIMENSION", "800")),
+    "jpeg_quality": int(os.getenv("JPEG_QUALITY", "70")),
     "cache_ttl": int(os.getenv("CACHE_TTL_SECONDS", "1800")),
     "port": int(os.getenv("PORT", "8000")),
 }
@@ -266,43 +266,65 @@ def sanitize_vision_output(
         txt = re.sub(r"عدم دقة الوقت والتاريخ على شاشة لوحة FACP[^\.\n،]*", "", txt)
         return txt.strip()
 
+    if "summary" in parsed_data:
+        parsed_data["summary"] = clean_txt(parsed_data["summary"])
     if "findings_summary" in parsed_data:
         parsed_data["findings_summary"] = clean_txt(parsed_data["findings_summary"])
 
-    if isinstance(parsed_data.get("violations_list"), list):
+    raw_obs = parsed_data.get("observations") if isinstance(parsed_data.get("observations"), list) else parsed_data.get("violations_list")
+    if isinstance(raw_obs, list):
         parsed_data["violations_list"] = [
             clean_txt(v)
-            for v in parsed_data["violations_list"]
+            for v in raw_obs
             if v and "عدم دقة الوقت والتاريخ" not in str(v) and "تاريخ مستقبلي" not in str(v)
         ]
     else:
         parsed_data["violations_list"] = []
+    parsed_data["observations"] = parsed_data["violations_list"]
 
-    if isinstance(parsed_data.get("corrective_actions"), list):
+    raw_capa = parsed_data.get("capa_actions") if isinstance(parsed_data.get("capa_actions"), list) else parsed_data.get("corrective_actions")
+    if isinstance(raw_capa, list) and raw_capa:
         parsed_data["corrective_actions"] = [
             clean_txt(c)
-            for c in parsed_data["corrective_actions"]
+            for c in raw_capa
             if c and "ضبط وتحديث الوقت والتاريخ" not in str(c) and "تاريخ مستقبلي" not in str(c)
         ]
     else:
         parsed_data["corrective_actions"] = ["استمرار المتابعة الدورية وتوثيق الفحص"]
+    parsed_data["capa_actions"] = parsed_data["corrective_actions"]
 
+    pattern_key = str(parsed_data.get("pattern") or target_submode or "general").strip().lower()
+    if pattern_key not in STATIC_REFERENCE_MAP:
+        pattern_key = target_submode if target_submode in STATIC_REFERENCE_MAP else "general"
+    mapped_ref = STATIC_REFERENCE_MAP[pattern_key]
+
+    parsed_data["pattern"] = pattern_key
     parsed_data["submode"] = target_submode
+    parsed_data["standard_reference"] = mapped_ref["standard_reference"]
+    parsed_data["category_name"] = mapped_ref["category_name"]
 
-    # ضمان وجود جميع الحقول المطلوبة لواجهة الراصد البصري الذكي
-    defaults = {
-        "compliance_status": "غير مطابق" if parsed_data["violations_list"] else "مطابق",
-        "risk_level": "متوسط" if parsed_data["violations_list"] else "منخفض",
-        "confidence_score": 95,
-        "detected_element": "عنصر / معدة سلامة ميدانية",
-        "findings_summary": "تم فحص الموقع وتدقيق الاشتراطات الهندسية وفق معايير CBAHI FMS و NFPA.",
-        "standard_reference": "CBAHI FMS / SBC 801 / NFPA",
-        "inspector_recommendation": "توثيق الحالة في محضر الجولة الميدانية",
-        "suggested_directive": "التأكيد على استدامة الجاهزية التشغيلية",
-    }
-    for k, v in defaults.items():
-        if k not in parsed_data or parsed_data[k] is None:
-            parsed_data[k] = v
+    status_val = parsed_data.get("status") or parsed_data.get("compliance_status") or ("غير مطابق" if parsed_data["violations_list"] else "مطابق")
+    risk_val = parsed_data.get("risk") or parsed_data.get("risk_level") or ("عالي" if status_val != "مطابق" else "منخفض")
+    conf_val = parsed_data.get("confidence") or parsed_data.get("confidence_score") or 95
+    title_val = parsed_data.get("title") or parsed_data.get("violation_name") or parsed_data.get("detected_element") or mapped_ref["category_name"]
+    summary_val = parsed_data.get("summary") or parsed_data.get("findings_summary") or f"تم فحص الموقع وتوثيق حالة ({title_val}) ميدانياً."
+    directive_val = parsed_data.get("directive") or parsed_data.get("suggested_directive") or "التأكيد على استدامة الجاهزية التشغيلية"
+
+    parsed_data["status"] = status_val
+    parsed_data["compliance_status"] = status_val
+    parsed_data["risk"] = risk_val
+    parsed_data["risk_level"] = risk_val
+    parsed_data["confidence"] = conf_val
+    parsed_data["confidence_score"] = conf_val
+    parsed_data["title"] = title_val
+    parsed_data["violation_name"] = title_val
+    parsed_data["violation_type"] = mapped_ref["category_name"]
+    parsed_data["detected_element"] = title_val
+    parsed_data["summary"] = summary_val
+    parsed_data["findings_summary"] = summary_val
+    parsed_data["directive"] = directive_val
+    parsed_data["suggested_directive"] = directive_val
+    parsed_data["inspector_recommendation"] = parsed_data.get("inspector_recommendation") or directive_val
 
     # Submode specific defaults
     if target_submode == "extinguisher":
@@ -532,6 +554,68 @@ def build_hazard_prompt(
 }}"""
 
 
+STATIC_REFERENCE_MAP: Dict[str, Dict[str, str]] = {
+    "extinguisher": {
+        "standard_reference": "CBAHI FMS.04 / NFPA 10 / SBC 801",
+        "category_name": "مهمات ومعدات إطفاء الحريق",
+    },
+    "emergency_exit": {
+        "standard_reference": "CBAHI FMS.14 / NFPA 101 / NFPA 80 / SBC 801 / OSHA 1910.36",
+        "category_name": "مسالك الهروب ومخارج الطوارئ",
+    },
+    "hazard": {
+        "standard_reference": "CBAHI FMS.07 / NFPA 70 / SBC 801 / SBC 401",
+        "category_name": "المخاطر والتمديدات الكهربائية",
+    },
+    "slip_leak": {
+        "standard_reference": "CBAHI FMS.14 / OSHA 1910.22 / SBC 801",
+        "category_name": "سلامة أسطح المشي ومخاطر الانزلاق",
+    },
+    "storage": {
+        "standard_reference": "CBAHI FMS.04 / NFPA 1 / SBC 801",
+        "category_name": "التخزين العشوائي والمواد القابلة للاشتعال",
+    },
+    "alarm_sprinkler": {
+        "standard_reference": "NFPA 72 / NFPA 13 / CBAHI FMS.07",
+        "category_name": "أنظمة الإنذار المبكر والرش الآلي",
+    },
+    "medgas_hazmat": {
+        "standard_reference": "CBAHI FMS.11 / NFPA 99 / SBC 801",
+        "category_name": "إدارة المواد الخطرة والغازات الطبية",
+    },
+    "smoking": {
+        "standard_reference": "المرسوم الملكي م/56 / سياسة MC-SS-P-02",
+        "category_name": "مخالفات لائحة منع التدخين",
+    },
+    "general": {
+        "standard_reference": "CBAHI FMS.05 / SBC 201 / NFPA 101",
+        "category_name": "اشتراطات السلامة العامة وإدارة المرافق",
+    },
+}
+
+VISION_SYSTEM_PROMPT = """أنت كبير مفتشي السلامة في المدينة الطبية بجامعة الملك سعود (KSUMC). افحص الصورة الميدانية بدقة عينيه، ويُمنع منعاً باتاً كتابة عبارات عامة مثل "مخالفة سلامة عامة". يجب أن تصف الأجسام المرئية في الصورة بدقة (مثال: وجود كراتين مكدسة أمام طفاية حريق، أو باب طوارئ مثبت بمانع، أو سلك كهربائي مكشوف).
+
+أخرج النتيجة بصيغة JSON فقط بالمفاتيح التالية:
+{
+  "status": "غير مطابق" أو "مطابق",
+  "pattern": "اختر واحداً: [extinguisher, emergency_exit, hazard, slip_leak, storage, alarm_sprinkler, medgas_hazmat, smoking, general]",
+  "confidence": رقم بين 88 و 99,
+  "risk": "عالي" أو "متوسط" أو "منخفض",
+  "title": "اسم دقيق للمخالفة في 4 إلى 6 كلمات يصف ما في الصورة مباشرة",
+  "summary": "فقرة موجزة من سطرين تشرح الحالة المرصودة في الصورة بدقة وسبب مخالفتها للمعيار",
+  "observations": [
+    "نقطة 1: وصف عيني دقيق للمخالفة الأساسية ومكانها في الصورة",
+    "نقطة 2: وصف تفصيلي للخطر الناتج أو العائق المرصود في الموقع"
+  ],
+  "capa_actions": [
+    "إجراء فوري: خطوة عملية محددة لإزالة المخالفة الظاهرة في الصورة فوراً",
+    "إجراء تصحيحي: خطوة فنية لمعالجة السبب الجذري في الموقع",
+    "إجراء وقائي (CAPA): إجراء لمنع تكرار هذه الحالة مستقبلاً"
+  ],
+  "directive": "توجيه ميداني مختصر من سطر واحد خاص بهذه الحالة"
+}"""
+
+
 def build_general_prompt(
     riyadh_ctx: Dict[str, Any],
     facility: str,
@@ -541,39 +625,8 @@ def build_general_prompt(
     item_label: str,
     notes: str,
 ) -> str:
-    return f"""أنت خبير واستشاري السلامة والحماية من الحريق بالمدينة الطبية بجامعة الملك سعود (KSUMC).
-قم بتقييم الصورة/الصور المرفقة وفق المعايير والأنظمة التالية بدقة صارمة:
-1. معايير المركز السعودي لاعتماد المنشآت الصحية (CBAHI - معايير السلامة وإدارة المرافق FMS، وبخاصة FMS.04، FMS.05، FMS.07، FMS.11، FMS.14).
-2. كود الحريق الوطني وكود البناء السعودي (SBC 801 / SBC 201).
-3. مواصفات الجمعية الوطنية للحماية من الحرائق (NFPA 72 لوحات وكواشف الإنذار، NFPA 101 مسالك الهروب، NFPA 99، NFPA 10 طفايات الحريق، NFPA 13 رشاشات المياه).
-4. لائحة مكافحة التدخين بالمنشآت الحكومية والصحية (المرسوم الملكي م/56 والسياسة MC-SS-P-02).
-
-توجيهات التوقيت (توقيت الرياض - المملكة العربية السعودية):
-- التاريخ الفعلي الحالي للمعاينة: {riyadh_ctx['currentDate']} (عام {riyadh_ctx['year']}) والوقت: {riyadh_ctx['currentTime']}.
-- لا تعتبر عام {riyadh_ctx['year']} أو تاريخ اليوم تاريخاً مستقبلياً عند قراءة شاشات لوحات إنذار الحريق (FACP).
-- ركز تقييمك الهندسي على:
-  1. حالة المعدة أو المسار أو لوحة الإنذار (FIRE ALARM / SYSTEM TROUBLE / ضغط الطفاية / خلو مخارج الطوارئ / وجود أجهزة تسخين أو توصيلات كهربائية مخالفة).
-  2. تحديد المخالفات بدقة إن وجدت، وخطة الإجراءات التصحيحية والوقائية العاجلة (CAPA).
-
-سياق الفحص: المنشأة: {facility} | المبنى: {building} | الدور: {floor} | نوع الفحص: {checklist_type} | البند/الغرفة: {item_label}
-ملاحظات المفتش الميداني: {notes or 'لا توجد ملاحظات إضافية'}
-
-أجب بصيغة JSON نظيفة وصحيحة فقط بدون أي نص خارجي على الشكل التالي:
-{{
-  "submode": "general",
-  "hazard_detected": true,
-  "compliance_status": "مطابق" أو "غير مطابق" أو "ملاحظة حرجة" أو "تحذير وقائي",
-  "risk_level": "عالي جداً" أو "عالي" أو "متوسط" أو "منخفض" أو "آمن",
-  "confidence_score": 96,
-  "detected_element": "وصف دقيق للمعدة أو العنصر أو الخطر الظاهر في الصورة",
-  "detected_devices": ["قائمة بالأجهزة المخالفة إن وجدت: غلاية، سخان، مايكرويف، توصيلة كهربائية"],
-  "findings_summary": "ملخص الملاحظات والمخاطر المكتشفة بأسلوب هندسي ورقابي رصين",
-  "violations_list": ["قائمة بالمخالفات بالتفصيل إن وجدت"],
-  "corrective_actions": ["قائمة بالإجراءات التصحيحية والوقائية الفورية المطلوبة CAPA"],
-  "standard_reference": "المعيار النظامي المرجعي (مثال: CBAHI FMS.04 أو CBAHI FMS.07 أو NFPA 101 أو SBC 801)",
-  "inspector_recommendation": "توجيه مهني فوري للمفتش الميداني",
-  "suggested_directive": "التوجيه الإداري المقترح لمدير إدارة السلامة"
-}}"""
+    ctx_str = f"\nسياق الموقع: المنشأة: {facility} | المبنى: {building} | الدور: {floor} | الموقع: {item_label} | ملاحظة المفتش: {notes or 'لا توجد'}"
+    return f"{VISION_SYSTEM_PROMPT}{ctx_str}"
 
 
 def build_vision_prompt(

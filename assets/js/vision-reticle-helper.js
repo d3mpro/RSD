@@ -652,37 +652,42 @@
 
     // 0. اسم وتصنيف المخالفة وبيانات الخطورة
     const violHeader = [];
-    if (a.violation_name) violHeader.push(`• اسم المخالفة: ${a.violation_name}`);
-    if (a.violation_type) violHeader.push(`• نوع وتصنيف المخالفة: ${a.violation_type}`);
-    if (a.risk_level) violHeader.push(`• درجة الخطورة: ${a.risk_level}`);
+    const vTitle = a.title || a.violation_name;
+    const vCat = a.category_name || a.violation_type;
+    const vRisk = a.risk || a.risk_level;
+    if (vTitle) violHeader.push(`• اسم المخالفة: ${vTitle}`);
+    if (vCat) violHeader.push(`• نوع وتصنيف المخالفة: ${vCat}`);
+    if (vRisk) violHeader.push(`• درجة الخطورة: ${vRisk}`);
     if (violHeader.length > 0) {
       parts.push(`بيانات المخالفة المرصودة:\n${violHeader.join('\n')}`);
     }
 
     // 1. ملخص المعاينة
-    const summary = a.findings_summary || a.detected_element || 'رصد ملاحظة ومخالفة سلامة ميدانية تستوجب التدخل والتصحيح.';
+    const summary = a.summary || a.findings_summary || a.title || a.detected_element || 'رصد ملاحظة ومخالفة سلامة ميدانية تستوجب التدخل والتصحيح.';
     parts.push(`ملخص المعاينة الميدانية:\n${summary}`);
 
     // 2. المخالفات المرصودة (منقطة)
-    const viols = Array.isArray(a.violations_list)
-      ? a.violations_list.filter(Boolean)
-      : (a.violations_list ? [a.violations_list] : []);
+    const rawViols = a.observations || a.violations_list;
+    const viols = Array.isArray(rawViols)
+      ? rawViols.filter(Boolean)
+      : (rawViols ? [rawViols] : []);
     if (viols.length > 0) {
       parts.push(`المخالفات والملاحظات المرصودة:\n${viols.map(v => `• ${v}`).join('\n')}`);
     }
 
     // 3. المرجع الرقابي والنظامي
     const std = a.standard_reference || 'CBAHI / NFPA';
-    parts.push(`المرجع النظامي والرقابي:\n${std}`);
+    parts.push(`المرجع النظامي والنظامي:\n${std}`.replace('النظامي والنظامي', 'النظامي والرقابي'));
 
     // 4. خطة الإجراءات التصحيحية والوقائية (CAPA)
-    const capas = Array.isArray(a.corrective_actions)
-      ? a.corrective_actions.filter(Boolean)
-      : (a.corrective_actions ? [a.corrective_actions] : []);
+    const rawCapas = a.capa_actions || a.corrective_actions;
+    const capas = Array.isArray(rawCapas)
+      ? rawCapas.filter(Boolean)
+      : (rawCapas ? [rawCapas] : []);
     if (capas.length > 0) {
       parts.push(`خطة الإجراءات التصحيحية والوقائية (CAPA):\n${capas.map(c => `• ${c}`).join('\n')}`);
-    } else if (a.suggested_directive) {
-      parts.push(`خطة الإجراءات التصحيحية والوقائية (CAPA):\n• ${a.suggested_directive}`);
+    } else if (a.directive || a.suggested_directive) {
+      parts.push(`خطة الإجراءات التصحيحية والوقائية (CAPA):\n• ${a.directive || a.suggested_directive}`);
     }
 
     return parts.join('\n\n');
@@ -699,9 +704,9 @@
     const building = loc.building || 'المستشفى';
     const floor = loc.floor || '';
     const room = loc.room || '';
-    const title = a.violation_name || a.detected_element || 'مخالفة سلامة مرصودة بالذكاء الاصطناعي';
-    const violation_type = a.violation_type || '';
-    const risk_level = a.risk_level || 'متوسط';
+    const title = a.title || a.violation_name || a.detected_element || 'مخالفة سلامة مرصودة بالذكاء الاصطناعي';
+    const violation_type = a.category_name || a.violation_type || '';
+    const risk_level = a.risk || a.risk_level || 'متوسط';
     const standard_reference = a.standard_reference || 'CBAHI / NFPA';
     const description = formatViolationDescription(a);
     const image = imageBase64 || '';
