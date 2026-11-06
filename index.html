@@ -132,7 +132,305 @@
           تسجيل الخروج
         </button>
       </div>
-    </div>
+    <!-- Quick Access Section for Demo & Review (حسابات الدخول السريع في الصفحة الرئيسية) -->
+    <section id="quick-access-section" class="w-full bg-white rounded-3xl border border-amber-300 shadow-xl p-5 sm:p-7 space-y-5 animate-in fade-in duration-300">
+      
+      <!-- Section Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-800 border border-amber-400/30 text-xs font-black flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+              <span>حسابات الدخول السريع المعتمدة (Quick Access Personas)</span>
+            </span>
+            <span class="text-xs text-gray-500 font-semibold">• تجربة فورية بنقرة واحدة - كلمة المرور الموحدة: <code class="text-emerald-700 font-bold bg-emerald-50 px-1 py-0.5 rounded">123456</code></span>
+          </div>
+          <h2 class="text-base sm:text-lg font-black text-[#082B49] flex items-center gap-2">
+            <span class="material-symbols-outlined text-amber-500 text-2xl">flash_on</span>
+            <span>بوابة التقييم والاستعراض السريع للمشروع واللجان</span>
+          </h2>
+          <p class="text-xs text-gray-600 font-medium">
+            اختر أي دور وظيفي لتجربة دورة العمل المتكاملة لمنظومة رصد مباشرة بنقرة واحدة
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0 flex-wrap">
+          <a 
+            href="accounts-credentials-a4.html" 
+            target="_blank" 
+            title="طباعة كشف الحسابات الـ 22 كاملاً على ورق A4" 
+            class="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#082B49] border border-blue-200 text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-sm text-blue-700">print</span>
+            <span>كشف الحسابات A4</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 7 Core Personas Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+
+        <!-- Card 1: Executive Director (D1) -->
+        <div class="rounded-2xl border-2 border-blue-100 hover:border-blue-500 bg-gradient-to-b from-blue-50/50 to-white p-4 flex flex-col justify-between transition-all hover:shadow-md group">
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+                <span class="material-symbols-outlined text-xl">workspace_premium</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-black">القيادة العليا</span>
+            </div>
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-black text-sm text-[#082B49] group-hover:text-blue-700 transition-colors">المدير العام للسلامة والأمن</h3>
+                <span class="font-mono text-xs font-black text-blue-800 bg-blue-100 px-1.5 py-0.5 rounded">D1</span>
+              </div>
+              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">الداشبورد التنفيذي الموحد، المؤشرات الإستراتيجية، واعتماد التقارير المحالة من رئيس القسم</p>
+            </div>
+          </div>
+          <div class="mt-4 pt-2 border-t border-blue-50 flex items-center gap-2">
+            <button 
+              type="button" 
+              onclick="KSUSystemMode.quickLogin('executive')" 
+              class="flex-1 py-2 px-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
+            >
+              <span>دخول بنقرة واحدة</span>
+              <span class="material-symbols-outlined text-sm">arrow_forward</span>
+            </button>
+            <button 
+              type="button" 
+              onclick="fillLoginForm('D1', '123456')" 
+              title="تعبئة بيانات الحساب في نموذج الدخول" 
+              class="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-all cursor-pointer"
+            >
+              <span class="material-symbols-outlined text-sm">edit_note</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 2: Head of Dept (H2) -->
+        <div class="rounded-2xl border-2 border-purple-100 hover:border-purple-500 bg-gradient-to-b from-purple-50/40 to-white p-4 flex flex-col justify-between transition-all hover:shadow-md group">
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-500/20 group-hover:scale-105 transition-transform">
+                <span class="material-symbols-outlined text-xl">military_tech</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-black">رئيس إدارة السلامة</span>
+            </div>
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-black text-sm text-[#082B49] group-hover:text-purple-700 transition-colors">رئيس إدارة السلامة</h3>
+                <span class="font-mono text-xs font-black text-purple-800 bg-purple-100 px-1.5 py-0.5 rounded">H2</span>
+              </div>
+              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">أ. مصعب آل حماد - مراجعة التقارير المحالة من H1، الحفظ بالأرشيف أو الإحالة للمدير العام</p>
+            </div>
+          </div>
+          <div class="mt-4 pt-2 border-t border-purple-50 flex items-center gap-2">
+            <button 
+              type="button" 
+              onclick="KSUSystemMode.quickLogin('dept_head')" 
+              class="flex-1 py-2 px-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
+            >
+              <span>دخول بنقرة واحدة</span>
+              <span class="material-symbols-outlined text-sm">arrow_forward</span>
+            </button>
+            <button 
+              type="button" 
+              onclick="fillLoginForm('H2', '123456')" 
+              title="تعبئة بيانات الحساب في نموذج الدخول" 
+              class="p-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold transition-all cursor-pointer"
+            >
+              <span class="material-symbols-outlined text-sm">edit_note</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 3: General Supervisor (H1) -->
+        <div class="rounded-2xl border-2 border-amber-100 hover:border-amber-500 bg-gradient-to-b from-amber-50/40 to-white p-4 flex flex-col justify-between transition-all hover:shadow-md group">
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform">
+                <span class="material-symbols-outlined text-xl">admin_panel_settings</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-black">المشرف العام (H1)</span>
+            </div>
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-black text-sm text-[#082B49] group-hover:text-amber-700 transition-colors">المشرف العام الملك خالد</h3>
+                <span class="font-mono text-xs font-black text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded">H1</span>
+              </div>
+              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">أ. حسن دعاك - استلام تقارير الميدان، الأرشفة، والتوجيه لرئيس إدارة السلامة (H2)</p>
+            </div>
+          </div>
+          <div class="mt-4 pt-2 border-t border-amber-50 flex items-center gap-2">
+            <button 
+              type="button" 
+              onclick="KSUSystemMode.quickLogin('head')" 
+              class="flex-1 py-2 px-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
+            >
+              <span>دخول بنقرة واحدة</span>
+              <span class="material-symbols-outlined text-sm">arrow_forward</span>
+            </button>
+            <button 
+              type="button" 
+              onclick="fillLoginForm('H1', '123456')" 
+              title="تعبئة بيانات الحساب في نموذج الدخول" 
+              class="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold transition-all cursor-pointer"
+            >
+              <span class="material-symbols-outlined text-sm">edit_note</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 4: Quality (Q1) -->
+        <div class="rounded-2xl border-2 border-emerald-100 hover:border-emerald-500 bg-gradient-to-b from-emerald-50/40 to-white p-4 flex flex-col justify-between transition-all hover:shadow-md group">
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+                <span class="material-symbols-outlined text-xl">verified</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-black">الجودة والاعتماد</span>
+            </div>
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-black text-sm text-[#082B49] group-hover:text-emerald-700 transition-colors">مسؤول الجودة لسباهي</h3>
+                <span class="font-mono text-xs font-black text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">Q1</span>
+              </div>
+              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">قسم الجودة - مطابقة معايير CBAHI FMS، مراجعة الجولات الميدانية، وسجل الامتثال</p>
+            </div>
+          </div>
+          <div class="mt-4 pt-2 border-t border-emerald-50 flex items-center gap-2">
+            <button 
+              type="button" 
+              onclick="KSUSystemMode.quickLogin('quality')" 
+              class="flex-1 py-2 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
+            >
+              <span>دخول بنقرة واحدة</span>
+              <span class="material-symbols-outlined text-sm">arrow_forward</span>
+            </button>
+            <button 
+              type="button" 
+              onclick="fillLoginForm('Q1', '123456')" 
+              title="تعبئة بيانات الحساب في نموذج الدخول" 
+              class="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition-all cursor-pointer"
+            >
+              <span class="material-symbols-outlined text-sm">edit_note</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 5: Shift Supervisor (S1) -->
+        <div class="rounded-2xl border-2 border-teal-100 hover:border-teal-500 bg-gradient-to-b from-teal-50/40 to-white p-4 flex flex-col justify-between transition-all hover:shadow-md group">
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-md shadow-teal-500/20 group-hover:scale-105 transition-transform">
+                <span class="material-symbols-outlined text-xl">supervisor_account</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-md bg-teal-100 text-teal-800 text-[10px] font-black">مشرف الوردية</span>
+            </div>
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-black text-sm text-[#082B49] group-hover:text-teal-700 transition-colors">مشرف السلامة الميداني</h3>
+                <span class="font-mono text-xs font-black text-teal-800 bg-teal-100 px-1.5 py-0.5 rounded">S1</span>
+              </div>
+              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">أ. ناصر القحطاني (الوردية 1 صباحي) - كتابة وإرسال تقارير السلامة للمشرف العام H1</p>
+            </div>
+          </div>
+          <div class="mt-4 pt-2 border-t border-teal-50 flex items-center gap-2">
+            <button 
+              type="button" 
+              onclick="KSUSystemMode.quickLogin('supervisor')" 
+              class="flex-1 py-2 px-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
+            >
+              <span>دخول بنقرة واحدة</span>
+              <span class="material-symbols-outlined text-sm">arrow_forward</span>
+            </button>
+            <button 
+              type="button" 
+              onclick="fillLoginForm('S1', '123456')" 
+              title="تعبئة بيانات الحساب في نموذج الدخول" 
+              class="p-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-bold transition-all cursor-pointer"
+            >
+              <span class="material-symbols-outlined text-sm">edit_note</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 6: Field Inspector (M1) -->
+        <div class="rounded-2xl border-2 border-indigo-100 hover:border-indigo-500 bg-gradient-to-b from-indigo-50/40 to-white p-4 flex flex-col justify-between transition-all hover:shadow-md group">
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+                <span class="material-symbols-outlined text-xl">checklist_rtl</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-black">الميدان والتفتيش</span>
+            </div>
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-black text-sm text-[#082B49] group-hover:text-indigo-700 transition-colors">مفتش السلامة الميداني</h3>
+                <span class="font-mono text-xs font-black text-indigo-800 bg-indigo-100 px-1.5 py-0.5 rounded">M1</span>
+              </div>
+              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">أ. عادل الشلوي - تنفيذ الجولات الـ 14، مسح الباركود، رفع تقارير السلامة دون إنترنت</p>
+            </div>
+          </div>
+          <div class="mt-4 pt-2 border-t border-indigo-50 flex items-center gap-2">
+            <button 
+              type="button" 
+              onclick="KSUSystemMode.quickLogin('inspector')" 
+              class="flex-1 py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
+            >
+              <span>دخول بنقرة واحدة</span>
+              <span class="material-symbols-outlined text-sm">arrow_forward</span>
+            </button>
+            <button 
+              type="button" 
+              onclick="fillLoginForm('M1', '123456')" 
+              title="تعبئة بيانات الحساب في نموذج الدخول" 
+              class="p-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-all cursor-pointer"
+            >
+              <span class="material-symbols-outlined text-sm">edit_note</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card 7: System Developer (DEV) -->
+        <div class="rounded-2xl border-2 border-slate-200 hover:border-slate-800 bg-gradient-to-b from-slate-100/60 to-white p-4 flex flex-col justify-between transition-all hover:shadow-md group">
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="w-10 h-10 rounded-xl bg-slate-800 text-white flex items-center justify-center shadow-md shadow-slate-700/20 group-hover:scale-105 transition-transform">
+                <span class="material-symbols-outlined text-xl">terminal</span>
+              </div>
+              <span class="px-2 py-0.5 rounded-md bg-slate-200 text-slate-800 text-[10px] font-black">مدير النظام</span>
+            </div>
+            <div>
+              <div class="flex items-center justify-between">
+                <h3 class="font-black text-sm text-[#082B49] group-hover:text-slate-900 transition-colors">مطور ومسؤول التقنية</h3>
+                <span class="font-mono text-xs font-black text-slate-900 bg-slate-200 px-1.5 py-0.5 rounded">DEV</span>
+              </div>
+              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">أ. علي الصقري (95972) - إدارة الحسابات، الأصول الـ 1757، وضبط المنظومة والسحابة</p>
+            </div>
+          </div>
+          <div class="mt-4 pt-2 border-t border-slate-100 flex items-center gap-2">
+            <button 
+              type="button" 
+              onclick="KSUSystemMode.quickLogin('developer')" 
+              class="flex-1 py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
+            >
+              <span>دخول بنقرة واحدة</span>
+              <span class="material-symbols-outlined text-sm">arrow_forward</span>
+            </button>
+            <button 
+              type="button" 
+              onclick="fillLoginForm('DEV', '123456')" 
+              title="تعبئة بيانات الحساب في نموذج الدخول" 
+              class="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-bold transition-all cursor-pointer"
+            >
+              <span class="material-symbols-outlined text-sm">edit_note</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </section>
 
     <!-- Login Box: Username & Password Authentication -->
     <div id="login-section" class="bg-white rounded-3xl border border-gray-200 shadow-xl p-6 sm:p-9 max-w-md mx-auto w-full transition-all">
@@ -534,7 +832,20 @@
     }
 
     function updateSystemModeUI() {
-      // Production Mode: active
+      const isDemo = (window.KSUSystemMode && typeof window.KSUSystemMode.isDemo === 'function')
+        ? window.KSUSystemMode.isDemo()
+        : (window.location.hostname.includes('rsd-go-demo') || localStorage.getItem('ksumc_system_mode') === 'demo');
+
+      const quickSection = document.getElementById('quick-access-section');
+      const user = window.KSUAuth ? window.KSUAuth.getUser() : null;
+
+      if (quickSection) {
+        if (isDemo && !user) {
+          quickSection.classList.remove('hidden');
+        } else if (!isDemo) {
+          quickSection.classList.add('hidden');
+        }
+      }
     }
 
     function redirectAfterLogin(user) {

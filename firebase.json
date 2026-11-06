@@ -52,6 +52,14 @@
         "destination": "/admin.html"
       },
       {
+        "source": "/developer",
+        "destination": "/admin.html"
+      },
+      {
+        "source": "/developer.html",
+        "destination": "/admin.html"
+      },
+      {
         "source": "/quality",
         "destination": "/quality.html"
       },

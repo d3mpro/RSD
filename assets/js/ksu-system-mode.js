@@ -123,7 +123,7 @@
       color: 'slate',
       badge: 'الإدارة والتقنية',
       username: 'DEV',
-      portal: 'developer.html',
+      portal: 'admin.html',
       description: 'إدارة المستخدمين والأصول، مراقبة قواعد البيانات السحابية، وضبط معمارية المنظومة'
     }
   };
@@ -338,11 +338,16 @@
     PERSONAS: QUICK_PERSONAS,
 
     /**
-     * استعلام وضع النظام الحالي (افتراضياً: وضع العرض ما لم يتم تحويله للإنتاج)
+     * استعلام وضع النظام الحالي (افتراضياً: وضع العرض في rsd-go-demo والإنتاج في rsd-ksu)
      */
     getMode: function() {
       try {
-        localStorage.setItem(STORAGE_KEY_MODE, MODE_PRODUCTION);
+        const hostname = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
+        if (hostname.includes('rsd-go-demo')) {
+          return MODE_DEMO;
+        }
+        const saved = localStorage.getItem(STORAGE_KEY_MODE);
+        if (saved) return saved;
         return MODE_PRODUCTION;
       } catch (e) {
         return MODE_PRODUCTION;
@@ -353,14 +358,14 @@
      * هل النظام في وضع العرض والتجربة السريعة؟
      */
     isDemo: function() {
-      return false;
+      return this.getMode() === MODE_DEMO;
     },
 
     /**
      * هل النظام في وضع الإنتاج الفعلي المعتمد؟
      */
     isProduction: function() {
-      return true;
+      return this.getMode() === MODE_PRODUCTION;
     },
 
     /**
@@ -537,7 +542,7 @@
             altUsername: 'alsaqri',
             role: 'مطور النظام ومسؤول التقنية والمشرف العام',
             roleCategory: 'developer',
-            portal: 'developer',
+            portal: 'admin',
             facility: 'المدينة الطبية',
             department: 'الإدارة العامة للأمن والسلامة - القيادة والأنظمة',
             shift: 'جميع الورديات',

@@ -696,12 +696,13 @@
      */
     getDefaultPortalUrl: function(user) {
       if (user && user.portal && ['developer', 'head', 'admin', 'quality', 'field', 'dashboard'].includes(user.portal)) {
+        if (user.portal === 'developer') return 'admin.html';
         return user.portal + '.html';
       }
       const cat = this.getRoleCategory(user);
       switch (cat) {
         case 'developer':
-          return 'developer.html';
+          return 'admin.html';
         case 'head':
           return 'head.html';
         case 'admin':
