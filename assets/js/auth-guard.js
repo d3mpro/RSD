@@ -66,7 +66,7 @@
   const DEFAULT_USERS = [
     {
       id: 'USR-01',
-      name: 'أ. علي سليمان الصقري',
+      name: 'مطور النظام',
       empId: 'DEV',
       employeeId: 'DEV',
       altEmpId: '95972',
@@ -76,7 +76,7 @@
       phone: '0532722622',
       role: 'مطور النظام ومسؤول التقنية والمشرف العام',
       roleCategory: 'developer',
-      portal: 'developer',
+      portal: 'admin',
       facility: 'المدينة الطبية',
       shift: 'جميع الورديات',
       passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
@@ -100,7 +100,7 @@
     },
     {
       id: 'USR-DIR-01',
-      name: 'المدير العام للسلامة والأمن',
+      name: 'مدير عام',
       empId: 'D1',
       employeeId: 'D1',
       username: 'D1',
@@ -125,7 +125,7 @@
     },
     {
       id: 'USR-HEAD-02',
-      name: 'أ. مصعب عبدالله آل حماد (رئيس إدارة السلامة)',
+      name: 'رئيس إدارة',
       empId: 'H2',
       employeeId: 'H2',
       username: 'H2',
@@ -154,7 +154,7 @@
     },
     {
       id: 'USR-7453',
-      name: 'أ. حسن إبراهيم دعاك (المشرف العام H1)',
+      name: 'مشرف عام',
       empId: 'H1',
       employeeId: 'H1',
       username: 'H1',
@@ -187,7 +187,7 @@
     },
     {
       id: 'USR-Q1',
-      name: 'قسم الجودة وتقييم الأداء',
+      name: 'مسؤول الجودة والاعتماد',
       empId: 'Q1',
       employeeId: 'Q1',
       username: 'Q1',
@@ -223,7 +223,7 @@
     // ==========================================
     {
       id: 'USR-SH1-201',
-      name: 'أ. ناصر فلاح القحطاني',
+      name: 'مشرف الوردية',
       empId: 'S1',
       employeeId: 'S1',
       altEmpId: 'KSU-SH1-201',
@@ -245,7 +245,7 @@
     },
     {
       id: 'USR-SH2-301',
-      name: 'أ. أحمد عبدالله الأكلبي',
+      name: 'مشرف الوردية',
       empId: 'S2',
       employeeId: 'S2',
       altEmpId: 'KSU-SH2-301',
@@ -267,7 +267,7 @@
     },
     {
       id: 'USR-SH3-401',
-      name: 'أ. سيف عبدالكريم مكرمي',
+      name: 'مشرف الوردية',
       empId: 'S3',
       employeeId: 'S3',
       altEmpId: 'KSU-SH3-401',
@@ -294,7 +294,7 @@
     // 1. الوردية الأولى (صباحي - Shift 1)
     {
       id: 'USR-SH1-202',
-      name: 'أ. عادل عاضة الشلوي',
+      name: 'مفتش الوردية',
       empId: 'M1',
       employeeId: 'M1',
       altEmpId: 'KSU-SH1-202',
@@ -311,7 +311,7 @@
     },
     {
       id: 'USR-SH1-203',
-      name: 'أ. عادل خلف العنزي',
+      name: 'مفتش الوردية',
       empId: 'M2',
       employeeId: 'M2',
       altEmpId: 'KSU-SH1-203',
@@ -328,7 +328,7 @@
     },
     {
       id: 'USR-SH1-204',
-      name: 'أ. عبدالله إبراهيم الدامغ',
+      name: 'مفتش الوردية',
       empId: 'M3',
       employeeId: 'M3',
       altEmpId: 'KSU-SH1-204',
@@ -345,7 +345,7 @@
     },
     {
       id: 'USR-SH1-205',
-      name: 'أ. محمد سعود الصقري',
+      name: 'مفتش الوردية',
       empId: 'M4',
       employeeId: 'M4',
       altEmpId: 'KSU-SH1-205',
@@ -362,7 +362,7 @@
     },
     {
       id: 'USR-SH1-206',
-      name: 'أ. ياسر قينان الزهراني',
+      name: 'مفتش الوردية',
       empId: 'M5',
       employeeId: 'M5',
       altEmpId: 'KSU-SH1-206',
@@ -379,7 +379,7 @@
     },
     {
       id: 'USR-SH1-207',
-      name: 'أ. مشعان خلف العنزي',
+      name: 'مفتش الوردية',
       empId: 'M6',
       employeeId: 'M6',
       altEmpId: 'KSU-SH1-207',
@@ -398,7 +398,7 @@
     // 2. الوردية الثانية (مسائي - Shift 2)
     {
       id: 'USR-SH2-302',
-      name: 'أ. عبدالرحمن حسين الكعبي',
+      name: 'مفتش الوردية',
       empId: 'M7',
       employeeId: 'M7',
       altEmpId: 'KSU-SH2-302',
@@ -415,7 +415,7 @@
     },
     {
       id: 'USR-SH2-303',
-      name: 'أ. أحمد قاسم ابوعيشة',
+      name: 'مفتش الوردية',
       empId: 'M8',
       employeeId: 'M8',
       altEmpId: 'KSU-SH2-303',
@@ -432,7 +432,7 @@
     },
     {
       id: 'USR-SH2-304',
-      name: 'أ. محمد علي الربعي',
+      name: 'مفتش الوردية',
       empId: 'M9',
       employeeId: 'M9',
       altEmpId: 'KSU-SH2-304',
@@ -449,7 +449,7 @@
     },
     {
       id: 'USR-SH2-305',
-      name: 'أ. سلطان علي العاصمي',
+      name: 'مفتش الوردية',
       empId: 'M10',
       employeeId: 'M10',
       altEmpId: 'KSU-SH2-305',
@@ -468,7 +468,7 @@
     // 3. الوردية الثالثة (ليلي - Shift 3)
     {
       id: 'USR-SH3-402',
-      name: 'أ. سليمان سالم العنزي',
+      name: 'مفتش الوردية',
       empId: 'M11',
       employeeId: 'M11',
       altEmpId: 'KSU-SH3-402',
@@ -485,7 +485,7 @@
     },
     {
       id: 'USR-SH3-403',
-      name: 'أ. فواز حمد العازمي',
+      name: 'مفتش الوردية',
       empId: 'M12',
       employeeId: 'M12',
       altEmpId: 'KSU-SH3-403',
@@ -502,7 +502,7 @@
     },
     {
       id: 'USR-SH3-404',
-      name: 'أ. صالح محمد العريف',
+      name: 'مفتش الوردية',
       empId: 'M13',
       employeeId: 'M13',
       altEmpId: 'KSU-SH3-404',
@@ -519,7 +519,7 @@
     },
     {
       id: 'USR-SH3-405',
-      name: 'أ. ناصر فلاح القحطاني',
+      name: 'مفتش الوردية',
       empId: 'M14',
       employeeId: 'M14',
       altEmpId: 'KSU-SH3-405',
@@ -743,12 +743,8 @@
       }
 
       if (portalKey === 'developer') {
-        if (roleCat !== 'developer' && user.id !== 'USR-01' && user.empId !== '95972' && user.email !== 'aalsaqri@ksu.edu.sa') {
-          alert('عفواً: بوابة مطور النظام معزولة ومخصصة فقط لمطور ومسؤول التقنية (أ. علي سليمان الصقري).');
-          window.location.replace(this.getDefaultPortalUrl(user));
-          return false;
-        }
-        return true;
+        window.location.replace(this.getDefaultPortalUrl(user));
+        return false;
       }
 
       if (portalKey === 'head') {
