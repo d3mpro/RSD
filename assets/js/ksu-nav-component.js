@@ -151,6 +151,11 @@
 
       const isDeveloper = roleCat === 'developer' || (user && (user.id === 'USR-01' || user.empId === '95972'));
       const isHeadOrAdmin = isDeveloper || roleCat === 'head' || roleCat === 'admin' || roleCat === 'executive';
+      const allowedArchiveRoles = ['developer', 'head', 'admin', 'executive', 'quality', 'supervisor'];
+      const canAccessCloudArchive = activeKey !== 'field' && Boolean(user) && (
+        allowedArchiveRoles.includes(roleCat) ||
+        (isDeveloper && roleCat !== 'field_inspector' && user.roleCategory !== 'guest')
+      );
 
       const isQuality = activeKey === 'quality';
       const isProduction = (window.KSUSystemMode && typeof window.KSUSystemMode.isProduction === 'function') 
@@ -174,8 +179,13 @@
 
         <!-- الجانب الأيسر: الإجراءات العصرية وبطاقة المستخدم -->
         <div class="flex items-center gap-2 shrink-0">
-          <!-- زر ملف شارك 7 السريع (يظهر فقط في وضع العرض/الديمو ويختفي تماماً في وضع الإنتاج الفعلي) -->
-          
+          ${canAccessCloudArchive ? `
+          <!-- زر مركز أرشفة سحابة الجامعة 1TB (للمشرفين ورئيس القسم والجودة والإدارة فقط) -->
+          <button type="button" id="ksu-nav-cloud-archive-btn" onclick="KSUNav.openCloudArchiveHub()" title="أرشيف سحابة الجامعة 1TB (OneDrive & موقع قسم السلامة)" class="flex items-center gap-1.5 px-2.5 h-9 rounded-xl bg-sky-50 hover:bg-[#004B87] text-[#004B87] hover:text-white border border-sky-200 shadow-2xs transition-all cursor-pointer text-xs font-black">
+            <span class="material-symbols-outlined text-[18px]">cloud_done</span>
+            <span class="hidden md:inline">سحابة الجامعة 1TB</span>
+          </button>
+          ` : ''}
 
           <!-- زر جرس التوجيهات والإشعارات اللحظية -->
           <button type="button" onclick="KSUNav.toggleNotificationsModal()" title="التوجيهات والإشعارات اللحظية" class="relative flex items-center justify-center w-9 h-9 rounded-xl bg-white hover:bg-blue-50 text-[#082B49] border border-gray-200 shadow-2xs transition-all cursor-pointer">
@@ -322,6 +332,16 @@
                   </span>
                   <span class="material-symbols-outlined text-xs text-slate-400">chevron_left</span>
                 </a>
+
+                ${canAccessCloudArchive ? `
+                <button type="button" onclick="KSUNav.openCloudArchiveHub()" class="w-full menu-item-row flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-sky-900 bg-sky-50 hover:bg-sky-100 border border-sky-200 transition-all shadow-2xs cursor-pointer" style="background-color: #f0f9ff !important;">
+                  <span class="flex items-center gap-2.5">
+                    <span class="material-symbols-outlined text-base text-[#004B87]">cloud_upload</span>
+                    <span>أرشيف سحابة الجامعة 1TB (OneDrive & SharePoint)</span>
+                  </span>
+                  <span class="text-[9px] bg-[#004B87] text-white px-1.5 py-0.5 rounded font-black">1TB</span>
+                </button>
+                ` : ''}
               </div>
 
               <!-- زر تسجيل الخروج الرسمي -->
@@ -340,6 +360,32 @@
     togglePortalMenu: function() {
       // المعاينة والتبديل التجريبي معطل تماماً في بيئة الإنتاج المعتمدة
       return false;
+    },
+
+    openCloudArchiveHub: function() {
+      const menu = document.getElementById('ksu-user-dropdown-menu');
+      if (menu && !menu.classList.contains('hidden')) {
+        menu.classList.add('hidden');
+      }
+      if (window.ksuSyncEngine && typeof window.ksuSyncEngine.openSyncModal === 'function') {
+        window.ksuSyncEngine.openSyncModal();
+        return;
+      }
+      if (this._loadingCloudSyncScript) return;
+      this._loadingCloudSyncScript = true;
+      const script = document.createElement('script');
+      script.src = 'assets/js/ksu-cloud-sync.js';
+      script.onload = () => {
+        this._loadingCloudSyncScript = false;
+        if (window.ksuSyncEngine && typeof window.ksuSyncEngine.openSyncModal === 'function') {
+          window.ksuSyncEngine.openSyncModal();
+        }
+      };
+      script.onerror = () => {
+        this._loadingCloudSyncScript = false;
+        alert('تعذر تحميل وحدة الأرشفة السحابية. يرجى تحديث الصفحة والمحاولة مجدداً.');
+      };
+      (document.head || document.body).appendChild(script);
     },
 
     toggleUserMenu: function() {
