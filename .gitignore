@@ -72,6 +72,9 @@ firepit-log.txt
 
 # dotenv environment variables file
 .env
+oracle-vision-agent/.env
+oracle-vision-agent/archive_vault/
+.superpowers/
 
 # dataconnect generated files
 .dataconnect
