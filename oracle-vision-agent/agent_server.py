@@ -17,6 +17,7 @@ KSUMC Smart Safety Vision Agent - Oracle Cloud Server (Qwen2.5-VL + Ollama + Gem
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import io
@@ -732,10 +733,15 @@ def send_archive_email_if_configured(
         for fname, raw_bytes in jpg_attachments:
             msg.add_attachment(raw_bytes, maintype="image", subtype="jpeg", filename=fname)
 
-        with smtplib.SMTP(host, CONFIG["archive_smtp_port"], timeout=15) as server:
-            server.starttls()
-            server.login(user, pw)
-            server.send_message(msg)
+        if CONFIG["archive_smtp_port"] == 465:
+            with smtplib.SMTP_SSL(host, CONFIG["archive_smtp_port"], timeout=15) as server:
+                server.login(user, pw)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(host, CONFIG["archive_smtp_port"], timeout=15) as server:
+                server.starttls()
+                server.login(user, pw)
+                server.send_message(msg)
         return True
     except Exception as exc:
         logger.warning(f"Archive SMTP dispatch skipped/failed: {exc}")
@@ -873,6 +879,9 @@ async def call_github_models_vision(images_b64: List[tuple[str, str]], prompt: s
                     if resp.status_code == 429 and model_name != models_to_try[-1]:
                         last_err = RuntimeError(f"GitHub Models ({model_name}) HTTP 429")
                         continue
+                    if resp.status_code in (401, 403):
+                        last_err = RuntimeError(f"GitHub Models ({model_name}) HTTP {resp.status_code}: {resp.text[:180]}")
+                        break
                     if resp.status_code != 200:
                         raise RuntimeError(f"GitHub Models ({model_name}) HTTP {resp.status_code}: {resp.text[:180]}")
                     data = resp.json()
@@ -1194,7 +1203,7 @@ async def dispatch_archive_bundle(
 ):
     _verify_agent_token(x_ksumc_key, x_ksumc_token)
     try:
-        saved = save_archive_bundle(body)
+        saved = await asyncio.to_thread(save_archive_bundle, body)
         return {"success": True, **saved}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

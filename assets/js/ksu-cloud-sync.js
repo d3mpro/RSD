@@ -82,6 +82,46 @@ class KSUCloudSyncEngine {
   // Helpers: Storage Readers, Dates, Base64 Binary, IndexedDB Directory Handle
   // =========================================================================
 
+  _escapeHtml(str) {
+    return String(str === null || str === undefined ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  async _ensureAiClientLoaded() {
+    if (typeof window.buildFullPageHtmlFromViolation === 'function' && window.KSUMediaVault) {
+      return true;
+    }
+    if (!document || typeof document.createElement !== 'function') return false;
+    return new Promise((resolve) => {
+      try {
+        const script = document.createElement('script');
+        script.src = 'assets/js/ksu-ai-client.js';
+        let settled = false;
+        const finish = (ok) => {
+          if (settled) return;
+          settled = true;
+          resolve(ok);
+        };
+        script.onload = () => finish(true);
+        script.onerror = () => finish(false);
+        (document.head || document.body).appendChild(script);
+        // In non-browser test sandboxes where script onload never fires asynchronously, settle gracefully
+        Promise.resolve().then(() => {
+          if (!settled && typeof window.showDirectoryPicker !== 'function' && (!navigator || !navigator.userAgent || navigator.userAgent === 'NodeTest')) {
+            finish(false);
+          }
+        });
+        setTimeout(() => finish(false), 3000);
+      } catch (_) {
+        resolve(false);
+      }
+    });
+  }
+
   _readCollection(stateProp, localStorageKeys, fallback = []) {
     if (typeof state !== 'undefined' && state && state[stateProp] !== undefined && state[stateProp] !== null) {
       if (!Array.isArray(fallback) || (Array.isArray(state[stateProp]) && state[stateProp].length > 0)) {
@@ -89,16 +129,23 @@ class KSUCloudSyncEngine {
       }
     }
     const keys = Array.isArray(localStorageKeys) ? localStorageKeys : [localStorageKeys];
+    let firstValidParsed = undefined;
     for (const k of keys) {
       if (!k) continue;
       try {
         const raw = localStorage.getItem(k);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed !== null && parsed !== undefined) return parsed;
+          if (parsed !== null && parsed !== undefined) {
+            if (firstValidParsed === undefined) firstValidParsed = parsed;
+            if (!Array.isArray(parsed) || parsed.length > 0) {
+              return parsed;
+            }
+          }
         }
       } catch (_) {}
     }
+    if (firstValidParsed !== undefined) return firstValidParsed;
     if (typeof state !== 'undefined' && state && state[stateProp] !== undefined) {
       return state[stateProp];
     }
@@ -420,7 +467,7 @@ class KSUCloudSyncEngine {
     const rounds = this._readCollection('rounds', ['ksumc_safety_rounds', 'ksumc_rounds_registry', 'ksumc_field_rounds'], []);
     const safetyViolations = this._readCollection('safetyViolations', ['ksumc_safety_violations'], []);
     const smokingViolations = this._readCollection('smokingViolations', ['ksumc_smoking_violations'], []);
-    const capa = this._readCollection('capa', ['ksumc_capa_records'], []);
+    const capa = this._readCollection('capa', ['ksumc_capa_registry', 'ksumc_capa_records'], []);
     const doors = this._readCollection('doors', ['ksumc_safety_doors'], []);
     const permits = this._readCollection('permits', ['ksumc_safety_permits'], []);
     const alarms = this._readCollection('alarms', ['ksumc_safety_alarms'], []);
@@ -497,6 +544,8 @@ class KSUCloudSyncEngine {
           if (data && Array.isArray(data.images) && data.images.length > 0) {
             return data.images;
           }
+        } else if (resp && resp.status !== 404) {
+          throw new Error(`Archive HTTP ${resp.status}`);
         }
       } catch (_) {
         const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com');
@@ -529,11 +578,11 @@ class KSUCloudSyncEngine {
     const rowsHtml = (db.safetyViolations || []).slice(0, 50).map((v, idx) => `
       <tr>
         <td>${idx + 1}</td>
-        <td style="font-family:monospace;font-weight:700;">${v.id || v.cardId || '-'}</td>
-        <td>${v.date || '-'}</td>
-        <td>${v.facility || '-'} - ${v.location || ''}</td>
-        <td>${Array.isArray(v.devices) ? v.devices.join('، ') : (v.visionData?.detected_element || '-')}</td>
-        <td>${v.status || 'معتمد'}</td>
+        <td style="font-family:monospace;font-weight:700;">${this._escapeHtml(v.id || v.cardId || '-')}</td>
+        <td>${this._escapeHtml(v.date || '-')}</td>
+        <td>${this._escapeHtml(v.facility || '-')} - ${this._escapeHtml(v.location || '')}</td>
+        <td>${this._escapeHtml(Array.isArray(v.devices) ? v.devices.join('، ') : (v.visionData?.detected_element || '-'))}</td>
+        <td>${this._escapeHtml(v.status || 'معتمد')}</td>
       </tr>
     `).join('') || '<tr><td colspan="6" style="text-align:center;">لا توجد مخالفات مسجلة في هذه الفترة</td></tr>';
 
@@ -643,8 +692,11 @@ class KSUCloudSyncEngine {
       throw new Error('مجلد الأرشفة غير صالح');
     }
 
+    await this._ensureAiClientLoaded();
+
     const today = options.today || this._getRiyadhToday();
     const monthFolder = options.monthFolder || today.slice(0, 7);
+    const archivedSet = this.getArchivedCardIdsSet();
 
     const archiveRoot = await dirHandle.getDirectoryHandle(this.archiveRootFolderName, { create: true });
     const monthDir = await archiveRoot.getDirectoryHandle(monthFolder, { create: true });
@@ -662,6 +714,7 @@ class KSUCloudSyncEngine {
     for (const v of (db.safetyViolations || [])) {
       const rawId = String(v.cardId || v.id || '').trim();
       if (!rawId) continue;
+      if (options.skipAlreadyArchived && archivedSet.has(rawId)) continue;
       const safeId = rawId.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80);
 
       const bestImages = await this.resolveBestViolationImages(v);
@@ -674,17 +727,22 @@ class KSUCloudSyncEngine {
       }
 
       let fullHtml = '';
+      let hasCompleteOfficialCard = false;
       if (typeof window.buildFullPageHtmlFromViolation === 'function') {
         fullHtml = window.buildFullPageHtmlFromViolation(v, bestImages);
+        hasCompleteOfficialCard = Boolean(fullHtml);
       } else if (v.fullPageHtml) {
         fullHtml = v.fullPageHtml;
-      } else {
-        fullHtml = `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${safeId}</title></head><body><h1>محضر مخالفة سلامة: ${safeId}</h1><p>${v.location || ''}</p></body></html>`;
+        hasCompleteOfficialCard = true;
       }
 
-      await this._writeFileToDir(dir01, `${safeId}_محضر_رصد.html`, fullHtml);
-      filesWritten++;
-      newlyArchivedIds.push(rawId);
+      if (fullHtml) {
+        await this._writeFileToDir(dir01, `${safeId}_محضر_رصد.html`, fullHtml);
+        filesWritten++;
+      }
+      if (hasCompleteOfficialCard) {
+        newlyArchivedIds.push(rawId);
+      }
     }
 
     // 2. Write 5 UTF-8 BOM Excel CSV Registers + Printable CBAHI Evidence Pack
@@ -723,6 +781,8 @@ class KSUCloudSyncEngine {
   // =========================================================================
 
   async shareOrDownloadMobileBundle() {
+    await this._ensureAiClientLoaded();
+
     const today = this._getRiyadhToday();
     const monthFolder = today.slice(0, 7);
     const pkg = this.getUnifiedDatabasePackage();
@@ -730,34 +790,45 @@ class KSUCloudSyncEngine {
     const csvs = this.buildArchiveCsvRegisters();
     const cbahiHtml = this.buildCbahiMonthlyEvidenceHtml(monthFolder, db);
 
-    const fileEntries = [
+    const summaryEntries = [
       { name: `01_سجل_مخالفات_السلامة_${monthFolder}.csv`, content: csvs.violationsCsv, mime: 'text/csv;charset=utf-8' },
       { name: `02_سجل_الجولات_التفتيشية_${monthFolder}.csv`, content: csvs.roundsCsv, mime: 'text/csv;charset=utf-8' },
       { name: `03_سجل_امتثال_سباهي_وCAPA_${monthFolder}.csv`, content: csvs.cbahiCsv, mime: 'text/csv;charset=utf-8' },
+      { name: `04_سجل_تقارير_الورديات_والبلاغات_${monthFolder}.csv`, content: csvs.shiftReportsCsv, mime: 'text/csv;charset=utf-8' },
+      { name: `05_سجل_أصول_ومعدات_السلامة_${monthFolder}.csv`, content: csvs.assetsCsv, mime: 'text/csv;charset=utf-8' },
       { name: `ملف_شواهد_الاعتماد_سباهي_${monthFolder}.html`, content: cbahiHtml, mime: 'text/html;charset=utf-8' },
       { name: `KSUMC_Full_Backup_${today}.json`, content: JSON.stringify(pkg, null, 2), mime: 'application/json' }
     ];
 
+    const fileEntries = [...summaryEntries];
     const archivedIds = [];
+
     for (const v of (db.safetyViolations || []).slice(0, 15)) {
       const rawId = String(v.cardId || v.id || '').trim();
       if (!rawId) continue;
       const safeId = rawId.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 80);
       const bestImgs = await this.resolveBestViolationImages(v);
-      if (bestImgs[0]) {
-        const bytes = this._dataUrlToBytes(bestImgs[0]);
+      let wroteImgs = false;
+      for (let i = 0; i < bestImgs.length; i++) {
+        const bytes = this._dataUrlToBytes(bestImgs[i]);
         if (bytes.length > 0) {
-          fileEntries.push({ name: `${safeId}_0.jpg`, content: bytes, mime: 'image/jpeg' });
+          fileEntries.push({ name: `${safeId}_${i}.jpg`, content: bytes, mime: 'image/jpeg' });
+          wroteImgs = true;
         }
       }
-      if (typeof window.buildFullPageHtmlFromViolation === 'function') {
+      const fullHtml = (typeof window.buildFullPageHtmlFromViolation === 'function')
+        ? window.buildFullPageHtmlFromViolation(v, bestImgs)
+        : (v.fullPageHtml || '');
+      if (fullHtml) {
         fileEntries.push({
           name: `${safeId}_محضر_رصد.html`,
-          content: window.buildFullPageHtmlFromViolation(v, bestImgs),
+          content: fullHtml,
           mime: 'text/html;charset=utf-8'
         });
+        if (wroteImgs || (!v.photo && (!v.images || !v.images.length))) {
+          archivedIds.push(rawId);
+        }
       }
-      archivedIds.push(rawId);
     }
 
     // Attempt native Web Share API with files (opens iOS/Android sheet with OneDrive / SharePoint app)
@@ -775,7 +846,7 @@ class KSUCloudSyncEngine {
           this.lastSyncTime = new Date().toLocaleString('ar-SA');
           localStorage.setItem('ksu_last_sync_time', this.lastSyncTime);
           this.updateUI();
-          this.showModalMessage('تم إرسال حزمة الأرشفة بنجاح إلى تطبيق OneDrive / SharePoint ✓', 'success');
+          this.showModalMessage('تم إرسال حزمة الأرشفة والصور عالية الدقة بنجاح إلى تطبيق OneDrive / SharePoint ✓', 'success');
           return { sharedViaWebShare: true, filesCount: shareFiles.length };
         }
       } catch (err) {
@@ -785,8 +856,8 @@ class KSUCloudSyncEngine {
       }
     }
 
-    // Fallback: Trigger browser downloads for primary archive files
-    for (const f of fileEntries.slice(0, 5)) {
+    // Fallback (no Web Share API): Download the 7 summary CSV/HTML/JSON registers WITHOUT falsely marking photo violations archived
+    for (const f of summaryEntries) {
       const blob = new Blob([f.content], { type: f.mime });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -795,20 +866,32 @@ class KSUCloudSyncEngine {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
-    this.markCardIdsArchived(archivedIds);
     this.lastSyncTime = new Date().toLocaleString('ar-SA');
     localStorage.setItem('ksu_last_sync_time', this.lastSyncTime);
     this.updateUI();
-    this.showModalMessage('تم تنزيل حزمة الأرشيف السحابي على جهازك بنجاح ✓', 'success');
-    return { sharedViaWebShare: false, filesCount: fileEntries.length };
+    this.showModalMessage('تم تنزيل سجلات Excel والنسخة الاحتياطية بنجاح ✓ (لأرشفة الصور الأصلية 1280px على الكمبيوتر استخدم زر مزامنة مجلد السحابة)', 'info');
+    return { sharedViaWebShare: false, filesCount: summaryEntries.length };
   }
 
   // =========================================================================
   // Safe Legacy Firebase RTDB Slimming (Verified Archived Records ONLY)
   // =========================================================================
 
+  async _downscaleViolationPhoto(src) {
+    if (!src || typeof src !== 'string' || src.length <= 45000) return src;
+    if (typeof window.compressImageForAI === 'function') {
+      try {
+        const out = await window.compressImageForAI(src, 480, 0.6);
+        if (out) return out;
+      } catch (_) {}
+    }
+    return src;
+  }
+
   async slimLegacyCloudViolations() {
+    await this._ensureAiClientLoaded();
     const archivedSet = this.getArchivedCardIdsSet();
     let list = [];
     try {
@@ -820,31 +903,74 @@ class KSUCloudSyncEngine {
     let slimmedCount = 0;
     let skippedUnarchivedCount = 0;
     const slimmedRecords = [];
+    const updatedList = [];
 
-    const updatedList = list.map((item) => {
-      if (!item || typeof item !== 'object') return item;
+    for (const item of list) {
+      if (!item || typeof item !== 'object') {
+        updatedList.push(item);
+        continue;
+      }
       const id = String(item.cardId || item.id || '').trim();
       const hasBloatedHtml = Boolean(item.cardInnerHtml || item.fullPageHtml);
-      if (!hasBloatedHtml) return item;
+      const hasOversizedPhoto = Boolean(
+        (typeof item.photo === 'string' && item.photo.length > 45000) ||
+        (Array.isArray(item.images) && item.images.some(img => typeof img === 'string' && img.length > 45000))
+      );
+
+      if (!hasBloatedHtml && !hasOversizedPhoto) {
+        updatedList.push(item);
+        continue;
+      }
 
       // Safety Gate: NEVER slim a violation whose high-res evidence hasn't been archived yet
       if (!id || !archivedSet.has(id)) {
         skippedUnarchivedCount++;
-        return item;
+        updatedList.push(item);
+        continue;
       }
 
-      if (item.visionData || item.hasVisualInspectionCard) {
-        const copy = Object.assign({}, item);
+      const copy = Object.assign({}, item);
+      let modified = false;
+
+      if ((copy.visionData || copy.hasVisualInspectionCard) && hasBloatedHtml) {
         delete copy.cardInnerHtml;
         delete copy.fullPageHtml;
+        modified = true;
+      }
+
+      if (hasOversizedPhoto) {
+        if (typeof copy.photo === 'string' && copy.photo.length > 45000) {
+          const smaller = await this._downscaleViolationPhoto(copy.photo);
+          if (smaller && smaller !== copy.photo) {
+            copy.photo = smaller;
+            modified = true;
+          }
+        }
+        if (Array.isArray(copy.images)) {
+          const nextImages = [];
+          for (const imgSrc of copy.images) {
+            if (typeof imgSrc === 'string' && imgSrc.length > 45000) {
+              const smaller = await this._downscaleViolationPhoto(imgSrc);
+              if (smaller && smaller !== imgSrc) modified = true;
+              nextImages.push(smaller || imgSrc);
+            } else {
+              nextImages.push(imgSrc);
+            }
+          }
+          copy.images = nextImages;
+        }
+      }
+
+      if (modified) {
         copy.updatedAt = new Date().toISOString();
         copy.updatedAtMs = Date.now();
         slimmedCount++;
         slimmedRecords.push(copy);
-        return copy;
+        updatedList.push(copy);
+      } else {
+        updatedList.push(item);
       }
-      return item;
-    });
+    }
 
     if (slimmedCount > 0) {
       localStorage.setItem('ksumc_safety_violations', JSON.stringify(updatedList));
@@ -876,11 +1002,23 @@ class KSUCloudSyncEngine {
     const inp = document.getElementById('ksu-custom-sp-folder-input');
     if (!inp) return;
     const url = String(inp.value || '').trim();
-    if (url && !/^https:\/\/[a-z0-9.-]*sharepoint\.com\//i.test(url)) {
-      this.showModalMessage('يرجى إدخال رابط مجلد صحيح من نطاق جامعة الملك سعود (sharepoint.com)', 'warning');
-      return;
-    }
     if (url) {
+      let validSp = false;
+      try {
+        const parsed = new URL(url);
+        const host = parsed.hostname.toLowerCase();
+        validSp = parsed.protocol === 'https:' && (
+          host === 'ksusa.sharepoint.com' ||
+          host === 'ksusa-my.sharepoint.com' ||
+          host.endsWith('.sharepoint.com')
+        );
+      } catch (_) {
+        validSp = false;
+      }
+      if (!validSp) {
+        this.showModalMessage('يرجى إدخال رابط مجلد رسمي صحيح من نطاق جامعة الملك سعود (ksusa.sharepoint.com)', 'warning');
+        return;
+      }
       localStorage.setItem(CUSTOM_FOLDER_URL_KEY, url);
       this.showModalMessage('تم حفظ رابط مجلد الشواهد المشترك بنجاح ✓', 'success');
     } else {
@@ -903,7 +1041,7 @@ class KSUCloudSyncEngine {
     modal.className = 'hidden fixed inset-0 z-[9998] items-center justify-center p-3 sm:p-5';
     modal.style.cssText = 'background:rgba(8,43,73,0.72);backdrop-filter:blur(4px);direction:rtl;font-family:Cairo,Segoe UI,Tahoma,sans-serif;';
 
-    const customUrl = localStorage.getItem(CUSTOM_FOLDER_URL_KEY) || '';
+    const customUrl = this._escapeHtml(localStorage.getItem(CUSTOM_FOLDER_URL_KEY) || '');
 
     modal.innerHTML = `
       <div style="background:#ffffff;width:100%;max-width:760px;max-height:90vh;overflow-y:auto;border-radius:20px;border:2px solid #004B87;box-shadow:0 25px 60px rgba(0,0,0,0.35);color:#0f172a;">
@@ -1076,7 +1214,7 @@ class KSUCloudSyncEngine {
       if (dirHandle && typeof dirHandle.queryPermission === 'function') {
         const perm = await dirHandle.queryPermission({ mode: 'readwrite' });
         if (perm === 'granted') {
-          await this.syncToDirectoryHandle(dirHandle);
+          await this.syncToDirectoryHandle(dirHandle, { skipAlreadyArchived: !isManual });
         }
       }
       this.lastSyncTime = new Date().toLocaleString('ar-SA');
@@ -1140,6 +1278,9 @@ class KSUCloudSyncEngine {
                 localStorage.setItem(storageKey, JSON.stringify(db[prop]));
               }
             }
+            if (db.capa !== undefined) {
+              localStorage.setItem('ksumc_capa_registry', JSON.stringify(db.capa));
+            }
             if (db.qualitySchedule) {
               localStorage.setItem('ksumc_quality_monthly_schedule', JSON.stringify(db.qualitySchedule));
               localStorage.setItem('ksumc_schedule_user_customized', 'true');
@@ -1178,6 +1319,7 @@ class KSUCloudSyncEngine {
     document.body.appendChild(link);
     link.click();
     link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
     this.showToast('تم تصدير سجل الأصول بصيغة Excel CSV بنجاح ✓', 'success');
   }
 
@@ -1198,9 +1340,9 @@ class KSUCloudSyncEngine {
 
     const openCustomBtn = document.getElementById('ksu-custom-sp-open-btn');
     if (openCustomBtn) {
-      const customUrl = localStorage.getItem(CUSTOM_FOLDER_URL_KEY) || '';
-      openCustomBtn.setAttribute('href', customUrl || '#');
-      openCustomBtn.style.display = customUrl ? 'inline-flex' : 'none';
+      const rawCustomUrl = localStorage.getItem(CUSTOM_FOLDER_URL_KEY) || '';
+      openCustomBtn.setAttribute('href', rawCustomUrl || '#');
+      openCustomBtn.style.display = rawCustomUrl ? 'inline-flex' : 'none';
     }
 
     const statsStrip = document.getElementById('ksu-archive-stats-strip');
@@ -1268,7 +1410,7 @@ class KSUCloudSyncEngine {
     };
     box.className = '';
     box.style.cssText = `padding:10px 12px;border-radius:11px;font-size:11.5px;font-weight:800;display:flex;align-items:center;gap:8px;${styles[type] || styles.info}`;
-    box.innerHTML = `<span>${msg}</span>`;
+    box.textContent = msg;
   }
 
   showToast(message, type = 'info') {

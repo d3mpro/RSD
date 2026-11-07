@@ -151,7 +151,7 @@
 
       const isDeveloper = roleCat === 'developer' || (user && (user.id === 'USR-01' || user.empId === '95972'));
       const isHeadOrAdmin = isDeveloper || roleCat === 'head' || roleCat === 'admin' || roleCat === 'executive';
-      const allowedArchiveRoles = ['developer', 'head', 'admin', 'executive', 'quality', 'supervisor'];
+      const allowedArchiveRoles = ['developer', 'head', 'admin', 'executive', 'quality', 'supervisor', 'shift_supervisor'];
       const canAccessCloudArchive = activeKey !== 'field' && Boolean(user) && (
         allowedArchiveRoles.includes(roleCat) ||
         (isDeveloper && roleCat !== 'field_inspector' && user.roleCategory !== 'guest')
@@ -366,6 +366,14 @@
       const menu = document.getElementById('ksu-user-dropdown-menu');
       if (menu && !menu.classList.contains('hidden')) {
         menu.classList.add('hidden');
+      }
+      if (typeof window.buildFullPageHtmlFromViolation !== 'function' && !this._loadingAiClientScript) {
+        this._loadingAiClientScript = true;
+        const aiScript = document.createElement('script');
+        aiScript.src = 'assets/js/ksu-ai-client.js';
+        aiScript.onload = () => { this._loadingAiClientScript = false; };
+        aiScript.onerror = () => { this._loadingAiClientScript = false; };
+        (document.head || document.body).appendChild(aiScript);
       }
       if (window.ksuSyncEngine && typeof window.ksuSyncEngine.openSyncModal === 'function') {
         window.ksuSyncEngine.openSyncModal();

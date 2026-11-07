@@ -56,12 +56,22 @@ function createHubSandbox(customFetch, customNavigator = {}) {
 
   const elementsById = new Map();
   const makeEl = (tag = 'div') => {
+    let _innerHTML = '';
     const el = {
       tagName: String(tag).toUpperCase(),
       id: '',
       className: '',
       style: {},
-      innerHTML: '',
+      get innerHTML() { return _innerHTML; },
+      set innerHTML(val) {
+        _innerHTML = String(val);
+        const matches = _innerHTML.matchAll(/id="([^"]+)"/g);
+        for (const m of matches) {
+          if (!elementsById.has(m[1])) {
+            elementsById.set(m[1], makeEl('input'));
+          }
+        }
+      },
       textContent: '',
       value: '',
       children: [],
@@ -134,10 +144,13 @@ function createHubSandbox(customFetch, customNavigator = {}) {
     Buffer,
     Blob: globalThis.Blob,
     File: globalThis.File,
-    URL: {
-      createObjectURL: () => 'blob:mock',
-      revokeObjectURL: () => {}
-    },
+    URL: Object.assign(
+      function(...args) { return new globalThis.URL(...args); },
+      {
+        createObjectURL: () => 'blob:mock',
+        revokeObjectURL: () => {}
+      }
+    ),
     btoa: (s) => Buffer.from(s, 'binary').toString('base64'),
     atob: (s) => Buffer.from(s, 'base64').toString('binary'),
     encodeURIComponent,
@@ -396,4 +409,73 @@ test('Task 3.5: Legacy shims, self-injected OneDrive/SharePoint modal, and Mobil
   const mobRes = await eng.shareOrDownloadMobileBundle();
   assert.equal(mobRes.sharedViaWebShare, true);
   assert.ok(sharedPayload && Array.isArray(sharedPayload.files) && sharedPayload.files.length >= 2);
+});
+
+test('Task 3.6: Mobile download fallback (when Web Share unavailable) does NOT falsely mark violation cardIds as archived, and slimLegacyCloudViolations downscales oversized archived photos', async () => {
+  const ctxFallback = createHubSandbox(null, {}); // no navigator.share
+  const bloatedPhoto = 'data:image/jpeg;base64,' + 'Z'.repeat(60000);
+  ctxFallback.localStorage.setItem('ksumc_safety_violations', JSON.stringify([
+    {
+      id: 'KSU-FALLBACK-99',
+      cardId: 'KSU-FALLBACK-99',
+      date: '2026-11-08',
+      hasVisualInspectionCard: true,
+      photo: bloatedPhoto,
+      images: [bloatedPhoto],
+      visionData: { findings_summary: 'فحص بدون Web Share' }
+    }
+  ]));
+
+  vm.runInContext(ksuAiClientCode, ctxFallback);
+  vm.runInContext(ksuCloudSyncCode, ctxFallback);
+
+  const dlRes = await ctxFallback.window.ksuSyncEngine.shareOrDownloadMobileBundle();
+  assert.equal(dlRes.sharedViaWebShare, false);
+  const archivedAfterFallback = JSON.parse(ctxFallback.localStorage.getItem('ksumc_archived_card_ids') || '[]');
+  assert.equal(archivedAfterFallback.includes('KSU-FALLBACK-99'), false, 'Download fallback must NOT mark cardId archived when .jpg/.html evidence was not exported');
+
+  // Now mark KSU-FALLBACK-99 archived and provide a mock compressImageForAI to verify 480px photo downscaling
+  ctxFallback.window.ksuSyncEngine.markCardIdsArchived(['KSU-FALLBACK-99']);
+  ctxFallback.window.compressImageForAI = async (_src, maxDim) => `data:image/jpeg;base64,DOWNSCALED_${maxDim}PX`;
+
+  const slimRes = await ctxFallback.window.ksuSyncEngine.slimLegacyCloudViolations();
+  assert.equal(slimRes.slimmedCount, 1, 'Archived record with >45KB photo must be downscaled even without cardInnerHtml');
+  const updatedViols = JSON.parse(ctxFallback.localStorage.getItem('ksumc_safety_violations'));
+  assert.equal(updatedViols[0].photo, 'data:image/jpeg;base64,DOWNSCALED_480PX');
+  assert.deepEqual(Array.from(updatedViols[0].images), ['data:image/jpeg;base64,DOWNSCALED_480PX']);
+});
+
+test('Task 3.7: resolveBestViolationImages falls back to Firebase Bridge on HTTP 502, CAPA reads ksumc_capa_registry, and evil-sharepoint.com URL is rejected', async () => {
+  const mock502Fetch = async () => ({ ok: false, status: 502, json: async () => ({}) });
+  const ctx = createHubSandbox(mock502Fetch);
+  ctx.location.hostname = 'rsd-ksu.web.app';
+  ctx.localStorage.setItem('ksumc_capa_records', '[]');
+  ctx.localStorage.setItem('ksumc_capa_registry', JSON.stringify([{ id: 'CAPA-REG-1', title: 'خطة تصحيحية معتمدة' }]));
+
+  vm.runInContext(ksuAiClientCode, ctx);
+  ctx.window.KSUAI.dispatchViaFirebaseBridge = async (action, payload) => {
+    if (action === 'archive-media' && payload.cardId === 'KSU-BRIDGE-502') {
+      return { images: ['data:image/jpeg;base64,BRIDGE_1280PX_IMG'] };
+    }
+    return null;
+  };
+  vm.runInContext(ksuCloudSyncCode, ctx);
+
+  const eng = ctx.window.ksuSyncEngine;
+  const imgs = await eng.resolveBestViolationImages({ id: 'KSU-BRIDGE-502', photo: 'data:image/jpeg;base64,THUMB' });
+  assert.deepEqual(Array.from(imgs), ['data:image/jpeg;base64,BRIDGE_1280PX_IMG']);
+
+  const pkg = eng.getUnifiedDatabasePackage();
+  assert.equal(pkg.database.capa.length, 1);
+  assert.equal(pkg.database.capa[0].id, 'CAPA-REG-1');
+
+  eng.openSyncModal();
+  const urlInp = ctx.document.getElementById('ksu-custom-sp-folder-input');
+  urlInp.value = 'https://evil-sharepoint.com/phish';
+  eng.saveCustomSharedFolderUrl();
+  assert.equal(ctx.localStorage.getItem('ksumc_custom_sharepoint_folder_url'), null, 'Lookalike domain must be rejected');
+
+  urlInp.value = 'https://ksusa.sharepoint.com/sites/safty/Shared%20Documents';
+  eng.saveCustomSharedFolderUrl();
+  assert.equal(ctx.localStorage.getItem('ksumc_custom_sharepoint_folder_url'), 'https://ksusa.sharepoint.com/sites/safty/Shared%20Documents');
 });

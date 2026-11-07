@@ -323,3 +323,38 @@ test('Task 2.4: printSafetyViolation in app.js dynamically reconstructs and prin
   assert.equal(printedHtml.includes('KSU-VIS-2026-8899'), true);
   assert.equal(printedHtml.includes('تخزين كراتين أمام لوحة التوزيع الكهربائية'), true);
 });
+
+test('Task 2.5: callGeminiDirectly breaks immediately on network AbortError/TypeError instead of multiplying timeouts across keys, and exports window.compressImageForAI', async () => {
+  let geminiAttempts = 0;
+  const mockAbortFetch = async (url) => {
+    if (url.includes('generativelanguage.googleapis.com')) {
+      geminiAttempts++;
+      const abortErr = new Error('The operation was aborted');
+      abortErr.name = 'AbortError';
+      throw abortErr;
+    }
+    if (url.includes('/ai/analyze-inspection-image')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          source: 'GitHub Models (openai/gpt-4o)',
+          data: { status: 'مطابق', title: 'فحص سليم', summary: 'لا توجد مخالفة' }
+        })
+      };
+    }
+    throw new Error('Unexpected URL');
+  };
+
+  const ctx = createBrowserSandbox(mockAbortFetch);
+  ctx.localStorage.setItem('ksumc_gemini_api_keys', 'key_a,key_b,key_c');
+  ctx.localStorage.setItem('ksumc_oracle_agent_url', 'http://127.0.0.1:8000');
+  vm.runInContext(ksuAiClientCode, ctx);
+
+  assert.equal(typeof ctx.window.compressImageForAI, 'function', 'window.compressImageForAI must be exported');
+
+  const res = await ctx.window.KSUAI.analyzeInspectionImage({ image: 'data:image/jpeg;base64,QUJD' });
+  assert.equal(geminiAttempts, 1, 'Must break Gemini key loop immediately when network/firewall aborts connection');
+  assert.equal(res.success, true);
+});

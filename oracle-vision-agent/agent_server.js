@@ -259,7 +259,8 @@ async function callGithubModelsVision(images, prompt, fetchImpl = fetch) {
             lastErr = err;
             continue;
           }
-          throw err;
+          lastErr = err;
+          break;
         }
 
         const data = await resp.json();
