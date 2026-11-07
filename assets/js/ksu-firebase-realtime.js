@@ -17,7 +17,23 @@
 (function() {
     'use strict';
 
-    const FIREBASE_CONFIG = {
+    const isDemoEnvironment = typeof window !== 'undefined' && (
+        window.location.hostname.includes('rsd-go-demo') ||
+        localStorage.getItem('ksumc_system_mode') === 'demo'
+    );
+
+    const DEMO_FIREBASE_CONFIG = {
+        apiKey: "AIzaSyAfK_m1az407rQZOoqbSnGZ1D6nn11Rn6A",
+        authDomain: "rsd-go-demo.firebaseapp.com",
+        projectId: "rsd-go-demo",
+        storageBucket: "rsd-go-demo.firebasestorage.app",
+        messagingSenderId: "145211723666",
+        appId: "1:145211723666:web:9d9de10cfd803f2f2e3b4b",
+        measurementId: "G-5K43RBNLXZ",
+        databaseURL: window.KSU_FIREBASE_RTDB_URL || localStorage.getItem('ksumc_rtdb_url') || "https://rsd-go-demo-default-rtdb.firebaseio.com"
+    };
+
+    const PROD_FIREBASE_CONFIG = {
         apiKey: "AIzaSyBXKoswq5Eq7JdenprjUPQkgereD2fcv7s",
         authDomain: "rsd-ksu.firebaseapp.com",
         projectId: "rsd-ksu",
@@ -28,7 +44,9 @@
         databaseURL: window.KSU_FIREBASE_RTDB_URL || localStorage.getItem('ksumc_rtdb_url') || "https://rsd-ksu-default-rtdb.firebaseio.com"
     };
 
-    const PROD_CLEANUP_VERSION = 'ksumc_prod_clean_v6_0_rsd_ksu';
+    const FIREBASE_CONFIG = isDemoEnvironment ? DEMO_FIREBASE_CONFIG : PROD_FIREBASE_CONFIG;
+
+    const PROD_CLEANUP_VERSION = isDemoEnvironment ? 'ksumc_demo_clean_v6_0' : 'ksumc_prod_clean_v6_0_rsd_ksu';
 
     class KSUFirebaseRealtimeSync {
         constructor() {

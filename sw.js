@@ -3,8 +3,11 @@
  * المدينة الطبية بجامعة الملك سعود - محرك العمل دون اتصال
  */
 
-const CACHE_NAME = 'rsd-ksu-cache-v2.0-pure-prod-2026-11-03';
-const FIREBASE_NOTIFS_URL = 'https://rsd-ksu-default-rtdb.firebaseio.com/notifications.json';
+const isDemoHost = typeof self !== 'undefined' && self.location && self.location.hostname && self.location.hostname.includes('rsd-go-demo');
+const CACHE_NAME = isDemoHost ? 'rsd-go-demo-cache-v2.1' : 'rsd-ksu-cache-v2.0-pure-prod-2026-11-03';
+const FIREBASE_NOTIFS_URL = isDemoHost
+  ? 'https://rsd-go-demo-default-rtdb.firebaseio.com/notifications.json'
+  : 'https://rsd-ksu-default-rtdb.firebaseio.com/notifications.json';
 
 // سجل الإشعارات التي تم عرضها عبر Service Worker لمنع التكرار
 const swShownNotifIds = new Set();

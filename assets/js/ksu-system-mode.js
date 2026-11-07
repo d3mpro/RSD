@@ -14,117 +14,106 @@
   const SECURITY_PASSWORD = 'Kk@122566##';
   const ACCEPTED_PASSWORDS = ['Kk@122566##', 'kk@122566##'];
 
-  // حسابات التجربة السريعة المعتمدة للجان التقييم والإدارة
+  // حسابات التجربة السريعة المعتمدة للجان التقييم والإدارة (مسميات وظيفية معتمدة)
   const QUICK_PERSONAS = {
     executive: {
       key: 'executive',
-      title: 'المدير العام للسلامة والأمن (الإدارة العليا)',
+      title: 'المدير العام للسلامة والأمن',
       subTitle: 'اعتماد التقارير الاستراتيجية والمؤشرات التنفيذية',
-      icon: 'dashboard',
+      icon: 'workspace_premium',
       color: 'blue',
-      badge: 'القيادة العليا',
+      badge: 'مدير عام',
       username: 'D1',
       portal: 'dashboard.html',
-      description: 'الداشبورد التنفيذي الموحد، استلام التقارير المحالة من رئيس القسم، والمؤشرات الاستراتيجية'
+      description: 'الداشبورد التنفيذي الموحد، المؤشرات الإستراتيجية، واعتماد التقارير المحالة من رئيس الإدارة'
     },
     director: {
       key: 'director',
       title: 'المدير العام للسلامة والأمن',
-      subTitle: 'استلام التقارير المحالة من رئيس القسم',
+      subTitle: 'استلام التقارير المحالة من رئيس الإدارة',
       icon: 'workspace_premium',
       color: 'blue',
-      badge: 'المدير العام (D1)',
+      badge: 'مدير عام',
       username: 'D1',
+      portal: 'dashboard.html',
+      description: 'استعراض واعتماد التقارير المرفوعة وإصدار التوجيهات النهائية'
+    },
+    dept_head: {
+      key: 'dept_head',
+      title: 'رئيس إدارة السلامة',
+      subTitle: 'مراجعة التقارير المحالة وتوجيهها واعتمادها',
+      icon: 'military_tech',
+      color: 'purple',
+      badge: 'رئيس إدارة',
+      username: 'H2',
       portal: 'head.html',
-      description: 'استعراض واعتماد التقارير المرفوعة من رئيس إدارة السلامة وإصدار التوجيهات النهائية'
+      description: 'مراجعة التقارير المحالة من المشرف العام، الحفظ بالأرشيف أو الإحالة للمدير العام'
+    },
+    head: {
+      key: 'head',
+      title: 'المشرف العام',
+      subTitle: 'مراجعة تقارير الميدان وتوجيهها لرئيس الإدارة',
+      icon: 'admin_panel_settings',
+      color: 'amber',
+      badge: 'مشرف عام',
+      username: 'H1',
+      portal: 'head.html',
+      description: 'استلام تقارير الميدان، الأرشفة، والتوجيه لرئيس إدارة السلامة'
+    },
+    general_supervisor: {
+      key: 'general_supervisor',
+      title: 'المشرف العام',
+      subTitle: 'مراجعة تقارير الميدان وتوجيهها لرئيس الإدارة',
+      icon: 'admin_panel_settings',
+      color: 'amber',
+      badge: 'مشرف عام',
+      username: 'H1',
+      portal: 'head.html',
+      description: 'استلام تقارير الميدان، الأرشفة، والتوجيه لرئيس إدارة السلامة'
     },
     quality: {
       key: 'quality',
-      title: 'مسؤول الجودة والاعتماد (CBAHI / JCI)',
-      subTitle: 'مطابقة معايير FMS واعتماد الجولات',
+      title: 'مسؤول الجودة والاعتماد',
+      subTitle: 'مطابقة معايير CBAHI FMS واعتماد الجولات',
       icon: 'verified',
       color: 'emerald',
       badge: 'الجودة والاعتماد',
       username: 'Q1',
       portal: 'quality.html',
-      description: 'تدقيق معايير سباهي FMS.4 و FMS.12، مراجعة الجولات الميدانية، وسجل التحسين المستمر'
-    },
-    head: {
-      key: 'head',
-      title: 'المشرف العام الملك خالد (H1)',
-      subTitle: 'أ. حسن إبراهيم دعاك - مراجعة التقارير وتوجيهها',
-      icon: 'admin_panel_settings',
-      color: 'amber',
-      badge: 'المشرف العام (H1)',
-      username: 'H1',
-      portal: 'head.html',
-      description: 'مراجعة تقارير السلامة الواردة من الميدان، الحفظ في الأرشيف أو التوجيه لرئيس القسم'
-    },
-    general_supervisor: {
-      key: 'general_supervisor',
-      title: 'المشرف العام الملك خالد (H1)',
-      subTitle: 'أ. حسن إبراهيم دعاك - مراجعة التقارير وتوجيهها',
-      icon: 'admin_panel_settings',
-      color: 'amber',
-      badge: 'المشرف العام (H1)',
-      username: 'H1',
-      portal: 'head.html',
-      description: 'مراجعة تقارير السلامة الواردة من الميدان، الحفظ في الأرشيف أو التوجيه لرئيس القسم'
-    },
-    dept_head: {
-      key: 'dept_head',
-      title: 'رئيس إدارة السلامة (H2)',
-      subTitle: 'أ. مصعب عبدالله آل حماد - اعتماد وتوجيه التقارير',
-      icon: 'military_tech',
-      color: 'purple',
-      badge: 'رئيس القسم (H2)',
-      username: 'H2',
-      portal: 'head.html',
-      description: 'مراجعة التقارير المحالة من المشرف العام (H1)، الحفظ في الأرشيف أو التوجيه للمدير العام للسلامة والأمن'
-    },
-    inspector: {
-      key: 'inspector',
-      title: 'مفتش السلامة الميداني',
-      subTitle: 'تنفيذ الجولات ورفع تقارير السلامة',
-      icon: 'checklist_rtl',
-      color: 'indigo',
-      badge: 'الميدان والتفتيش',
-      username: 'M1',
-      portal: 'field.html',
-      description: 'كتابة وإرسال تقارير السلامة للمشرف العام (H1)، نماذج CBAHI الـ 14، والعمل بدون إنترنت'
+      description: 'تدقيق معايير سباهي FMS، مراجعة الجولات الميدانية، وسجل الامتثال والتحسين'
     },
     supervisor: {
       key: 'supervisor',
-      title: 'مشرف السلامة الميداني',
-      subTitle: 'إشراف الوردية ورفع تقارير السلامة للمشرف العام',
+      title: 'مشرف الوردية',
+      subTitle: 'إشراف الوردية وتدقيق وإرسال تقارير السلامة',
       icon: 'supervisor_account',
       color: 'teal',
-      badge: 'الإشراف الميداني',
+      badge: 'مشرف الوردية',
       username: 'S1',
       portal: 'field.html',
-      description: 'إشراف الوردية الميدانية، كتابة وإرسال تقارير السلامة للمشرف العام (H1)، واعتماد الجولات'
+      description: 'إشراف الوردية الميدانية، كتابة وإرسال تقارير السلامة للمشرف العام، واعتماد الجولات'
     },
     field_supervisor: {
       key: 'field_supervisor',
-      title: 'مشرف السلامة الميداني',
-      subTitle: 'إشراف الوردية ورفع تقارير السلامة للمشرف العام',
+      title: 'مشرف الوردية',
+      subTitle: 'إشراف الوردية وتدقيق وإرسال تقارير السلامة',
       icon: 'supervisor_account',
       color: 'teal',
-      badge: 'الإشراف الميداني',
+      badge: 'مشرف الوردية',
       username: 'S1',
       portal: 'field.html',
-      description: 'إشراف الوردية الميدانية، كتابة وإرسال تقارير السلامة للمشرف العام (H1)، واعتماد الجولات'
+      description: 'إشراف الوردية الميدانية، كتابة وإرسال تقارير السلامة للمشرف العام، واعتماد الجولات'
     },
-    developer: {
-      key: 'developer',
-      title: 'مدير النظام ومسؤول التقنية',
-      subTitle: 'التحكم الإداري الكامل وهندسة النظام',
-      icon: 'terminal',
-      color: 'slate',
-      badge: 'الإدارة والتقنية',
-      username: 'DEV',
-      portal: 'developer.html',
-      description: 'إدارة المستخدمين والأصول، مراقبة قواعد البيانات السحابية، وضبط معمارية المنظومة'
+    inspector: {
+      key: 'inspector',
+      title: 'مفتش الوردية',
+      subTitle: 'تنفيذ الجولات والتفتيش الذكي ورفع تقارير السلامة',
+      icon: 'checklist_rtl',
+      color: 'indigo',
+      badge: 'مفتش الوردية',
+      username: 'M1',
+      portal: 'field.html',
+      description: 'تنفيذ نماذج CBAHI الـ 14، مسح الباركود، الفحص البصري الذكي، والعمل دون إنترنت'
     }
   };
 
@@ -338,11 +327,16 @@
     PERSONAS: QUICK_PERSONAS,
 
     /**
-     * استعلام وضع النظام الحالي (افتراضياً: وضع العرض ما لم يتم تحويله للإنتاج)
+     * استعلام وضع النظام الحالي (افتراضياً: وضع العرض في rsd-go-demo والإنتاج في rsd-ksu)
      */
     getMode: function() {
       try {
-        localStorage.setItem(STORAGE_KEY_MODE, MODE_PRODUCTION);
+        const hostname = (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
+        if (hostname.includes('rsd-go-demo')) {
+          return MODE_DEMO;
+        }
+        const saved = localStorage.getItem(STORAGE_KEY_MODE);
+        if (saved) return saved;
         return MODE_PRODUCTION;
       } catch (e) {
         return MODE_PRODUCTION;
@@ -353,14 +347,14 @@
      * هل النظام في وضع العرض والتجربة السريعة؟
      */
     isDemo: function() {
-      return false;
+      return this.getMode() === MODE_DEMO;
     },
 
     /**
      * هل النظام في وضع الإنتاج الفعلي المعتمد؟
      */
     isProduction: function() {
-      return true;
+      return this.getMode() === MODE_PRODUCTION;
     },
 
     /**
@@ -443,10 +437,10 @@
         if (resolvedKey === 'head' || resolvedKey === 'general_supervisor' || normKey === 'h1') {
           user = {
             id: 'USR-7453',
-            name: 'أ. حسن إبراهيم دعاك (المشرف العام H1)',
+            name: 'المشرف العام',
             empId: 'H1',
             username: 'H1',
-            role: 'المشرف العام الملك خالد (H1) - مشرف وحدة السلامة',
+            role: 'المشرف العام (H1) - مشرف وحدة السلامة',
             roleCategory: 'head',
             workflowRole: 'h1',
             portal: 'head',
@@ -458,10 +452,10 @@
         } else if (resolvedKey === 'dept_head' || normKey === 'h2') {
           user = {
             id: 'USR-HEAD-02',
-            name: 'أ. مصعب عبدالله آل حماد (رئيس إدارة السلامة)',
+            name: 'رئيس إدارة السلامة',
             empId: 'H2',
             username: 'H2',
-            role: 'رئيس إدارة السلامة بالمدينة الطبية',
+            role: 'رئيس إدارة السلامة بالمدينة الطبية (H2)',
             roleCategory: 'head',
             workflowRole: 'dept_head',
             portal: 'head',
@@ -476,7 +470,7 @@
             name: 'المدير العام للسلامة والأمن',
             empId: 'D1',
             username: 'D1',
-            role: 'مدير الإدارة العامة للأمن والسلامة بالمدينة الطبية',
+            role: 'مدير الإدارة العامة للأمن والسلامة (D1)',
             roleCategory: 'head',
             workflowRole: 'director',
             portal: persona.portal.replace('.html', ''),
@@ -488,10 +482,10 @@
         } else if (resolvedKey === 'quality' || normKey === 'q1') {
           user = {
             id: 'USR-Q1',
-            name: 'قسم الجودة وتقييم الأداء',
+            name: 'مسؤول الجودة والاعتماد',
             empId: 'Q1',
             username: 'Q1',
-            role: 'قسم الجودة وتقييم الأداء (CBAHI / JCI)',
+            role: 'مسؤول الجودة والاعتماد (Q1) - CBAHI / JCI',
             roleCategory: 'quality',
             portal: 'quality',
             facility: 'مستشفى الملك خالد الجامعي (KKUH)',
@@ -502,11 +496,11 @@
         } else if (resolvedKey === 'inspector' || normKey === 'm1') {
           user = {
             id: 'USR-SH1-202',
-            name: 'أ. عادل عاضة الشلوي',
+            name: 'مفتش الوردية',
             empId: 'M1',
             username: 'M1',
             altEmpId: 'KSU-SH1-202',
-            role: 'مفتش سلامة ميداني',
+            role: 'مفتش سلامة ميداني (M1)',
             roleCategory: 'field_inspector',
             portal: 'field',
             facility: 'مستشفى الملك خالد الجامعي (KKUH)',
@@ -517,31 +511,16 @@
         } else if (resolvedKey === 'supervisor' || resolvedKey === 'field_supervisor' || normKey === 's1') {
           user = {
             id: 'USR-SH1-201',
-            name: 'أ. ناصر فلاح القحطاني',
+            name: 'مشرف الوردية',
             empId: 'KSU-SH1-201',
             username: 'S1',
-            role: 'مشرف الوردية الأولى (مشرف ميداني)',
+            role: 'مشرف الوردية الميداني (S1)',
             roleCategory: 'shift_supervisor',
             portal: 'field',
             facility: 'مستشفى الملك خالد الجامعي (KKUH)',
             department: 'إدارة السلامة الميدانية',
             shift: 'الوردية 1 (صباحي)',
             permissions: { approveReports: true, conductInspections: true, issuePermits: true }
-          };
-        } else if (resolvedKey === 'developer' || normKey === 'dev' || normKey === 'alsaqri') {
-          user = {
-            id: 'USR-01',
-            name: 'أ. علي سليمان الصقري',
-            empId: '95972',
-            username: 'DEV',
-            altUsername: 'alsaqri',
-            role: 'مطور النظام ومسؤول التقنية والمشرف العام',
-            roleCategory: 'developer',
-            portal: 'developer',
-            facility: 'المدينة الطبية',
-            department: 'الإدارة العامة للأمن والسلامة - القيادة والأنظمة',
-            shift: 'جميع الورديات',
-            permissions: { all: true, developer: true, manageUsers: true, approveReports: true }
           };
         }
       }
