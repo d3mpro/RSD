@@ -791,7 +791,15 @@
                 return u;
             });
 
-            return this.db.ref('users').set(cleanUsers).then(() => {
+            const updateMap = {};
+            cleanUsers.forEach(u => {
+                if (u && (u.id || u.username || u.empId)) {
+                    const key = this.sanitizeFirebaseKey(u.id || u.username || u.empId);
+                    updateMap[key] = u;
+                }
+            });
+
+            return this.db.ref('users').update(updateMap).then(() => {
                 return this.db.ref('system_status/lastUpdate').set({
                     action: actionName,
                     deviceId: this.deviceId,
@@ -1221,7 +1229,12 @@
         syncNotification(notifObj) {
             if (!this.db || !notifObj) return Promise.resolve(false);
             const key = this.sanitizeFirebaseKey(notifObj.id || ('DIR-' + Date.now()));
-            const cleanData = JSON.parse(JSON.stringify(Object.assign({}, notifObj, {
+            const timestampVal = notifObj.timestamp || notifObj.createdAt || new Date().toISOString();
+            const cleanData = JSON.parse(JSON.stringify(Object.assign({
+                timestamp: timestampVal,
+                createdAt: timestampVal
+            }, notifObj, {
+                timestamp: timestampVal,
                 originDeviceId: notifObj.originDeviceId || this.deviceId
             })));
             return this.db.ref('notifications/' + key).set(cleanData).then(() => {

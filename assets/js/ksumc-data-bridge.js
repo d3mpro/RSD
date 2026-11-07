@@ -859,13 +859,15 @@
         type: notif.type || 'executive_directive',
         status: notif.status || 'نشط',
         acknowledgedBy: Array.isArray(notif.acknowledgedBy) ? notif.acknowledgedBy : [],
+        timestamp: notif.timestamp || notif.createdAt || nowIso,
         date: notif.date || nowIso.split('T')[0],
         time: notif.time || new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
         createdAt: notif.createdAt || nowIso,
         updatedAt: nowIso,
         createdAtMs: notif.createdAtMs || nowMs,
         updatedAtMs: nowMs,
-        ...notif
+        ...notif,
+        timestamp: notif.timestamp || notif.createdAt || nowIso
       };
 
       const existingIdx = list.findIndex(item => String(item.id) === String(newNotif.id));

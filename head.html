@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="utf-8" />
@@ -2351,6 +2351,7 @@
       if (window.KSUDataBridge && typeof window.KSUDataBridge.saveNotification === 'function') {
         window.KSUDataBridge.saveNotification({
           id: 'DIR-' + Date.now().toString().slice(-6),
+          timestamp: new Date().toISOString(),
           title: (priority === 'critical') ? '⚡ توجيه عاجل وفوري من رئيس القسم حول الجولة' : '📢 توجيه رسمي من رئيس القسم حول الجولة',
           message: `الجولة (${roundId}): ${notes}`,
           notes: notes,
@@ -3154,6 +3155,7 @@
         if (typeof window.KSUDataBridge.saveNotification === 'function') {
           window.KSUDataBridge.saveNotification({
             id: dirId,
+            timestamp: new Date().toISOString(),
             title: priority === 'critical' ? '⚡ توجيه تنفيذي عاجل من رئيس القسم' : '📢 توجيه تنفيذي من رئيس القسم للمفتشين',
             message: text,
             notes: text,
