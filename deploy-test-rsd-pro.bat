@@ -11,11 +11,11 @@ echo    القناة السحابية: rsd-pro (المشروع: rsd-ksu)
 echo ===================================================================
 echo.
 
-set FB_CMD=call "%~dp0tools\node_modules\.bin\firebase.cmd"
-if not exist "%~dp0tools\node_modules\.bin\firebase.cmd" (
-    if exist "%~dp0..\RSD-GO-DEMO\tools\node_modules\.bin\firebase.cmd" (
-        set FB_CMD=call "%~dp0..\RSD-GO-DEMO\tools\node_modules\.bin\firebase.cmd"
-    )
+set FB_CMD=npx --yes firebase-tools@latest
+if exist "%~dp0tools\node_modules\.bin\firebase.cmd" (
+    set FB_CMD=call "%~dp0tools\node_modules\.bin\firebase.cmd"
+) else if exist "%~dp0..\RSD-GO-DEMO\tools\node_modules\.bin\firebase.cmd" (
+    set FB_CMD=call "%~dp0..\RSD-GO-DEMO\tools\node_modules\.bin\firebase.cmd"
 )
 
 echo -------------------------------------------------------------------
