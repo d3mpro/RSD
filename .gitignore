@@ -78,3 +78,4 @@ oracle-vision-agent/archive_vault/
 
 # dataconnect generated files
 .dataconnect
+.agents/

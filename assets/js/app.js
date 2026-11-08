@@ -7648,18 +7648,19 @@ function loadState() {
     localStorage.setItem('ksumc_roster_version', OFFICIAL_ROSTER_VERSION);
   }
 
-  // Assets (Synchronized with official 1,587 real extinguishers, official emergency exits, 61 FM-200 Systems & 61 FHC Cabinets)
-  const OFFICIAL_ASSETS_VERSION = '2026.10.12_KSU_REAL_EXTINGUISHERS_REGISTRY_1587_V3';
+  // Assets (Synchronized with official 1,587 real extinguishers, official emergency exits, 61 FM-200 Systems, 61 FHC Cabinets & 10 FACP Panels)
+  const OFFICIAL_ASSETS_VERSION = '2026.11.08_KSU_FACP_REGISTRY_V4';
   const assetsVersion = localStorage.getItem('ksumc_assets_version');
   const storedAssets = localStorage.getItem(STORAGE_KEY_ASSETS);
   const realExtinguishers = (typeof KSU_REAL_EXTINGUISHERS !== 'undefined' && Array.isArray(KSU_REAL_EXTINGUISHERS)) ? KSU_REAL_EXTINGUISHERS : [];
   const realFM200 = (typeof KSU_FM200_ASSETS !== 'undefined' && Array.isArray(KSU_FM200_ASSETS)) ? KSU_FM200_ASSETS : [];
   const realFHC = (typeof KSU_FHC_ASSETS !== 'undefined' && Array.isArray(KSU_FHC_ASSETS)) ? KSU_FHC_ASSETS : [];
-  const otherAssets = INITIAL_ASSETS.filter(a => a.category !== 'طفايات الحريق' && !a.id.startsWith('FE-') && !a.id.startsWith('EXT-') && !(a.category && a.category.includes('FM-200')) && !(a.category && a.category.includes('صناديق') && a.id && a.id.startsWith('PL')));
+  const realFACP = (typeof KSU_FACP_ASSETS !== 'undefined' && Array.isArray(KSU_FACP_ASSETS)) ? KSU_FACP_ASSETS : [];
+  const otherAssets = INITIAL_ASSETS.filter(a => a.category !== 'طفايات الحريق' && !a.id.startsWith('FE-') && !a.id.startsWith('EXT-') && !(a.category && a.category.includes('FM-200')) && !(a.category && a.category.includes('صناديق') && a.id && a.id.startsWith('PL')) && !(a.id && a.id.startsWith('FACP-')));
 
   if (assetsVersion !== OFFICIAL_ASSETS_VERSION || !storedAssets || (storedAssets && JSON.parse(storedAssets).length < 1800)) {
-    // Purge previous extinguishers and adopt official 1,587 registry
-    state.assets = [...realExtinguishers, ...otherAssets, ...realFM200, ...realFHC];
+    // Purge previous extinguishers and adopt official 1,587 registry + FACP registry
+    state.assets = [...realExtinguishers, ...otherAssets, ...realFM200, ...realFHC, ...realFACP];
     localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(state.assets));
     localStorage.setItem('ksumc_assets_version', OFFICIAL_ASSETS_VERSION);
   } else {
@@ -7668,9 +7669,9 @@ function loadState() {
     const nonExtinguisherAssets = state.assets.filter(a => a.category !== 'طفايات الحريق' && !a.id.startsWith('FE-') && !a.id.startsWith('EXT-'));
     state.assets = [...realExtinguishers, ...nonExtinguisherAssets];
     
-    // Ensure all official exits, FM-200 systems & FHC cabinets are present even in cached state
+    // Ensure all official exits, FM-200 systems, FHC cabinets & FACP panels are present even in cached state
     const currentAssetIds = new Set(state.assets.map(a => a.id));
-    const missingAssets = [...otherAssets, ...realFM200, ...realFHC].filter(a => !currentAssetIds.has(a.id));
+    const missingAssets = [...otherAssets, ...realFM200, ...realFHC, ...realFACP].filter(a => !currentAssetIds.has(a.id));
     if (missingAssets.length > 0) {
       const seen = new Set(currentAssetIds);
       missingAssets.forEach(a => {
@@ -7733,6 +7734,7 @@ function saveRounds(targetRound) {
   localStorage.setItem(STORAGE_KEY_ROUNDS, serializedRounds);
   localStorage.setItem('ksumc_field_rounds', serializedRounds);
   localStorage.setItem('ksumc_rounds_registry', serializedRounds);
+  localStorage.setItem('ksumc_rounds', serializedRounds);
   if (typeof syncRoundsToShiftInspectionLog === 'function') {
     syncRoundsToShiftInspectionLog();
   }
@@ -9741,13 +9743,25 @@ function getAllPlantRoomAssets() {
 }
 
 function getAllFacpAssets() {
-  const fromState = (state.assets || []).filter(a =>
-    (a.category && (a.category.includes('لوحات') || a.category.includes('إنذار') || a.category.includes('الحريق'))) ||
-    (a.id && a.id.startsWith('FACP-')) ||
-    (a.type && a.type.includes('لوحة إنذار'))
-  );
+  if (typeof KSU_FACP_ASSETS !== 'undefined' && Array.isArray(KSU_FACP_ASSETS) && KSU_FACP_ASSETS.length > 0) {
+    return KSU_FACP_ASSETS;
+  }
+  const fromState = (state.assets || []).filter(a => {
+    if (!a) return false;
+    // Strictly exclude extinguishers and hose cabinets
+    if (a.category && (a.category.includes('طفايات') || a.category.includes('صناديق') || a.category.includes('خراطيم'))) return false;
+    if (a.id && (a.id.startsWith('FE-') || a.id.startsWith('EXT-') || a.id.startsWith('FHC-') || a.id.startsWith('FH-') || a.id.startsWith('PL'))) return false;
+    return (
+      (a.category && (a.category.includes('لوحات إنذار') || a.category.includes('لوحة إنذار') || (a.category.includes('لوحات') && !a.category.includes('طفايات')))) ||
+      (a.id && (a.id.startsWith('FACP-') || a.id.startsWith('FA-') || a.id.startsWith('FA00') || a.id.startsWith('NM-'))) ||
+      (a.type && (a.type.includes('لوحة إنذار') || a.type.includes('FACP')))
+    );
+  });
   if (fromState.length > 0) return fromState;
   return (typeof KSU_FACP_ASSETS !== 'undefined' && Array.isArray(KSU_FACP_ASSETS)) ? KSU_FACP_ASSETS : [];
+}
+if (typeof window !== 'undefined') {
+  window.getAllFacpAssets = getAllFacpAssets;
 }
 
 function populateRoundFloorOptions(selectedBuilding, desiredFloor = null) {
@@ -10612,7 +10626,7 @@ function renderFloorAssetsReconciliation() {
           <div class="p-6 rounded-xl bg-surface-container-low border border-dashed border-outline-variant text-center flex flex-col items-center gap-2">
             <span class="material-symbols-outlined text-3xl text-primary/60">inventory_2</span>
             <p class="text-xs font-bold text-primary">لا توجد أصول مسجلة لهذا النموذج في (${currentBuilding === 'all' ? 'جميع المباني' : currentBuilding} — ${currentFloor === 'all' ? 'جميع الأدوار' : currentFloor}).</p>
-            <p class="text-[11px] text-on-surface-variant">النماذج المزودة بأصول مسجلة حالياً: طفايات الحريق، نظام FM-200، مخارج الطوارئ، وصناديق الحريق.</p>
+            <p class="text-[11px] text-on-surface-variant">النماذج المزودة بأصول مسجلة حالياً: طفايات الحريق، نظام FM-200، مخارج الطوارئ، صناديق الحريق، ولوحات إنذار الحريق (SBC 801).</p>
           </div>
         ` : floorAssets.map((asset) => {
           const status = state.currentRoundDraft.floorAssetsStatus[asset.id] || 'pending';
@@ -12131,6 +12145,40 @@ function openNewRoundModal(formType = 'all', targetBuilding = null) {
       shiftSelect.value = activeShiftKey;
     }
 
+    // 3c. Inspector Card UI handling: Auto-bind for fas_insp & fas_test
+    const manualInspGroup = document.getElementById('round-inspector-manual-selection-group');
+    const autoBoundBadge = document.getElementById('round-inspector-auto-bound-badge');
+    const autoNameEl = document.getElementById('round-inspector-auto-name');
+    const autoBadgeEl = document.getElementById('round-inspector-auto-badge');
+    const autoShiftEl = document.getElementById('round-inspector-auto-shift');
+    const inspectorCardTitle = document.getElementById('round-inspector-card-title');
+
+    const isFireAlarmForm = (formType === 'fas_insp' || formType === 'fas_test');
+    if (isFireAlarmForm) {
+      if (manualInspGroup) {
+        manualInspGroup.classList.add('hidden');
+        manualInspGroup.style.display = 'none';
+      }
+      if (autoBoundBadge) {
+        autoBoundBadge.classList.remove('hidden');
+        autoBoundBadge.style.display = 'flex';
+      }
+      if (autoNameEl) autoNameEl.textContent = defaultInspectorName;
+      if (autoBadgeEl) autoBadgeEl.textContent = `الرقم الوظيفي: ${defaultBadge}`;
+      if (autoShiftEl) autoShiftEl.textContent = typeof getShiftLabel === 'function' ? getShiftLabel(activeShiftKey) : 'الوردية الحالية';
+      if (inspectorCardTitle) inspectorCardTitle.textContent = 'ملاحظات التفتيش والإجراءات التصحيحية المعتمدة (CAPA)';
+    } else {
+      if (manualInspGroup) {
+        manualInspGroup.classList.remove('hidden');
+        manualInspGroup.style.display = '';
+      }
+      if (autoBoundBadge) {
+        autoBoundBadge.classList.add('hidden');
+        autoBoundBadge.style.display = 'none';
+      }
+      if (inspectorCardTitle) inspectorCardTitle.textContent = 'بيانات المفتش والإجراءات التصحيحية المعتمدة';
+    }
+
     // 4. Ensure current draft has current selected floor from dropdown
     const floorSelect = document.getElementById('inp-round-floor');
     if (floorSelect && floorSelect.value) {
@@ -12191,6 +12239,20 @@ function saveNewInspectionRound() {
     const zone = document.getElementById('inp-round-zone')?.value || '';
     const facpAssetId = document.getElementById('sel-round-facp-asset')?.value || '';
     const ppmDate = document.getElementById('inp-round-ppm-date')?.value || '';
+
+    // Synchronize comprehensive FACP panel metadata for fas_insp & fas_test
+    const allFacp = (typeof getAllFacpAssets === 'function') ? getAllFacpAssets() : ((typeof KSU_FACP_ASSETS !== 'undefined') ? KSU_FACP_ASSETS : []);
+    const matchedFacp = allFacp.find(p => p.id === facpAssetId || p.controlNo === facpAssetId) ||
+      (state.currentRoundDraft?.facpAssetId ? allFacp.find(p => p.id === state.currentRoundDraft.facpAssetId) : null);
+    const resolvedFacpId = facpAssetId || (matchedFacp ? matchedFacp.id : (state.currentRoundDraft?.facpAssetId || ''));
+    const resolvedFacpControlNo = (matchedFacp && matchedFacp.controlNo) ? matchedFacp.controlNo : (state.currentRoundDraft?.facpControlNo || (resolvedFacpId ? resolvedFacpId.replace('FACP-', '') : ''));
+    const resolvedFacpName = (matchedFacp && matchedFacp.name) ? matchedFacp.name : (state.currentRoundDraft?.facpName || '');
+    const resolvedFacpStatus = (matchedFacp && matchedFacp.status) ? matchedFacp.status : (state.currentRoundDraft?.facpStatus || '');
+    const resolvedFacpOpStatus = (matchedFacp && matchedFacp.operationalStatus) ? matchedFacp.operationalStatus : (state.currentRoundDraft?.facpOperationalStatus || '');
+    const resolvedZone = zone || (matchedFacp ? matchedFacp.zone : (state.currentRoundDraft?.zone || ''));
+    const resolvedLoop = loopNo || (matchedFacp ? matchedFacp.loopsCount : (state.currentRoundDraft?.loopNo || ''));
+    const resolvedDevices = devicesNo || (matchedFacp ? matchedFacp.devicesCount : (state.currentRoundDraft?.devicesNo || ''));
+    const resolvedPpmDate = ppmDate || (matchedFacp ? matchedFacp.nextPpmDate : (state.currentRoundDraft?.ppmDate || ''));
     const blok = document.getElementById('inp-round-blok')?.value || '';
     const photos = (window.roundPhotosList && window.roundPhotosList.length > 0) ? [...window.roundPhotosList] : (state.currentRoundDraft?.photos || []);
     const formTypeEl = document.getElementById('inp-round-form-type');
@@ -12240,7 +12302,7 @@ function saveNewInspectionRound() {
     const today = new Date().toISOString().split('T')[0];
     const nowIso = new Date().toISOString();
     const nowTimeStr = new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
-    const badgeCode = (currentUserObj && (currentUserObj.empId || currentUserObj.username)) ? (currentUserObj.empId || currentUserObj.username) : 'KSU-SAF-882';
+    const badgeCode = (currentUserObj && (currentUserObj.empId || currentUserObj.employeeId || currentUserObj.badge || currentUserObj.username)) ? (currentUserObj.empId || currentUserObj.employeeId || currentUserObj.badge || currentUserObj.username) : 'KSU-SAF-882';
 
     if (!Array.isArray(state.rounds)) state.rounds = [];
 
@@ -12281,6 +12343,15 @@ function saveNewInspectionRound() {
           violationCount: violation,
           notes,
           signature: inspector,
+          loopNo: resolvedLoop,
+          devicesNo: resolvedDevices,
+          zone: resolvedZone,
+          facpAssetId: resolvedFacpId,
+          facpControlNo: resolvedFacpControlNo,
+          facpName: resolvedFacpName,
+          facpStatus: resolvedFacpStatus,
+          facpOperationalStatus: resolvedFacpOpStatus,
+          ppmDate: resolvedPpmDate,
           items: state.currentRoundDraft.items,
           workflowHistory: [
             ...(existingRound.workflowHistory || []),
@@ -12353,11 +12424,15 @@ function saveNewInspectionRound() {
       actions,
       elevatorNumbers,
       actualPressure,
-      loopNo,
-      devicesNo,
-      zone,
-      facpAssetId,
-      ppmDate,
+      loopNo: resolvedLoop,
+      devicesNo: resolvedDevices,
+      zone: resolvedZone,
+      facpAssetId: resolvedFacpId,
+      facpControlNo: resolvedFacpControlNo,
+      facpName: resolvedFacpName,
+      facpStatus: resolvedFacpStatus,
+      facpOperationalStatus: resolvedFacpOpStatus,
+      ppmDate: resolvedPpmDate,
       blok,
       photos,
       items: state.currentRoundDraft.items,
@@ -12388,6 +12463,7 @@ function saveNewInspectionRound() {
       localStorage.setItem(STORAGE_KEY_ROUNDS, serialized);
       localStorage.setItem('ksumc_field_rounds', serialized);
       localStorage.setItem('ksumc_rounds_registry', serialized);
+      localStorage.setItem('ksumc_rounds', serialized);
     } catch (lsErr) {
       console.warn('LocalStorage save error:', lsErr);
     }

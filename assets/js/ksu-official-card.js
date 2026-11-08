@@ -177,7 +177,36 @@
           </span>
         </div>
       `;
-    } else if (fType === 'wet_chem' || fType === 'fas_insp' || fType === 'fm200') {
+    } else if (fType === 'fas_insp' || fType === 'fas_test') {
+      const ctrlNo = round.facpControlNo || (round.facpAssetId ? round.facpAssetId.replace('FACP-', '') : '');
+      const panelLabel = ctrlNo ? `[${ctrlNo}] ${round.facpName || 'لوحة إنذار الحريق'}` : (round.facpName || round.facpAssetId || 'لوحة إنذار الحريق الرئيسية');
+      const loop = round.loopNo ? `${round.loopNo} دائرة` : '1 دائرة';
+      const devices = round.devicesNo ? `${round.devicesNo} نقطة/جهاز` : 'معتمد';
+      const zone = round.zone || 'كامل المبنى';
+      const ppm = round.ppmDate || 'ساري ومحدث';
+      const isTrouble = (round.facpStatus && round.facpStatus.includes('عطل')) || (round.facpOperationalStatus && round.facpOperationalStatus.includes('Trouble')) || ctrlNo === 'NM-0022113';
+
+      specializedParamsHtml = `
+        <div style="margin-bottom: 8px; padding: 6px 10px; background: ${isTrouble ? '#fffbeb' : '#fef2f2'}; border: 1.5px solid ${isTrouble ? '#f59e0b' : '#dc2626'}; border-radius: 6px; font-size: 8.5px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; border-bottom: 1px dashed ${isTrouble ? '#fde68a' : '#fca5a5'}; padding-bottom: 4px;">
+            <div>
+              <strong style="color: ${isTrouble ? '#b45309' : '#991b1b'};">لوحة إنذار الحريق (FACP Panel):</strong>
+              <span style="font-weight: bold; color: #0f172a; margin-right: 4px;">${panelLabel}</span>
+            </div>
+            <div>
+              <strong style="color: ${isTrouble ? '#b45309' : '#991b1b'};">منطقة التغطية (Zone):</strong>
+              <span style="font-weight: bold; color: #1e293b; margin-right: 4px;">${zone}</span>
+            </div>
+            ${isTrouble ? '<span style="background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; padding: 1px 6px; border-radius: 4px; font-weight: bold;">⚠️ تنبيه عطل (Trouble)</span>' : '<span style="background: #dcfce7; color: #166534; border: 1px solid #86efac; padding: 1px 6px; border-radius: 4px; font-weight: bold;">✓ تعمل (Active)</span>'}
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+            <div><strong style="color: ${isTrouble ? '#b45309' : '#991b1b'};">عدد الدوائر (Loops):</strong> <span style="font-family: monospace; font-weight: bold;">${loop}</span></div>
+            <div><strong style="color: ${isTrouble ? '#b45309' : '#991b1b'};">الأجهزة والنقاط:</strong> <span style="font-weight: bold;">${devices}</span></div>
+            <div><strong style="color: ${isTrouble ? '#b45309' : '#991b1b'};">تاريخ صيانة PPM:</strong> <span style="font-weight: bold; color: #16a34a;">${ppm}</span></div>
+          </div>
+        </div>
+      `;
+    } else if (fType === 'wet_chem' || fType === 'fm200') {
       const loop = round.loopNo || 'LOOP-01';
       const devices = round.devicesNo || '32 نقطة';
       const ppm = round.ppmDate || 'ساري ومحدث';
@@ -676,64 +705,195 @@
     } else if (formType === 'fas_insp' || formType === 'fas_test') {
       container.classList.remove('hidden');
       const curBld = document.getElementById('inp-round-building')?.value || (window.state && window.state.currentRoundDraft && window.state.currentRoundDraft.building) || 'المستشفى';
-      const curFlr = document.getElementById('inp-round-floor')?.value || (window.state && window.state.currentRoundDraft && window.state.currentRoundDraft.floor) || 'all';
-
       const allFacp = (typeof getAllFacpAssets === 'function') ? getAllFacpAssets() : ((typeof KSU_FACP_ASSETS !== 'undefined') ? KSU_FACP_ASSETS : []);
-      const bldFacp = curBld === 'all'
-        ? allFacp
-        : allFacp.filter(a => (typeof matchBuilding === 'function') ? matchBuilding(a.building || a.buildingTab, curBld) : true);
+      const draftAssetId = window.state && window.state.currentRoundDraft && window.state.currentRoundDraft.facpAssetId;
       
-      const floorFacp = curFlr === 'all'
-        ? bldFacp
-        : bldFacp.filter(a => (typeof matchFloor === 'function') ? matchFloor(a.floor, curFlr) : true);
+      let initialPanel = null;
+      if (draftAssetId) {
+        initialPanel = allFacp.find(p => p.id === draftAssetId || p.controlNo === draftAssetId) || null;
+      }
+      if (!initialPanel && curBld && curBld !== 'all') {
+        initialPanel = allFacp.find(a => (typeof matchBuilding === 'function') ? matchBuilding(a.building || a.buildingTab, curBld) : true) || null;
+      }
+      if (!initialPanel && allFacp.length > 0) {
+        initialPanel = allFacp[0];
+      }
 
-      const targetList = floorFacp.length > 0 ? floorFacp : bldFacp;
-      const initialPanel = targetList[0] || null;
+      const panelsCardsHtml = allFacp.map(panel => {
+        const isTrouble = (panel.controlNo === 'NM-0022113') || (panel.operationalStatus && panel.operationalStatus.includes('Trouble')) || (panel.status && panel.status.includes('عطل'));
+        const isSelected = initialPanel && initialPanel.id === panel.id;
+
+        return `
+          <div id="facp-card-${panel.id}"
+               data-panel-id="${panel.id}"
+               data-control-no="${panel.controlNo}"
+               data-building-code="${panel.buildingCode}"
+               data-zone="${panel.zone || ''}"
+               onclick="window.selectFacpPanelCard('${panel.id}')"
+               class="facp-panel-card cursor-pointer p-3 rounded-xl border-2 transition-all flex flex-col justify-between gap-2 shadow-2xs ${
+                 isSelected
+                   ? 'border-red-600 bg-red-50/90 ring-1 ring-red-400'
+                   : (isTrouble ? 'border-amber-300 bg-amber-50/40 hover:border-amber-400' : 'border-slate-200 bg-white hover:border-red-300 hover:bg-slate-50/60')
+               }">
+            
+            <!-- Card Top Header -->
+            <div class="flex items-center justify-between gap-1.5">
+              <div class="flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-sm text-slate-500">apartment</span>
+                <span class="text-[11px] font-extrabold text-[#002B49]">${panel.buildingTab || panel.building} (${panel.buildingCode}) • ${panel.floor}</span>
+              </div>
+              ${isTrouble ? `
+                <span class="px-2 py-0.5 rounded-full text-[9.5px] font-black bg-amber-100 text-amber-950 border border-amber-400 flex items-center gap-1 shadow-2xs">
+                  <span class="material-symbols-outlined text-xs text-amber-700">warning</span>
+                  <span>يوجد إشارة عطل (Trouble)</span>
+                </span>
+              ` : `
+                <span class="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                  <span class="material-symbols-outlined text-xs text-emerald-600">check_circle</span>
+                  <span>سليم وتعمل (Active)</span>
+                </span>
+              `}
+            </div>
+
+            <!-- Card Body -->
+            <div class="flex items-center justify-between gap-2 pt-0.5">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined facp-card-radio text-lg ${isSelected ? 'text-red-600' : 'text-slate-400'}">
+                  ${isSelected ? 'radio_button_checked' : 'radio_button_unchecked'}
+                </span>
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-mono font-black text-xs px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-red-950">${panel.controlNo}</span>
+                    <span class="text-xs font-bold text-slate-900 truncate max-w-[190px]">${panel.name}</span>
+                  </div>
+                  <span class="text-[10px] font-medium text-slate-600 block mt-0.5">منطقة: <strong class="text-slate-800">${panel.zone}</strong></span>
+                </div>
+              </div>
+            </div>
+
+            ${isTrouble ? `
+              <div class="text-[9.5px] font-bold text-amber-900 bg-amber-100/70 p-1.5 rounded-lg border border-amber-300 flex items-center gap-1">
+                <span class="material-symbols-outlined text-xs text-amber-700">report</span>
+                <span>تنبيه: اللوحة مسجل عليها إشارة عطل - تتطلب معاينة دقيقة وملاحظات تصحيحية (CAPA)</span>
+              </div>
+            ` : ''}
+
+            <!-- Card Footer Metrics -->
+            <div class="flex items-center justify-between pt-1 border-t border-slate-200/80 text-[10px] font-bold text-slate-600">
+              <div class="flex items-center gap-3">
+                <span>الدوائر: <strong class="text-red-700 font-mono">${panel.loopsCount}</strong> Loops</span>
+                <span>الأجهزة: <strong class="text-slate-800 font-mono">${panel.devicesCount}</strong></span>
+              </div>
+              <span class="text-slate-500 font-medium">PPM: ${panel.nextPpmDate || 'محدث'}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      const dropdownOptionsHtml = allFacp.map(p =>
+        `<option value="${p.id}" ${initialPanel && initialPanel.id === p.id ? 'selected' : ''}>[${p.controlNo}] ${p.name} — ${p.floor}</option>`
+      ).join('') + `<option value="custom">✏️ إدخال لوحة يدوياً / أخرى...</option>`;
 
       container.innerHTML = `
-        <div class="p-3.5 rounded-2xl bg-red-50/70 border border-red-200 flex flex-col gap-2.5">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-            <span class="text-xs font-bold text-red-950 flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-base text-red-700">emergency_home</span>
-              <span>لوحة إنذار الحريق المستهدفة بالفحص (FACP Selection):</span>
-            </span>
-            <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-red-100 text-red-900 border border-red-200">
-              المتوفر بالمبنى: ${bldFacp.length} لوحة | بالدور: ${floorFacp.length} لوحة
-            </span>
+        <div class="p-4 rounded-2xl bg-gradient-to-b from-red-50/70 to-slate-50/80 border-2 border-red-200 shadow-sm space-y-3">
+          <!-- Header Bar -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-red-100">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-red-600 text-xl">emergency_home</span>
+              <div>
+                <h4 class="text-xs font-black text-[#002B49] flex items-center gap-1.5">
+                  <span>سجل لوحات إنذار الحريق المعتمدة</span>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-800 border border-red-300">FACP Registry</span>
+                </h4>
+                <p class="text-[10px] font-semibold text-slate-500">اختر لوحة التحكم المستهدفة بالفحص والمطابقة الدورية (SBC 801 / NFPA 72)</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-bold px-2.5 py-1 rounded-xl bg-white border border-slate-200 text-slate-700 shadow-2xs">
+                إجمالي: <strong class="text-red-600">10 لوحات</strong> | <strong class="text-slate-800">47 دائرة</strong>
+              </span>
+            </div>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <div>
-              <label class="text-[10px] font-bold text-slate-700 block mb-1">اختر اللوحة المسجلة في هذا المبنى والدور:</label>
-              <select id="sel-round-facp-asset" onchange="window.onFacpPanelSelectChange(this.value)" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-red-300 text-xs font-bold text-red-950 outline-none focus:ring-2 focus:ring-red-500">
-                ${bldFacp.length === 0 ? `<option value="">(لا توجد لوحات مسجلة بهذا المبنى)</option>` :
-                  bldFacp.map(p => `<option value="${p.id}" ${initialPanel && initialPanel.id === p.id ? 'selected' : ''}>[${p.controlNo}] ${p.name} — ${p.floor}</option>`).join('')
-                }
-                <option value="custom">✏️ إدخال لوحة يدوياً / أخرى...</option>
+          <!-- Building Filter Pills -->
+          <div>
+            <label class="text-[11px] font-bold text-slate-700 block mb-1.5">تصفية سريعة حسب المبنى المعتمد:</label>
+            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+              <button type="button" onclick="window.setFacpBuildingFilter('all')" data-facp-pill="all" class="facp-filter-pill px-3 py-1.5 rounded-xl font-bold transition-all shadow-2xs bg-red-600 text-white">الكل (10)</button>
+              <button type="button" onclick="window.setFacpBuildingFilter('C')" data-facp-pill="C" class="facp-filter-pill px-3 py-1.5 rounded-xl font-semibold transition-all bg-white border border-slate-300 text-slate-700 hover:bg-slate-100">المبنى الشرقي C (2)</button>
+              <button type="button" onclick="window.setFacpBuildingFilter('A')" data-facp-pill="A" class="facp-filter-pill px-3 py-1.5 rounded-xl font-semibold transition-all bg-white border border-slate-300 text-slate-700 hover:bg-slate-100">المستشفى الرئيسي A (5)</button>
+              <button type="button" onclick="window.setFacpBuildingFilter('D')" data-facp-pill="D" class="facp-filter-pill px-3 py-1.5 rounded-xl font-semibold transition-all bg-white border border-slate-300 text-slate-700 hover:bg-slate-100">الإداري D (1)</button>
+              <button type="button" onclick="window.setFacpBuildingFilter('H')" data-facp-pill="H" class="facp-filter-pill px-3 py-1.5 rounded-xl font-semibold transition-all bg-white border border-slate-300 text-slate-700 hover:bg-slate-100">العناية المركزة H (1)</button>
+              <button type="button" onclick="window.setFacpBuildingFilter('O')" data-facp-pill="O" class="facp-filter-pill px-3 py-1.5 rounded-xl font-semibold transition-all bg-white border border-slate-300 text-slate-700 hover:bg-slate-100">المستودعات O (1)</button>
+            </div>
+          </div>
+
+          <!-- Live Search Bar -->
+          <div class="relative">
+            <span class="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-lg">search</span>
+            <input type="text" id="inp-facp-search" oninput="window.filterFacpPanels()" placeholder="بحث فوري برقم اللوحة (مثال: FA0074...)، المنطقة، أو المبنى..." class="w-full pr-10 pl-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-semibold text-slate-800 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-400">
+          </div>
+
+          <!-- Visual Panels Grid -->
+          <div id="facp-panels-grid" class="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-[340px] overflow-y-auto pr-1">
+            ${panelsCardsHtml}
+          </div>
+          <div id="facp-empty-state" class="hidden p-6 rounded-xl bg-white border border-dashed border-slate-300 text-center flex flex-col items-center gap-1.5">
+            <span class="material-symbols-outlined text-2xl text-slate-400">search_off</span>
+            <span class="text-xs font-bold text-slate-700">لا توجد لوحات مطابقة للبحث أو التصفية الحالية</span>
+          </div>
+
+          <!-- Selected Panel Banner & Synchronized Form Fields -->
+          <div id="facp-selected-panel-banner" class="p-3 rounded-xl bg-white border border-red-300 shadow-2xs space-y-2.5">
+            <!-- Dropdown (Synchronized with selectFacpPanelCard) -->
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-red-600 text-base">check_circle</span>
+                <span class="text-[11px] font-bold text-[#002B49]">اللوحة المختارة المعتمدة:</span>
+                <span id="facp-selected-panel-title" class="text-xs font-black text-red-700">${initialPanel ? `[${initialPanel.controlNo}] ${initialPanel.name} — ${initialPanel.floor}` : 'لم يتم التحديد'}</span>
+              </div>
+              <select id="sel-round-facp-asset" onchange="window.onFacpPanelSelectChange(this.value)" class="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-100 border border-slate-300 text-slate-800 outline-none">
+                ${dropdownOptionsHtml}
               </select>
             </div>
-            <div>
-              <label class="text-[10px] font-bold text-slate-700 block mb-1">منطقة التغطية (Zone Coverage):</label>
-              <input type="text" id="inp-round-zone" placeholder="مثال: كامل المبنى أو B2/B1/0/1/2" value="${initialPanel ? (initialPanel.zone || '') : ''}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-red-300 text-xs font-bold text-slate-800 outline-none">
-            </div>
-          </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <div>
-              <label class="text-[10px] font-bold text-slate-700 block mb-1">رقم الدائرة (Loop NO):</label>
-              <input type="text" id="inp-round-loop" placeholder="مثال: 10 دوائر" value="${initialPanel ? initialPanel.loopsCount : '1'}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-red-300 text-xs font-bold text-slate-800 outline-none">
+            <!-- Synchronized Form Inputs -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label class="text-[10px] font-bold text-slate-700 block mb-0.5">منطقة التغطية (Zone Coverage):</label>
+                <input type="text" id="inp-round-zone" value="${initialPanel ? (initialPanel.zone || '') : ''}" placeholder="مثال: كامل المبنى أو B2/B1/0/1/2" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-red-500">
+              </div>
+              <div>
+                <label class="text-[10px] font-bold text-slate-700 block mb-0.5">موقع اللوحة / الغرفة الفنية:</label>
+                <input type="text" id="inp-round-room" value="${initialPanel ? (initialPanel.room || '') : ''}" placeholder="غرفة لوحات الإنذار" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-red-500">
+              </div>
             </div>
-            <div>
-              <label class="text-[10px] font-bold text-slate-700 block mb-1">عدد الأجهزة والحساسات (Devices NO):</label>
-              <input type="text" id="inp-round-devices" placeholder="مثال: 1487 جهازاً" value="${initialPanel ? (initialPanel.devicesCount || '') : ''}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-red-300 text-xs font-bold text-slate-800 outline-none">
-            </div>
-            <div>
-              <label class="text-[10px] font-bold text-slate-700 block mb-1">تاريخ الـ PPM القادم:</label>
-              <input type="date" id="inp-round-ppm-date" value="${initialPanel && initialPanel.nextPpmDate ? initialPanel.nextPpmDate : ''}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-red-300 text-xs font-bold text-slate-800 outline-none">
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div>
+                <label class="text-[10px] font-bold text-slate-700 block mb-0.5">عدد الدوائر (Loops NO):</label>
+                <input type="text" id="inp-round-loop" value="${initialPanel ? initialPanel.loopsCount : '1'}" placeholder="مثال: 10" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-red-500">
+              </div>
+              <div>
+                <label class="text-[10px] font-bold text-slate-700 block mb-0.5">عدد الأجهزة والنقاط (Devices NO):</label>
+                <input type="text" id="inp-round-devices" value="${initialPanel ? (initialPanel.devicesCount || '') : ''}" placeholder="مثال: 1487" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-red-500">
+              </div>
+              <div>
+                <label class="text-[10px] font-bold text-slate-700 block mb-0.5">تاريخ الصيانة الدورية (PPM Date):</label>
+                <input type="date" id="inp-round-ppm-date" value="${initialPanel && initialPanel.nextPpmDate ? initialPanel.nextPpmDate : ''}" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-red-500">
+              </div>
             </div>
           </div>
         </div>
       `;
+
+      if (initialPanel) {
+        setTimeout(() => {
+          if (typeof window.selectFacpPanelCard === 'function') {
+            window.selectFacpPanelCard(initialPanel.id);
+          }
+        }, 10);
+      }
     } else if (formType === 'wet_chem' || formType === 'fm200') {
       container.classList.remove('hidden');
       container.innerHTML = `
@@ -1147,14 +1307,101 @@
   };
 
   /**
-   * دالة المزامنة التلقائية عند اختيار لوحة إنذار حريق من القائمة
+   * إدارة تفاعلية متكاملة لسجل لوحات إنذار الحريق (FACP Panel Registry)
    */
-  window.onFacpPanelSelectChange = function(panelId) {
-    if (!panelId || panelId === 'custom') return;
+  window._activeFacpFilter = 'all';
+
+  window.setFacpBuildingFilter = function(filterKey) {
+    window._activeFacpFilter = filterKey || 'all';
+    document.querySelectorAll('.facp-filter-pill').forEach(btn => {
+      const pillKey = btn.getAttribute('data-facp-pill');
+      if (pillKey === window._activeFacpFilter) {
+        btn.className = 'facp-filter-pill px-3 py-1.5 rounded-xl font-bold transition-all shadow-2xs bg-red-600 text-white';
+      } else {
+        btn.className = 'facp-filter-pill px-3 py-1.5 rounded-xl font-semibold transition-all bg-white border border-slate-300 text-slate-700 hover:bg-slate-100';
+      }
+    });
+    if (typeof window.filterFacpPanels === 'function') {
+      window.filterFacpPanels();
+    }
+  };
+
+  window.filterFacpPanels = function() {
+    const searchVal = (document.getElementById('inp-facp-search')?.value || '').trim().toLowerCase();
+    const currentFilter = window._activeFacpFilter || 'all';
+    let visibleCount = 0;
+
+    document.querySelectorAll('.facp-panel-card').forEach(card => {
+      const bldCode = card.getAttribute('data-building-code') || '';
+      const ctrlNo = (card.getAttribute('data-control-no') || '').toLowerCase();
+      const zone = (card.getAttribute('data-zone') || '').toLowerCase();
+      const textContent = (card.textContent || '').toLowerCase();
+
+      const matchesFilter = (currentFilter === 'all') || (bldCode === currentFilter);
+      const matchesSearch = !searchVal || ctrlNo.includes(searchVal) || zone.includes(searchVal) || textContent.includes(searchVal);
+
+      if (matchesFilter && matchesSearch) {
+        card.style.display = '';
+        visibleCount++;
+      } else {
+        card.style.display = 'none';
+      }
+    });
+
+    const emptyEl = document.getElementById('facp-empty-state');
+    if (emptyEl) {
+      if (visibleCount === 0) {
+        emptyEl.classList.remove('hidden');
+        emptyEl.classList.add('flex');
+      } else {
+        emptyEl.classList.add('hidden');
+        emptyEl.classList.remove('flex');
+      }
+    }
+  };
+
+  window.selectFacpPanelCard = function(panelId) {
+    if (!panelId) return;
     const allFacp = (typeof getAllFacpAssets === 'function') ? getAllFacpAssets() : ((typeof KSU_FACP_ASSETS !== 'undefined') ? KSU_FACP_ASSETS : []);
-    const panel = allFacp.find(p => p.id === panelId);
+    const panel = allFacp.find(p => p.id === panelId || p.controlNo === panelId);
     if (!panel) return;
 
+    // 1. Update visual card borders and radio icons
+    document.querySelectorAll('.facp-panel-card').forEach(card => {
+      const cardId = card.getAttribute('data-panel-id');
+      const isThis = cardId === panel.id;
+      const isTrouble = (card.getAttribute('data-control-no') === 'NM-0022113') || card.innerHTML.includes('Trouble');
+
+      if (isThis) {
+        card.className = 'facp-panel-card cursor-pointer p-3 rounded-xl border-2 transition-all flex flex-col justify-between gap-2 shadow-xs border-red-600 bg-red-50/90 ring-1 ring-red-400';
+        const radio = card.querySelector('.facp-card-radio');
+        if (radio) {
+          radio.textContent = 'radio_button_checked';
+          radio.className = 'material-symbols-outlined facp-card-radio text-lg text-red-600';
+        }
+      } else {
+        card.className = `facp-panel-card cursor-pointer p-3 rounded-xl border-2 transition-all flex flex-col justify-between gap-2 shadow-2xs ${
+          isTrouble ? 'border-amber-300 bg-amber-50/40 hover:border-amber-400' : 'border-slate-200 bg-white hover:border-red-300 hover:bg-slate-50/60'
+        }`;
+        const radio = card.querySelector('.facp-card-radio');
+        if (radio) {
+          radio.textContent = 'radio_button_unchecked';
+          radio.className = 'material-symbols-outlined facp-card-radio text-lg text-slate-400';
+        }
+      }
+    });
+
+    // 2. Synchronize Dropdown and Banner
+    const selDropdown = document.getElementById('sel-round-facp-asset');
+    if (selDropdown) {
+      selDropdown.value = panel.id;
+    }
+    const bannerTitle = document.getElementById('facp-selected-panel-title');
+    if (bannerTitle) {
+      bannerTitle.textContent = `[${panel.controlNo}] ${panel.name} — ${panel.floor}`;
+    }
+
+    // 3. Auto-populate specialized inputs
     const loopInp = document.getElementById('inp-round-loop');
     const devInp = document.getElementById('inp-round-devices');
     const zoneInp = document.getElementById('inp-round-zone');
@@ -1167,21 +1414,70 @@
     if (ppmInp && panel.nextPpmDate) ppmInp.value = panel.nextPpmDate;
     if (roomInp && panel.room) roomInp.value = panel.room;
 
-    if (panel.floor) {
-      const floorSelect = document.getElementById('inp-round-floor');
-      if (floorSelect && typeof window.matchFloor === 'function' && !window.matchFloor(floorSelect.value, panel.floor)) {
-        const matchOpt = Array.from(floorSelect.options).find(o => window.matchFloor(o.value, panel.floor));
-        if (matchOpt) {
-          floorSelect.value = matchOpt.value;
-          if (window.state && window.state.currentRoundDraft) {
-            window.state.currentRoundDraft.floor = matchOpt.value;
-          }
-          if (typeof renderFloorAssetsReconciliation === 'function') {
-            renderFloorAssetsReconciliation();
-          }
+    // 4. Synchronize Building and Floor dropdowns in modal
+    const bldSelect = document.getElementById('inp-round-building');
+    if (bldSelect) {
+      const targetBldOpt = Array.from(bldSelect.options).find(opt => {
+        const v = opt.value;
+        if (v === panel.building || v === panel.buildingTab) return true;
+        if (typeof window.resolveCanonicalBuildingCode === 'function' && window.resolveCanonicalBuildingCode(v) === panel.buildingCode) return true;
+        if (typeof window.matchBuilding === 'function' && window.matchBuilding(v, panel.building)) return true;
+        return false;
+      });
+      if (targetBldOpt) {
+        bldSelect.value = targetBldOpt.value;
+        if (window.state && window.state.currentRoundDraft) {
+          window.state.currentRoundDraft.building = targetBldOpt.value;
+        }
+        if (typeof window.populateRoundFloorOptions === 'function') {
+          window.populateRoundFloorOptions(targetBldOpt.value, panel.floor);
         }
       }
     }
+
+    const floorSelect = document.getElementById('inp-round-floor');
+    if (floorSelect && panel.floor) {
+      const targetFloorOpt = Array.from(floorSelect.options).find(opt => {
+        if (typeof window.matchFloor === 'function' && window.matchFloor(opt.value, panel.floor)) return true;
+        if (opt.value.includes(panel.floorCode) || opt.text.includes(panel.floorCode)) return true;
+        return false;
+      });
+      if (targetFloorOpt) {
+        floorSelect.value = targetFloorOpt.value;
+        if (window.state && window.state.currentRoundDraft) {
+          window.state.currentRoundDraft.floor = targetFloorOpt.value;
+        }
+      }
+    }
+
+    // 5. Update draft state
+    if (window.state && window.state.currentRoundDraft) {
+      window.state.currentRoundDraft.facpAssetId = panel.id;
+      window.state.currentRoundDraft.facpControlNo = panel.controlNo;
+      window.state.currentRoundDraft.facpName = panel.name;
+      window.state.currentRoundDraft.facpStatus = panel.status;
+      window.state.currentRoundDraft.facpOperationalStatus = panel.operationalStatus;
+      window.state.currentRoundDraft.zone = panel.zone;
+      window.state.currentRoundDraft.loopNo = panel.loopsCount;
+      window.state.currentRoundDraft.devicesNo = panel.devicesCount;
+      window.state.currentRoundDraft.ppmDate = panel.nextPpmDate;
+    }
+
+    // 6. Update Floor Assets Reconciliation table if present
+    if (typeof window.renderFloorAssetsReconciliation === 'function') {
+      try { window.renderFloorAssetsReconciliation(); } catch (_) {}
+    }
+  };
+
+  /**
+   * دالة المزامنة عند تغيير القائمة المنسدلة
+   */
+  window.onFacpPanelSelectChange = function(panelId) {
+    if (!panelId) return;
+    if (panelId === 'custom') {
+      return;
+    }
+    window.selectFacpPanelCard(panelId);
   };
 
 })();
