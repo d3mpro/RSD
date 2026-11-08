@@ -507,7 +507,7 @@
           const res = await this.request('/ai/analyze-inspection-image', {
             method: 'POST',
             body: JSON.stringify(payload)
-          }, 45000);
+          }, isFirebase ? 15000 : 35000);
           if (res && res.success && res.data) {
             res.data = this.applyStaticReferenceMapping(res.data, submode || checklistType);
             res.data.ai_engine_source = res.source || 'Oracle Qwen2.5-VL Agent';
@@ -522,7 +522,7 @@
       if (isFirebase) {
         try {
           if (typeof onProgress === 'function') onProgress('جاري فحص جسر الفايربيس اللحظي...');
-          const bridgeRes = await this.dispatchViaFirebaseBridge('analyze-inspection-image', payload, 40000);
+          const bridgeRes = await this.dispatchViaFirebaseBridge('analyze-inspection-image', payload, 20000);
           if (bridgeRes && bridgeRes.success && bridgeRes.data) {
             bridgeRes.data = this.applyStaticReferenceMapping(bridgeRes.data, submode || checklistType);
             bridgeRes.data.ai_engine_source = bridgeRes.source || 'Oracle Ollama (via Firebase Bridge)';
@@ -610,10 +610,11 @@
         .map(k => k.trim())
         .filter(Boolean);
       const defaultKey = 'AQ.Ab8RN6K-cWBO2DLr-uuccKEbUvakPdEhwL9qMV4DMjeYggHF0w';
-      const keys = keyPool.length > 0 ? keyPool : [defaultKey];
-      if (!keys.includes(defaultKey)) keys.push(defaultKey);
-      const geminiKey = keys[(this._geminiKeyIdx++) % keys.length];
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+      const keys = [];
+      const sourcePool = keyPool.length > 0 ? keyPool : [defaultKey];
+      for (const candidate of sourcePool) {
+        if (candidate && !keys.includes(candidate)) keys.push(candidate);
+      }
 
       const parts = [];
       for (const img of (images || [])) {
@@ -639,47 +640,95 @@
         ? `\nسياق الموقع: المنشأة: ${facility || 'المدينة الطبية (KSUMC)'} | المبنى: ${building || ''} | الدور: ${floor || ''} | الموقع: ${itemLabel || ''} | ملاحظة المفتش: ${notes || ''}`
         : '';
       const promptText = `${this.VISION_SYSTEM_PROMPT}${contextHint}`;
-
       parts.push({ text: promptText });
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 40000);
-
-      const resp = await fetch(geminiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: this.VISION_SYSTEM_PROMPT }]
-          },
-          contents: [{ parts }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.2
-          }
-        }),
-        signal: controller.signal
+      const reqBodyStr = JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: this.VISION_SYSTEM_PROMPT }]
+        },
+        contents: [{ parts }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.2
+        }
       });
-      clearTimeout(timer);
 
-      if (!resp.ok) {
-        const errRaw = await resp.text();
-        throw new Error(`Gemini Cloud API Error ${resp.status}: ${errRaw.slice(0, 100)}`);
+      let lastErr = null;
+      for (let attempt = 0; attempt < keys.length; attempt++) {
+        const geminiKey = keys[(this._geminiKeyIdx++) % keys.length];
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 14000);
+        try {
+          const resp = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: reqBodyStr,
+            signal: controller.signal
+          });
+          clearTimeout(timer);
+
+          if (!resp.ok) {
+            const errRaw = await resp.text();
+            lastErr = new Error(`Gemini Cloud API Error ${resp.status}: ${errRaw.slice(0, 100)}`);
+            continue;
+          }
+
+          const resJson = await resp.json();
+          const rawOutput = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (!rawOutput) {
+            lastErr = new Error('لم يتم استلام محتوى من نموذج الذكاء الاصطناعي');
+            continue;
+          }
+
+          const parsedRaw = this.cleanAndParseJSON(rawOutput);
+          const parsedData = this.applyStaticReferenceMapping(parsedRaw, submode || checklistType);
+          parsedData.ai_engine_source = 'Google Gemini 2.5 Flash Vision';
+
+          return {
+            success: true,
+            data: parsedData,
+            source: 'Google Gemini 2.5 Flash Vision'
+          };
+        } catch (err) {
+          clearTimeout(timer);
+          lastErr = err;
+          if (err && (err.name === 'AbortError' || err instanceof TypeError)) {
+            break;
+          }
+        }
       }
 
-      const resJson = await resp.json();
-      const rawOutput = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      if (!rawOutput) throw new Error('لم يتم استلام محتوى من نموذج الذكاء الاصطناعي');
+      throw lastErr || new Error('تعذر الاتصال بمفاتيح Gemini');
+    },
 
-      const parsedRaw = this.cleanAndParseJSON(rawOutput);
-      const parsedData = this.applyStaticReferenceMapping(parsedRaw, submode || checklistType);
-      parsedData.ai_engine_source = 'Google Gemini 2.5 Flash Vision';
-
-      return {
-        success: true,
-        data: parsedData,
-        source: 'Google Gemini 2.5 Flash Vision'
+    /**
+     * أرشفة الصور عالية الدقة (1280px) ومحضر الضبط في خزنة الوكيل دون تأخير واجهة المفتش
+     */
+    archiveVisualViolationBundle(bundlePayload) {
+      if (!bundlePayload || !bundlePayload.cardId) return Promise.resolve(false);
+      const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com') || window.location.protocol === 'file:';
+      const url = this.getApiUrl('/archive/dispatch');
+      const headers = {
+        'Content-Type': 'application/json',
+        'X-KSUMC-KEY': this.apiKeyHeader
       };
+      return fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(bundlePayload)
+      }).then((resp) => {
+        if (!resp || !resp.ok) throw new Error(`Archive HTTP ${resp ? resp.status : 'ERR'}`);
+        return true;
+      }).catch(async () => {
+        if (isFirebase && typeof this.dispatchViaFirebaseBridge === 'function') {
+          try {
+            await this.dispatchViaFirebaseBridge('archive-dispatch', bundlePayload, 25000);
+            return true;
+          } catch (_) {}
+        }
+        return false;
+      });
     },
 
     /**
@@ -2093,10 +2142,147 @@
   // (Multimodal Safety Vision AI with Google Gemini 2.5)
   // ==============================================================================
 
+  // خزنة الصور عالية الدقة في المتصفح (IndexedDB + بديل الذاكرة الفوري) لمنع امتلاء localStorage و Firebase
+  const KSUMediaVault = (function() {
+    const DB_NAME = 'ksumc_media_vault';
+    const STORE_NAME = 'media_files';
+    const memFallback = new Map();
+    let dbPromise = null;
+
+    function openDb() {
+      if (!window.indexedDB || typeof window.indexedDB.open !== 'function') {
+        return Promise.resolve(null);
+      }
+      if (dbPromise) return dbPromise;
+      dbPromise = new Promise((resolve) => {
+        try {
+          const req = window.indexedDB.open(DB_NAME, 1);
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+              db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+            }
+          };
+          req.onsuccess = (e) => resolve(e.target.result);
+          req.onerror = () => resolve(null);
+        } catch (_) {
+          resolve(null);
+        }
+      });
+      return dbPromise;
+    }
+
+    return {
+      async saveMedia(recordId, imagesArray, meta = {}) {
+        const key = String(recordId || '').trim();
+        if (!key) return false;
+        const cleanImages = Array.isArray(imagesArray)
+          ? imagesArray.filter(Boolean)
+          : (imagesArray ? [imagesArray] : []);
+        const entry = {
+          id: key,
+          images: cleanImages,
+          meta: meta || {},
+          archived: false,
+          savedAt: new Date().toISOString()
+        };
+        memFallback.set(key, entry);
+        const db = await openDb();
+        if (!db) return true;
+        return new Promise((resolve) => {
+          try {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            tx.objectStore(STORE_NAME).put(entry);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(true);
+          } catch (_) {
+            resolve(true);
+          }
+        });
+      },
+
+      async getMedia(recordId) {
+        const key = String(recordId || '').trim();
+        if (!key) return null;
+        const db = await openDb();
+        if (db) {
+          const fromIdb = await new Promise((resolve) => {
+            try {
+              const tx = db.transaction(STORE_NAME, 'readonly');
+              const req = tx.objectStore(STORE_NAME).get(key);
+              req.onsuccess = () => resolve(req.result || null);
+              req.onerror = () => resolve(null);
+            } catch (_) {
+              resolve(null);
+            }
+          });
+          if (fromIdb && Array.isArray(fromIdb.images) && fromIdb.images.length) {
+            return fromIdb.images;
+          }
+        }
+        const mem = memFallback.get(key);
+        return (mem && Array.isArray(mem.images) && mem.images.length) ? mem.images : null;
+      },
+
+      async markArchived(recordId) {
+        const key = String(recordId || '').trim();
+        if (!key) return false;
+        if (memFallback.has(key)) {
+          memFallback.get(key).archived = true;
+        }
+        const db = await openDb();
+        if (!db) return true;
+        return new Promise((resolve) => {
+          try {
+            const tx = db.transaction(STORE_NAME, 'readwrite');
+            const store = tx.objectStore(STORE_NAME);
+            const getReq = store.get(key);
+            getReq.onsuccess = () => {
+              if (getReq.result) {
+                getReq.result.archived = true;
+                getReq.result.archivedAt = new Date().toISOString();
+                store.put(getReq.result);
+              }
+            };
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+          } catch (_) {
+            resolve(false);
+          }
+        });
+      },
+
+      async listAllKeys() {
+        const keys = new Set(memFallback.keys());
+        const db = await openDb();
+        if (db) {
+          await new Promise((resolve) => {
+            try {
+              const tx = db.transaction(STORE_NAME, 'readonly');
+              const req = tx.objectStore(STORE_NAME).getAllKeys();
+              req.onsuccess = () => {
+                (req.result || []).forEach(k => keys.add(String(k)));
+                resolve();
+              };
+              req.onerror = () => resolve();
+            } catch (_) {
+              resolve();
+            }
+          });
+        }
+        return Array.from(keys);
+      }
+    };
+  })();
+  window.KSUMediaVault = KSUMediaVault;
+
   // ضغط الصور محلياً للميدان لتسريع الرفع والاستجابة وتقليل التوكنات بـ 85% (Max 800px, Quality 0.7)
   function compressImageForAI(fileOrDataUrl, maxDimension = 800, quality = 0.7) {
     return new Promise((resolve) => {
       if (!fileOrDataUrl) return resolve('');
+      if (typeof Image === 'undefined' || typeof document === 'undefined' || typeof document.createElement !== 'function') {
+        return resolve(typeof fileOrDataUrl === 'string' ? fileOrDataUrl : '');
+      }
 
       const processImg = (img) => {
         let width = img.naturalWidth || img.width;
@@ -2113,7 +2299,8 @@
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext && canvas.getContext('2d');
+        if (!ctx) return resolve(typeof fileOrDataUrl === 'string' ? fileOrDataUrl : '');
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, width, height);
         ctx.drawImage(img, 0, 0, width, height);
@@ -2139,6 +2326,7 @@
       reader.readAsDataURL(fileOrDataUrl);
     });
   }
+  window.compressImageForAI = compressImageForAI;
 
   // تخزين بيانات الصور المرفوعة مؤقتاً
   const photoCache = {
@@ -2566,7 +2754,7 @@
     const files = e.target.files;
     if (files && files.length > 0) {
       for (let i = 0; i < files.length; i++) {
-        const compressed = await compressImageForAI(files[i]);
+        const compressed = await compressImageForAI(files[i], 1280, 0.78);
         if (compressed) {
           visionImagesList.push(compressed);
         }
@@ -2587,11 +2775,11 @@
   async function processVisionModalFile(fileOrUrl, autoRun = true) {
     if (Array.isArray(fileOrUrl)) {
       for (let item of fileOrUrl) {
-        const compressed = await compressImageForAI(item);
+        const compressed = await compressImageForAI(item, 1280, 0.78);
         if (compressed) visionImagesList.push(compressed);
       }
     } else {
-      const compressed = await compressImageForAI(fileOrUrl);
+      const compressed = await compressImageForAI(fileOrUrl, 1280, 0.78);
       if (compressed) visionImagesList.push(compressed);
     }
     currentActivePreviewIndex = visionImagesList.length - 1;
@@ -3333,23 +3521,23 @@
       // 1.1 Pre-check matching violation checkboxes and description
       const fullText = `${payload.title || ''} ${payload.description || ''} ${d.violation_type || ''}`.toLowerCase();
       if (fullText.includes('تخزين') || fullText.includes('مخلفات') || fullText.includes('كرتون') || fullText.includes('أثاث')) {
-        const chkStorage = document.querySelector('input[name="sv-devices"][value="تخزين مواد بموقع غير مخصص للتخزين"]');
+        const chkStorage = typeof document.querySelector === 'function' ? document.querySelector('input[name="sv-devices"][value="تخزين مواد بموقع غير مخصص للتخزين"]') : null;
         if (chkStorage) chkStorage.checked = true;
       }
       if (fullText.includes('توصيل') || fullText.includes('سلك')) {
-        const chkCable = document.querySelector('input[name="sv-devices"][value="توصيلة كهربائية"]');
+        const chkCable = typeof document.querySelector === 'function' ? document.querySelector('input[name="sv-devices"][value="توصيلة كهربائية"]') : null;
         if (chkCable) chkCable.checked = true;
       }
       if (fullText.includes('سخان')) {
-        const chkHeater = document.querySelector('input[name="sv-devices"][value="سخان"]');
+        const chkHeater = typeof document.querySelector === 'function' ? document.querySelector('input[name="sv-devices"][value="سخان"]') : null;
         if (chkHeater) chkHeater.checked = true;
       }
       if (fullText.includes('غلاية')) {
-        const chkKettle = document.querySelector('input[name="sv-devices"][value="غلاية"]');
+        const chkKettle = typeof document.querySelector === 'function' ? document.querySelector('input[name="sv-devices"][value="غلاية"]') : null;
         if (chkKettle) chkKettle.checked = true;
       }
       if (fullText.includes('مايكرويف')) {
-        const chkMicro = document.querySelector('input[name="sv-devices"][value="مايكرويف"]');
+        const chkMicro = typeof document.querySelector === 'function' ? document.querySelector('input[name="sv-devices"][value="مايكرويف"]') : null;
         if (chkMicro) chkMicro.checked = true;
       }
 
@@ -3483,12 +3671,12 @@
   };
 
   // اعتماد ورفع المخالفة وحفظها تلقائياً بصيغة PDF في الأرشيف الشامل بنفس تصميم كارت الفحص
-  window.approveAndUploadVisualViolation = function() {
+  window.approveAndUploadVisualViolation = async function() {
     const d = lastVisionAnalysisData || window.lastVisionAnalysisData;
     const img = lastVisionAnalysisImage || window.lastVisionAnalysisImage;
     if (!d) {
       alert('لا توجد بيانات فحص بصري لاعتمادها ورفعها.');
-      return;
+      return null;
     }
 
     const building = document.getElementById('sel-vision-building')?.value || window.lastVisionLocation?.building || 'مستشفى الملك خالد الجامعي (KKUH)';
@@ -3509,15 +3697,52 @@
     const today = (KSUAI && typeof KSUAI.getRiyadhDate === 'function') ? KSUAI.getRiyadhDate() : new Date().toISOString().split('T')[0];
     const nowTime = (KSUAI && typeof KSUAI.getRiyadhTime === 'function') ? KSUAI.getRiyadhTime() : new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
 
-    // Generate Official Inspection Card HTML & PDF Template
-    const cardRes = buildVisualInspectionCardHtml(d, img, loc, {
+    const highResImages = (window.lastVisionAnalysisImages && window.lastVisionAnalysisImages.length)
+      ? [...window.lastVisionAnalysisImages]
+      : ((lastVisionAnalysisImages && lastVisionAnalysisImages.length) ? [...lastVisionAnalysisImages] : (img ? [img] : []));
+    const primaryHighRes = highResImages[0] || img || '';
+
+    // Generate Official Inspection Card HTML & PDF Template (using high-res image for server archive)
+    const cardRes = buildVisualInspectionCardHtml(d, primaryHighRes, loc, {
       officerName,
       officerEmpId,
       shift,
       date: today,
       time: nowTime,
-      facility: building
+      facility: building,
+      images: highResImages
     });
+
+    const locationLabel = [building, floor].filter(Boolean).join(' - ') || 'المبنى الرئيسي';
+
+    // 0. حفظ النسخة الأصلية عالية الدقة (1280px) في خزنة المتصفح وخزنة وكيل الرؤية السحابي
+    if (window.KSUMediaVault && highResImages.length) {
+      await window.KSUMediaVault.saveMedia(cardRes.cardId, highResImages, {
+        date: today,
+        facility: building,
+        location: locationLabel,
+        room
+      });
+    }
+    if (KSUAI && typeof KSUAI.archiveVisualViolationBundle === 'function' && highResImages.length) {
+      KSUAI.archiveVisualViolationBundle({
+        cardId: cardRes.cardId,
+        date: today,
+        facility: building,
+        location: locationLabel,
+        severity: 'high',
+        summary: d.findings_summary || d.summary || d.detected_element || '',
+        htmlReport: cardRes.fullPageHtml,
+        images: highResImages,
+        metadata: { officerName, officerEmpId, shift, room }
+      });
+    }
+
+    // تصغير الصور المحفوظة في Firebase / localStorage إلى معاينات رشيقة (<35KB / 480px) مع حذف النصوص المكررة
+    const thumbImages = highResImages.length
+      ? await Promise.all(highResImages.map(src => compressImageForAI(src, 480, 0.6)))
+      : [];
+    const thumbPrimary = thumbImages[0] || (primaryHighRes ? await compressImageForAI(primaryHighRes, 480, 0.6) : '');
 
     const devices = (d.detected_devices && d.detected_devices.length) 
       ? d.detected_devices 
@@ -3529,7 +3754,7 @@
       date: today,
       time: nowTime,
       facility: building,
-      location: [building, floor].filter(Boolean).join(' - ') || 'المبنى الرئيسي',
+      location: locationLabel,
       room: room,
       devices: devices,
       workOrderNumber: d.work_order_number || null,
@@ -3548,17 +3773,19 @@
       routedToTitle: 'المشرف العام الملك خالد (H1)',
       headApprovalStatus: 'approved_by_head',
       isApproved: true,
-      cardInnerHtml: cardRes.cardInnerHtml,
-      fullPageHtml: cardRes.fullPageHtml,
-      photo: img,
-      images: (lastVisionAnalysisImages && lastVisionAnalysisImages.length) ? lastVisionAnalysisImages : (img ? [img] : []),
+      photo: thumbPrimary,
+      images: thumbImages,
+      highResVaulted: true,
       visionData: d,
       hasVisualInspectionCard: true,
       pdfGenerated: true,
       format: 'pdf_card',
+      severity: 'high',
+      timestamp: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      updatedAtMs: Date.now()
+      updatedAtMs: Date.now(),
+      _isOfflinePending: true
     };
 
     // 1. حفظ في التخزين المحلي لسجل المخالفات
@@ -3658,11 +3885,12 @@
     `;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 4000);
+    return newViol;
   };
 
   // الإبقاء على الدالة السابقة كاسم بديل للتوافق البرمجي الكامل
   window.transferVisualResultsToSafetyViolation = function() {
-    window.approveAndUploadVisualViolation();
+    return window.approveAndUploadVisualViolation();
   };
 
   window.broadcastVisualHazardAlert = function() {
@@ -4119,11 +4347,7 @@
     }
   };
 
-  // توليد تصميم كارت الفحص الرسمي لأي مخالفة سلامة (للمعاينة والطباعة في الأرشيف)
-  function buildCardHtmlFromViolation(v) {
-    if (!v) return '';
-    if (v.cardInnerHtml) return v.cardInnerHtml;
-
+  function reconstructVisualCardBundle(v, preferredImg) {
     const devList = Array.isArray(v.devices) ? v.devices : (v.devices ? [v.devices] : ['مخالفة اشتراطات سلامة']);
     const d = v.visionData || {
       risk_level: v.risk_level || 'عالي جداً',
@@ -4143,7 +4367,12 @@
       suggested_directive: v.directive || 'إصدار تعميم إداري صارم لجميع الإدارات والأقسام بالالتزام باشتراطات السلامة ومسارات الإخلاء.'
     };
 
-    const img = v.photo || (v.images && v.images[0]) || null;
+    const overrideList = Array.isArray(preferredImg) ? preferredImg.filter(Boolean) : (preferredImg ? [preferredImg] : null);
+    const img = (overrideList && overrideList[0]) || v.photo || (v.images && v.images[0]) || null;
+    const imagesArr = (overrideList && overrideList.length)
+      ? overrideList
+      : (v.images && v.images.length ? v.images : (img ? [img] : []));
+
     const loc = {
       building: v.facility || 'مستشفى الملك خالد الجامعي (KKUH)',
       floor: v.location || 'الدور الميداني',
@@ -4151,7 +4380,7 @@
       type: 'general'
     };
 
-    const res = buildVisualInspectionCardHtml(d, img, loc, {
+    return buildVisualInspectionCardHtml(d, img, loc, {
       cardId: v.cardId || v.id,
       date: v.date,
       time: v.time,
@@ -4159,17 +4388,29 @@
       inspectorEmpId: v.officerEmpId || '10842',
       shift: v.shift,
       facility: v.facility,
-      images: v.images || (img ? [img] : []),
+      images: imagesArr,
       workOrderNumber: v.workOrderNumber,
       workOrderTrade: v.workOrderTrade
     });
+  }
 
-    return res.cardInnerHtml;
+  // توليد تصميم كارت الفحص الرسمي لأي مخالفة سلامة (للمعاينة والطباعة في الأرشيف)
+  function buildCardHtmlFromViolation(v, preferredImg) {
+    if (!v) return '';
+    if (!preferredImg && v.cardInnerHtml) return v.cardInnerHtml;
+    return reconstructVisualCardBundle(v, preferredImg).cardInnerHtml;
+  }
+
+  function buildFullPageHtmlFromViolation(v, preferredImg) {
+    if (!v) return '';
+    if (!preferredImg && v.fullPageHtml) return v.fullPageHtml;
+    return reconstructVisualCardBundle(v, preferredImg).fullPageHtml;
   }
 
   // إتاحة محركات بناء كارت الفحص ومعاينة المخالفات عالمياً
   window.buildVisualInspectionCardHtml = buildVisualInspectionCardHtml;
   window.buildCardHtmlFromViolation = buildCardHtmlFromViolation;
+  window.buildFullPageHtmlFromViolation = buildFullPageHtmlFromViolation;
   window.ensureAIPrintStylesInstalled = ensureAIPrintStylesInstalled;
   window.triggerIsolatedPrint = triggerIsolatedPrint;
 

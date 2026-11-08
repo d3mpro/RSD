@@ -64,8 +64,8 @@
   <link rel="stylesheet" href="assets/css/styles.css?v=6.8.0" />
   <link rel="stylesheet" href="assets/css/core-theme.css?v=3.4" />
   <script src="assets/js/auth-guard.js?v=4.8.2"></script>
-  <script src="assets/js/ksumc-data-bridge.js?v=6.2"></script>
-  <script src="assets/js/ksu-firebase-realtime.js?v=6.8.0"></script>
+  <script src="assets/js/ksumc-data-bridge.js?v=6.3.0"></script>
+  <script src="assets/js/ksu-firebase-realtime.js?v=6.9.0"></script>
   <script src="assets/js/ksu-system-mode.js?v=1.2"></script>
   <script src="assets/js/ksu-nav-component.js?v=5.14"></script>
   <script>
@@ -722,7 +722,7 @@
             <div class="p-space-md rounded-xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm flex items-center justify-between">
               <div>
                 <span class="text-xs text-on-surface-variant block">مخالفات حرجة معلقة</span>
-                <span class="text-3xl font-extrabold text-emerald-600">0</span>
+                <span class="text-3xl font-extrabold text-emerald-600" id="kpi-critical-viols">0</span>
               </div>
               <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
                 <span class="material-symbols-outlined text-2xl">check_circle</span>
@@ -746,15 +746,28 @@
 
           <!-- Rounds List Section -->
           <div class="flex flex-col gap-space-sm">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <h3 class="text-base font-bold text-primary flex items-center gap-1">
                 <span class="material-symbols-outlined text-secondary">history</span>
-                سجل الجولات الميدانية لليوم
+                سجل الجولات الميدانية (ورديتك)
               </h3>
-              <button onclick="openNewRoundModal()" class="text-xs text-secondary font-bold hover:underline flex items-center gap-1">
-                <span class="material-symbols-outlined text-sm">add</span>
-                إضافة جولة جديدة
-              </button>
+              <div class="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
+                <div class="flex items-center gap-1.5 bg-surface-container-low p-1 rounded-xl border border-outline-variant/30">
+                  <button type="button" id="btn-rounds-filter-all" onclick="setFieldRoundsFilter('all')" class="rounds-quick-filter-btn px-3 py-1.5 rounded-xl bg-primary text-white font-black text-xs shadow-xs transition-all">
+                    الكل (<span id="rounds-filter-count-all">0</span>)
+                  </button>
+                  <button type="button" id="btn-rounds-filter-today" onclick="setFieldRoundsFilter('today')" class="rounds-quick-filter-btn px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs transition-all">
+                    اليوم (<span id="rounds-filter-count-today">0</span>)
+                  </button>
+                  <button type="button" id="btn-rounds-filter-mine" onclick="setFieldRoundsFilter('mine')" class="rounds-quick-filter-btn px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs transition-all">
+                    جولاتي (<span id="rounds-filter-count-mine">0</span>)
+                  </button>
+                </div>
+                <button onclick="openNewRoundModal()" class="text-xs text-secondary font-bold hover:underline flex items-center gap-1 px-2 py-1">
+                  <span class="material-symbols-outlined text-sm">add</span>
+                  إضافة جولة جديدة
+                </button>
+              </div>
             </div>
 
             <!-- Dynamic Rounds Container -->
@@ -4379,10 +4392,10 @@
   <script src="assets/js/ksu-wet-chemical-assets.js?v=1.0" charset="UTF-8"></script>
   <script src="assets/js/qr-scanner.js?v=5.5" charset="UTF-8"></script>
   <script src="assets/js/ksu-official-card.js?v=6.6.3" charset="UTF-8"></script>
-  <script src="assets/js/app.js?v=8.0.0" charset="UTF-8"></script>
+  <script src="assets/js/app.js?v=8.1.0" charset="UTF-8"></script>
   <script src="assets/js/ksu-integrations.js?v=6.0" charset="UTF-8"></script>
   <script src="assets/js/vision-reticle-helper.js?v=7.2.1" charset="UTF-8"></script>
-  <script src="assets/js/ksu-ai-client.js?v=7.2.1" charset="UTF-8"></script>
+  <script src="assets/js/ksu-ai-client.js?v=7.3.0" charset="UTF-8"></script>
 
   <!-- Service Worker Registration for PWA Offline Functionality -->
   <script>
@@ -5117,16 +5130,26 @@
     }
 
     function updateFieldLiveCounters() {
-      const roundsCount = (window.state && Array.isArray(window.state.rounds)) ? window.state.rounds.length : 0;
+      const rawRounds = (window.state && Array.isArray(window.state.rounds)) ? window.state.rounds : [];
+      const scopedRounds = (typeof window.getScopedRoundsForCurrentUser === 'function')
+        ? window.getScopedRoundsForCurrentUser(rawRounds, 'none')
+        : rawRounds;
+      const todayScopedRounds = (typeof window.getScopedRoundsForCurrentUser === 'function')
+        ? window.getScopedRoundsForCurrentUser(rawRounds, 'today')
+        : rawRounds.filter(r => r && r.date === new Date().toISOString().split('T')[0]);
+
       if (window.KSUDataBridge) {
-        const kpis = window.KSUDataBridge.getLiveKPIs();
         const alarmsCount = window.KSUDataBridge.getActiveAlarms().length;
         const viols = window.KSUDataBridge.getViolations();
 
-        const todayRnds = Math.max(roundsCount, kpis.todayRoundsCount || 0);
-        document.getElementById('kpi-today-rounds').textContent = todayRnds;
+        const todayEl = document.getElementById('kpi-today-rounds');
+        if (todayEl) todayEl.textContent = todayScopedRounds.length;
         const totRndsEl = document.getElementById('kpi-total-rounds');
-        if (totRndsEl) totRndsEl.textContent = todayRnds;
+        if (totRndsEl) totRndsEl.textContent = scopedRounds.length;
+        const pendObsEl = document.getElementById('kpi-pending-obs');
+        if (pendObsEl) pendObsEl.textContent = scopedRounds.reduce((sum, r) => sum + (r.observationCount || 0), 0);
+        const critViolEl = document.getElementById('kpi-critical-viols');
+        if (critViolEl) critViolEl.textContent = scopedRounds.reduce((sum, r) => sum + (r.violationCount || 0), 0);
         document.getElementById('kpi-today-violations').textContent = viols.total || 0;
         document.getElementById('kpi-today-alarms').textContent = alarmsCount || 0;
         

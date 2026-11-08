@@ -7723,7 +7723,10 @@ function notifyCloudSync() {
 }
 
 function saveRounds(targetRound) {
-  localStorage.setItem(STORAGE_KEY_ROUNDS, JSON.stringify(state.rounds));
+  const serializedRounds = JSON.stringify(state.rounds || []);
+  localStorage.setItem(STORAGE_KEY_ROUNDS, serializedRounds);
+  localStorage.setItem('ksumc_field_rounds', serializedRounds);
+  localStorage.setItem('ksumc_rounds_registry', serializedRounds);
   if (typeof syncRoundsToShiftInspectionLog === 'function') {
     syncRoundsToShiftInspectionLog();
   }
@@ -7757,9 +7760,18 @@ function saveAlarms(targetAlarm) {
   localStorage.setItem(STORAGE_KEY_ALARMS, JSON.stringify(state.alarms));
   renderAlarmsList();
   updateAlarmBadges();
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveAlarm === 'function') {
-    const payload = targetAlarm || (state.alarms && state.alarms.length > 0 ? state.alarms : null);
-    if (payload) window.KSUOracleSync.saveAlarm(payload);
+  if (!window._ksumcApplyingRemoteSync) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.saveAlarm === 'function') {
+      const payload = targetAlarm || (state.alarms && state.alarms.length > 0 ? state.alarms : null);
+      if (payload) window.KSUOracleSync.saveAlarm(payload);
+    }
+    if (window.ksuFirebaseSync) {
+      if (targetAlarm && typeof window.ksuFirebaseSync.syncAlarm === 'function') {
+        try { window.ksuFirebaseSync.syncAlarm(targetAlarm); } catch (_) {}
+      } else if (typeof window.ksuFirebaseSync.syncAlarmsList === 'function' && Array.isArray(state.alarms)) {
+        try { window.ksuFirebaseSync.syncAlarmsList(state.alarms); } catch (_) {}
+      }
+    }
   }
   notifyCloudSync();
   if (typeof renderHeadOperationalCenter === 'function') renderHeadOperationalCenter();
@@ -7772,9 +7784,18 @@ function savePermits(targetPermit) {
   } catch(_) {}
   renderPermitsList();
   if (typeof updateFieldLiveCounters === 'function') updateFieldLiveCounters();
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.savePermit === 'function') {
-    const payload = targetPermit || (state.permits && state.permits.length > 0 ? state.permits : null);
-    if (payload) window.KSUOracleSync.savePermit(payload);
+  if (!window._ksumcApplyingRemoteSync) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.savePermit === 'function') {
+      const payload = targetPermit || (state.permits && state.permits.length > 0 ? state.permits : null);
+      if (payload) window.KSUOracleSync.savePermit(payload);
+    }
+    if (window.ksuFirebaseSync) {
+      if (targetPermit && typeof window.ksuFirebaseSync.syncPermit === 'function') {
+        try { window.ksuFirebaseSync.syncPermit(targetPermit); } catch (_) {}
+      } else if (typeof window.ksuFirebaseSync.syncPermitsList === 'function' && Array.isArray(state.permits)) {
+        try { window.ksuFirebaseSync.syncPermitsList(state.permits); } catch (_) {}
+      }
+    }
   }
   notifyCloudSync();
   if (typeof renderQualityDoorsAndPermitsInbox === 'function') renderQualityDoorsAndPermitsInbox();
@@ -7782,24 +7803,44 @@ function savePermits(targetPermit) {
 function saveDoors(targetDoor) {
   localStorage.setItem(STORAGE_KEY_DOORS, JSON.stringify(state.doors));
   renderDoorsList();
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveDoor === 'function') {
-    const payload = targetDoor || (state.doors && state.doors.length > 0 ? state.doors : null);
-    if (payload) window.KSUOracleSync.saveDoor(payload);
+  if (!window._ksumcApplyingRemoteSync) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.saveDoor === 'function') {
+      const payload = targetDoor || (state.doors && state.doors.length > 0 ? state.doors : null);
+      if (payload) window.KSUOracleSync.saveDoor(payload);
+    }
+    if (window.ksuFirebaseSync) {
+      if (targetDoor && typeof window.ksuFirebaseSync.syncDoor === 'function') {
+        try { window.ksuFirebaseSync.syncDoor(targetDoor); } catch (_) {}
+      } else if (typeof window.ksuFirebaseSync.syncDoorsList === 'function' && Array.isArray(state.doors)) {
+        try { window.ksuFirebaseSync.syncDoorsList(state.doors); } catch (_) {}
+      }
+    }
   }
   notifyCloudSync();
   if (typeof renderQualityDoorsAndPermitsInbox === 'function') renderQualityDoorsAndPermitsInbox();
 }
 function saveCAPA(targetCAPA) {
   if (!state.capa) state.capa = [];
+  const serializedCapa = JSON.stringify(state.capa);
   if (window.KSUBridge && typeof window.KSUBridge.writeList === 'function') {
     window.KSUBridge.writeList('ksumc_capa_registry', state.capa);
   } else {
-    localStorage.setItem('ksumc_capa_registry', JSON.stringify(state.capa));
+    localStorage.setItem('ksumc_capa_registry', serializedCapa);
   }
+  localStorage.setItem('ksumc_capa_records', serializedCapa);
   if (typeof renderFieldCAPARegistry === 'function') renderFieldCAPARegistry();
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveCAPA === 'function') {
-    const payload = targetCAPA || (state.capa && state.capa.length > 0 ? state.capa : null);
-    if (payload) window.KSUOracleSync.saveCAPA(payload);
+  if (!window._ksumcApplyingRemoteSync) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.saveCAPA === 'function') {
+      const payload = targetCAPA || (state.capa && state.capa.length > 0 ? state.capa : null);
+      if (payload) window.KSUOracleSync.saveCAPA(payload);
+    }
+    if (window.ksuFirebaseSync) {
+      if (targetCAPA && typeof window.ksuFirebaseSync.syncCAPARecord === 'function') {
+        try { window.ksuFirebaseSync.syncCAPARecord(targetCAPA); } catch (_) {}
+      } else if (typeof window.ksuFirebaseSync.syncCAPAList === 'function' && Array.isArray(state.capa)) {
+        try { window.ksuFirebaseSync.syncCAPAList(state.capa); } catch (_) {}
+      }
+    }
   }
   notifyCloudSync();
 }
@@ -7807,22 +7848,40 @@ function saveSafetyViolations(targetViol) {
   localStorage.setItem(STORAGE_KEY_SAFETY_VIOLATIONS, JSON.stringify(state.safetyViolations));
   renderSafetyViolations();
   updateViolationBadges();
-  notifyCloudSync();
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveSafetyViolation === 'function') {
-    const payload = targetViol || (state.safetyViolations && state.safetyViolations.length > 0 ? state.safetyViolations : null);
-    if (payload) window.KSUOracleSync.saveSafetyViolation(payload);
+  if (!window._ksumcApplyingRemoteSync) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.saveSafetyViolation === 'function') {
+      const payload = targetViol || (state.safetyViolations && state.safetyViolations.length > 0 ? state.safetyViolations : null);
+      if (payload) window.KSUOracleSync.saveSafetyViolation(payload);
+    }
+    if (window.ksuFirebaseSync) {
+      if (targetViol && typeof window.ksuFirebaseSync.syncSafetyViolation === 'function') {
+        try { window.ksuFirebaseSync.syncSafetyViolation(targetViol); } catch (_) {}
+      } else if (typeof window.ksuFirebaseSync.syncSafetyViolationsList === 'function' && Array.isArray(state.safetyViolations)) {
+        try { window.ksuFirebaseSync.syncSafetyViolationsList(state.safetyViolations); } catch (_) {}
+      }
+    }
   }
+  notifyCloudSync();
   if (typeof renderHeadOperationalCenter === 'function') renderHeadOperationalCenter();
 }
 function saveSmokingViolations(targetViol) {
   localStorage.setItem(STORAGE_KEY_SMOKING_VIOLATIONS, JSON.stringify(state.smokingViolations));
   renderSmokingViolations();
   updateViolationBadges();
-  notifyCloudSync();
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveSmokingViolation === 'function') {
-    const payload = targetViol || (state.smokingViolations && state.smokingViolations.length > 0 ? state.smokingViolations : null);
-    if (payload) window.KSUOracleSync.saveSmokingViolation(payload);
+  if (!window._ksumcApplyingRemoteSync) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.saveSmokingViolation === 'function') {
+      const payload = targetViol || (state.smokingViolations && state.smokingViolations.length > 0 ? state.smokingViolations : null);
+      if (payload) window.KSUOracleSync.saveSmokingViolation(payload);
+    }
+    if (window.ksuFirebaseSync) {
+      if (targetViol && typeof window.ksuFirebaseSync.syncSmokingViolation === 'function') {
+        try { window.ksuFirebaseSync.syncSmokingViolation(targetViol); } catch (_) {}
+      } else if (typeof window.ksuFirebaseSync.syncSmokingViolationsList === 'function' && Array.isArray(state.smokingViolations)) {
+        try { window.ksuFirebaseSync.syncSmokingViolationsList(state.smokingViolations); } catch (_) {}
+      }
+    }
   }
+  notifyCloudSync();
   if (typeof renderHeadOperationalCenter === 'function') renderHeadOperationalCenter();
 }
 function updateViolationBadges() {
@@ -11372,13 +11431,101 @@ function applySystemMetrics() {
 // -------------------------------------------------------------
 // EXISTING INSPECTION & OPERATIONS LOGIC
 // -------------------------------------------------------------
+function normalizeShiftIdentifierForScope(raw) {
+  const s = String(raw || '').trim().toLowerCase();
+  if (!s || s === 'all' || s.includes('جميع')) return '';
+  if (s === 'shift1' || s.includes('1') || s.includes('صباح') || s.includes('الأولى') || s.includes('الاولى') || /^m1\b/i.test(s)) return 'shift1';
+  if (s === 'shift2' || s.includes('2') || s.includes('مسائ') || s.includes('الثانية') || /^m2\b/i.test(s)) return 'shift2';
+  if (s === 'shift3' || s.includes('3') || s.includes('ليل') || s.includes('الثالثة') || /^m3\b/i.test(s)) return 'shift3';
+  return s;
+}
+
+function isRecordOwnedByCurrentUser(r, user) {
+  if (!r || !user) return false;
+  const uId = String(user.id || '').trim().toLowerCase();
+  const uEmp = String(user.empId || user.employeeId || '').trim().toLowerCase();
+  const uUser = String(user.username || '').trim().toLowerCase();
+  const uName = String(user.name || '').trim();
+
+  const rInspId = String(r.inspectorId || '').trim().toLowerCase();
+  const rUser = String(r.inspectorUsername || '').trim().toLowerCase();
+  const rBadge = String(r.badge || r.employeeId || '').trim().toLowerCase();
+  const rName = String(r.inspector || r.reportedBy || '').trim();
+
+  if (uId && rInspId && uId === rInspId) return true;
+  if (uUser && (rUser === uUser || rBadge === uUser || rInspId === uUser)) return true;
+  if (uEmp && (rBadge === uEmp || rUser === uEmp || rInspId === uEmp)) return true;
+  if (uName && rName && (rName === uName || rName.includes(uName) || uName.includes(rName))) return true;
+  return false;
+}
+
+function getScopedRoundsForCurrentUser(roundsList, filterMode = 'none') {
+  let list = Array.isArray(roundsList) ? roundsList.slice() : [];
+  const currentUserObj = state.currentUser || (window.KSUAuth && typeof window.KSUAuth.getUser === 'function' ? window.KSUAuth.getUser() : null);
+
+  if (currentUserObj) {
+    const roleCat = (typeof getUserRoleCategory === 'function')
+      ? getUserRoleCategory(currentUserObj)
+      : ((window.KSUAuth && typeof window.KSUAuth.getRoleCategory === 'function') ? window.KSUAuth.getRoleCategory(currentUserObj) : (currentUserObj.roleCategory || 'field_inspector'));
+    const isDev = (typeof isSystemDeveloper === 'function')
+      ? isSystemDeveloper(currentUserObj)
+      : (currentUserObj.id === 'USR-01' || currentUserObj.role === 'admin' || roleCat === 'developer' || roleCat === 'admin');
+    const isSupervisorOrHigher = isDev || ['shift_supervisor', 'head', 'quality', 'executive', 'admin', 'developer'].includes(roleCat) || (currentUserObj.role && currentUserObj.role.includes('مشرف'));
+
+    if (!isSupervisorOrHigher) {
+      const userShift = normalizeShiftIdentifierForScope(currentUserObj.shift || currentUserObj.empId || currentUserObj.role);
+      if (userShift) {
+        list = list.filter(r => {
+          if (!r) return false;
+          if (isRecordOwnedByCurrentUser(r, currentUserObj)) return true;
+          const recShift = normalizeShiftIdentifierForScope(r.shift || r.shiftName);
+          return recShift === userShift;
+        });
+      }
+    }
+  }
+
+  if (filterMode === 'today') {
+    const todayStr = new Date().toISOString().split('T')[0];
+    list = list.filter(r => r && String(r.date || '') === todayStr);
+  } else if (filterMode === 'mine') {
+    if (currentUserObj) {
+      list = list.filter(r => isRecordOwnedByCurrentUser(r, currentUserObj));
+    }
+  }
+
+  return list;
+}
+window.getScopedRoundsForCurrentUser = getScopedRoundsForCurrentUser;
+
+function setFieldRoundsFilter(filterKey) {
+  state.fieldRoundsFilter = filterKey || 'all';
+  ['all', 'today', 'mine'].forEach(k => {
+    const btn = document.getElementById(`btn-rounds-filter-${k}`);
+    if (btn) {
+      if (k === state.fieldRoundsFilter) {
+        btn.className = 'rounds-quick-filter-btn px-3 py-1.5 rounded-xl bg-primary text-white font-black text-xs shadow-xs transition-all';
+      } else {
+        btn.className = 'rounds-quick-filter-btn px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs transition-all';
+      }
+    }
+  });
+  updateDashboardKPIs();
+  if (typeof renderInspectorWorkflowTracker === 'function') {
+    renderInspectorWorkflowTracker();
+  }
+}
+window.setFieldRoundsFilter = setFieldRoundsFilter;
+
 function updateDashboardKPIs() {
   let totalItems = 0;
   let totalCompliant = 0;
   let totalObservations = 0;
   let totalViolations = 0;
 
-  state.rounds.forEach(r => {
+  const scopedRounds = getScopedRoundsForCurrentUser(state.rounds || [], 'none');
+
+  scopedRounds.forEach(r => {
     totalItems += (r.compliantCount || 0) + (r.observationCount || 0) + (r.violationCount || 0);
     totalCompliant += (r.compliantCount || 0);
     totalObservations += (r.observationCount || 0);
@@ -11399,13 +11546,24 @@ function updateDashboardKPIs() {
   const elSidebarBar = document.getElementById('kpi-sidebar-bar');
   const elPendingRisks = document.getElementById('kpi-pending-risks');
   const elTotalRounds = document.getElementById('kpi-total-rounds');
+  const elPendingObs = document.getElementById('kpi-pending-obs');
+  const elCriticalViols = document.getElementById('kpi-critical-viols');
 
   if (elRate) elRate.textContent = rate + '%';
   if (elRateBar) elRateBar.style.width = rate + '%';
   if (elSidebarRate) elSidebarRate.textContent = rate + '%';
   if (elSidebarBar) elSidebarBar.style.width = rate + '%';
-  if (elPendingRisks) elPendingRisks.textContent = totalViolations;
-  if (elTotalRounds) elTotalRounds.textContent = state.rounds.length;
+  if (elPendingRisks) elPendingRisks.textContent = String(totalViolations);
+  if (elTotalRounds) elTotalRounds.textContent = String(scopedRounds.length);
+  if (elPendingObs) elPendingObs.textContent = String(totalObservations);
+  if (elCriticalViols) elCriticalViols.textContent = String(totalViolations);
+
+  const elFilterCountAll = document.getElementById('rounds-filter-count-all');
+  const elFilterCountToday = document.getElementById('rounds-filter-count-today');
+  const elFilterCountMine = document.getElementById('rounds-filter-count-mine');
+  if (elFilterCountAll) elFilterCountAll.textContent = String(scopedRounds.length);
+  if (elFilterCountToday) elFilterCountToday.textContent = String(getScopedRoundsForCurrentUser(state.rounds || [], 'today').length);
+  if (elFilterCountMine) elFilterCountMine.textContent = String(getScopedRoundsForCurrentUser(state.rounds || [], 'mine').length);
 
   applySystemMetrics();
   renderRoundsTables();
@@ -11415,7 +11573,10 @@ function renderRoundsTables() {
   const container = document.getElementById('rounds-list-container');
   if (!container) return;
 
-  if (state.rounds.length === 0) {
+  const activeFilter = state.fieldRoundsFilter || 'all';
+  const displayRounds = getScopedRoundsForCurrentUser(state.rounds || [], activeFilter === 'all' ? 'none' : activeFilter);
+
+  if (displayRounds.length === 0) {
     container.innerHTML = `
       <div class="p-8 text-center text-on-surface-variant bg-surface-container-low rounded-xl">
         <span class="material-symbols-outlined text-4xl text-outline-variant mb-2">checklist</span>
@@ -11430,19 +11591,19 @@ function renderRoundsTables() {
   const isDev = (typeof isSystemDeveloper === 'function') ? isSystemDeveloper(currentUserObj) : (currentUserObj && (currentUserObj.id === 'USR-01' || currentUserObj.role === 'admin'));
   const isSupervisor = roleCat === 'shift_supervisor' || isDev || (currentUserObj && currentUserObj.role && currentUserObj.role.includes('مشرف'));
 
-  container.innerHTML = state.rounds.map(r => {
+  container.innerHTML = displayRounds.map(r => {
     let workflowBadge = '';
     let supervisorActionBtn = '';
+    const roundShiftTitle = (typeof getShiftTitleArabic === 'function') ? getShiftTitleArabic(r.shift || r.shiftName) : 'الوردية المناوبة';
 
     if (r.workflowStatus === 'approved_cbahi' || r.workflowStatus === 'approved_quality') {
       workflowBadge = `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-black border border-emerald-300">معتمد في سجل الامتثال (CBAHI) ✓</span>`;
     } else if (r.workflowStatus === 'pending_quality') {
-      workflowBadge = `<span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[11px] font-black border border-sky-300">معتمد من المشرف - بانتظار الجودة</span>`;
+      workflowBadge = `<span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[11px] font-black border border-sky-300">${r.workflowStatusLabel || 'مرسل لقسم الجودة وتقييم الأداء - بانتظار الاعتماد'}</span>`;
     } else if (r.workflowStatus === 'returned_by_quality') {
       workflowBadge = `<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[11px] font-black border border-rose-300">معاد من الجودة للتصحيح ⚠️</span>`;
     } else {
       const canApprove = (typeof canSupervisorApproveRound === 'function') ? canSupervisorApproveRound(currentUserObj, r) : false;
-      const roundShiftTitle = (typeof getShiftTitleArabic === 'function') ? getShiftTitleArabic(r.shift || r.shiftName) : 'الوردية المناوبة';
 
       if (canApprove) {
         workflowBadge = `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-black border border-amber-300">بانتظار اعتمادك (مشرف ${roundShiftTitle})</span>`;
@@ -11904,7 +12065,10 @@ function saveNewInspectionRound() {
           floor,
           date: today,
           time: nowTimeStr,
+          timestamp: nowIso,
           inspector: inspector,
+          inspectorId: existingRound.inspectorId || (currentUserObj && (currentUserObj.id || currentUserObj.empId || currentUserObj.username)) || '',
+          inspectorUsername: existingRound.inspectorUsername || ((currentUserObj && currentUserObj.username) ? currentUserObj.username : ''),
           badge: existingRound.badge || badgeCode,
           shift: selectedShiftKey,
           shiftName: selectedShiftLabel,
@@ -11914,6 +12078,7 @@ function saveNewInspectionRound() {
           resubmittedAt: nowIso,
           updatedAt: nowIso,
           updatedAtMs: Date.now(),
+          _isOfflinePending: true,
           previousReturnReason: existingRound.qualityReturnReason || '',
           previousReturnNotes: existingRound.qualityReturnNotes || '',
           score,
@@ -11936,13 +12101,7 @@ function saveNewInspectionRound() {
         });
         state.rounds[editIdx] = updatedRound;
         state.editingRoundId = null;
-        try { saveRounds(); } catch (e) { console.warn('saveRounds error:', e); }
-        if (window.KSUOracleSync && typeof window.KSUOracleSync.saveRound === 'function') {
-          try { window.KSUOracleSync.saveRound(updatedRound); } catch (_) {}
-        }
-        if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncRound === 'function') {
-          try { window.ksuFirebaseSync.syncRound(updatedRound); } catch (_) {}
-        }
+        try { saveRounds(updatedRound); } catch (e) { console.warn('saveRounds error:', e); }
         closeNewRoundModal();
         if (typeof window.openOfficialInspectionCardModal === 'function') {
           try { window.openOfficialInspectionCardModal(updatedRound.id); } catch (_) {}
@@ -11956,13 +12115,16 @@ function saveNewInspectionRound() {
     const isDev = (typeof isSystemDeveloper === 'function') ? isSystemDeveloper(currentUserObj) : (currentUserObj && (currentUserObj.id === 'USR-01' || currentUserObj.role === 'admin'));
     const isSupervisor = roleCat === 'shift_supervisor' || isDev || (currentUserObj && currentUserObj.role && currentUserObj.role.includes('مشرف'));
 
-    const initialWorkflowStatus = isSupervisor ? 'pending_quality' : 'pending_supervisor';
-    const shiftTitle = (typeof getShiftTitleArabic === 'function') ? getShiftTitleArabic(selectedShiftKey) : 'الوردية المناوبة';
-    const initialWorkflowLabel = isSupervisor ? 'معتمد من مشرف الوردية - بانتظار اعتماد الجودة' : `بانتظار مراجعة واعتماد مشرف ${shiftTitle}`;
-    const initialHistoryLabel = isSupervisor ? 'تم رصد التفتيش واعتماده وتصديره لقسم الجودة وتقييم الأداء' : `تم رصد التفتيش الميداني ورفعه لمشرف ${shiftTitle} للاعتماد والتصدير`;
+    const initialWorkflowStatus = 'pending_quality';
+    const initialWorkflowLabel = isSupervisor
+      ? 'معتمد من مشرف الوردية - بانتظار اعتماد الجودة'
+      : 'معتمد من المفتش الميداني - بانتظار اعتماد الجودة (CBAHI)';
+    const initialHistoryLabel = isSupervisor
+      ? 'تم رصد التفتيش واعتماده وتصديره لقسم الجودة وتقييم الأداء'
+      : 'تم اعتماد جولة التفتيش الميدانية وإرسالها مباشرة لقسم الجودة وتقييم الأداء (CBAHI)';
 
     const newRound = {
-      id: 'insp-' + Date.now(),
+      id: 'insp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5),
       formType,
       formTitle,
       hospital,
@@ -11970,7 +12132,9 @@ function saveNewInspectionRound() {
       floor,
       date: today,
       time: nowTimeStr,
+      timestamp: nowIso,
       inspector: inspector,
+      inspectorId: (currentUserObj && (currentUserObj.id || currentUserObj.empId || currentUserObj.username)) ? String(currentUserObj.id || currentUserObj.empId || currentUserObj.username) : '',
       inspectorUsername: (currentUserObj && currentUserObj.username) ? currentUserObj.username : '',
       badge: badgeCode,
       shift: selectedShiftKey,
@@ -11981,8 +12145,10 @@ function saveNewInspectionRound() {
       approvedBySupervisor: isSupervisor ? (currentUserObj ? currentUserObj.name : 'مشرف الوردية') : null,
       supervisorApprovedAt: isSupervisor ? nowIso : null,
       submittedAt: nowIso,
+      createdAt: nowIso,
       updatedAt: nowIso,
       updatedAtMs: Date.now(),
+      _isOfflinePending: true,
       score,
       compliantCount: compliant,
       observationCount: observation,
@@ -12020,18 +12186,14 @@ function saveNewInspectionRound() {
     state.rounds.unshift(newRound);
     try { saveRounds(newRound); } catch (e) { console.warn('saveRounds error:', e); }
 
-    // Direct LocalStorage fallback guarantee
+    // Direct LocalStorage fallback guarantee across all round mirror keys
     try {
-      localStorage.setItem(STORAGE_KEY_ROUNDS, JSON.stringify(state.rounds));
+      const serialized = JSON.stringify(state.rounds);
+      localStorage.setItem(STORAGE_KEY_ROUNDS, serialized);
+      localStorage.setItem('ksumc_field_rounds', serialized);
+      localStorage.setItem('ksumc_rounds_registry', serialized);
     } catch (lsErr) {
       console.warn('LocalStorage save error:', lsErr);
-    }
-
-    if (window.KSUOracleSync && typeof window.KSUOracleSync.saveRound === 'function') {
-      try { window.KSUOracleSync.saveRound(newRound); } catch (_) {}
-    }
-    if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncRound === 'function') {
-      try { window.ksuFirebaseSync.syncRound(newRound); } catch (_) {}
     }
 
     // Auto-transfer non-compliant items (observations / violations) to CAPA Registry
@@ -12057,7 +12219,11 @@ function saveNewInspectionRound() {
           assignedTo: 'قسم صيانة وسائل السلامة',
           reportedBy: inspector,
           reportedByBadge: badgeCode,
+          timestamp: nowIso,
           createdAt: nowIso,
+          updatedAt: nowIso,
+          updatedAtMs: Date.now(),
+          _isOfflinePending: true,
           targetDate: new Date(Date.now() + 3*24*60*60*1000).toISOString().split('T')[0],
           resolutionNotes: '',
           closedAt: null
@@ -12275,14 +12441,17 @@ function submitImmediateHazard() {
     code: 'CODE-RED-HAZARD',
     title: type,
     location: location,
+    date: new Date().toISOString().split('T')[0],
     time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
+    timestamp: new Date().toISOString(),
     status: 'استجابة فورية نشطة',
     severity: 'critical',
-    reportedBy: 'مفتش السلامة الميداني'
+    reportedBy: 'مفتش السلامة الميداني',
+    _isOfflinePending: true
   };
 
   state.alarms.unshift(newAlarm);
-  saveAlarms();
+  saveAlarms(newAlarm);
   closeHazardModal();
   playEmergencySound();
   showToast('تم إرسال البلاغ وتوجيه فرق الإسناد السريع بالمدينة الطبية فوراً!', 'error');
@@ -12813,21 +12982,17 @@ function saveNewPermit() {
     qualityStatus: 'archived_approved',
     routedTo: 'ARCHIVE',
     routedToTitle: 'أرشيف التصاريح المعتمدة',
+    timestamp: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     updatedAtMs: Date.now(),
+    _isOfflinePending: true,
     qrToken: 'KSU-HWP-' + ((state.permits ? state.permits.length : 0) + 100) + '-APPROVED'
   };
 
   if (!state.permits) state.permits = [];
   state.permits.unshift(newPermit);
   savePermits(newPermit);
-  if (window.KSUOracleSync && typeof window.KSUOracleSync.savePermit === 'function') {
-    window.KSUOracleSync.savePermit(newPermit);
-  }
-  if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncPermit === 'function') {
-    window.ksuFirebaseSync.syncPermit(newPermit);
-  }
   closeNewPermitModal();
   renderPermitsList();
   showToast('تم إصدار تصريح العمل الساخن واعتماده فورياً وحفظه في أرشيف التصاريح المعتمدة ✓', 'success');
@@ -13073,7 +13238,11 @@ function convertObservationToCAPA(roundId, itemId) {
     assignedTo: 'قسم صيانة وسائل السلامة',
     reportedBy: round.inspector,
     reportedByBadge: round.badge,
+    timestamp: nowIso,
     createdAt: nowIso,
+    updatedAt: nowIso,
+    updatedAtMs: Date.now(),
+    _isOfflinePending: true,
     targetDate: new Date(Date.now() + 3*24*60*60*1000).toISOString().split('T')[0],
     resolutionNotes: '',
     closedAt: null
@@ -13139,7 +13308,11 @@ function saveFieldCAPA() {
     assignedTo: assignedTo,
     reportedBy: reportedBy,
     reportedByBadge: (currentUserObj && (currentUserObj.empId || currentUserObj.username)) || 'KSU-SAF',
+    timestamp: nowIso,
     createdAt: nowIso,
+    updatedAt: nowIso,
+    updatedAtMs: Date.now(),
+    _isOfflinePending: true,
     targetDate: new Date(Date.now() + 3*24*60*60*1000).toISOString().split('T')[0],
     resolutionNotes: '',
     closedAt: null
@@ -13433,16 +13606,15 @@ function saveNewDoorRequest() {
     qualityStatus: 'archived_approved',
     routedTo: 'ARCHIVE',
     routedToTitle: 'أرشيف طلبات فتح الأبواب المعتمدة',
+    timestamp: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    updatedAtMs: Date.now()
+    updatedAtMs: Date.now(),
+    _isOfflinePending: true
   };
 
   state.doors.unshift(newDoor);
-  saveDoors();
-  if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncDoor === 'function') {
-    window.ksuFirebaseSync.syncDoor(newDoor);
-  }
+  saveDoors(newDoor);
   removeDoorIdCardPhoto();
   closeNewDoorModal();
   showToast('تم توثيق طلب فتح الباب واعتماده فورياً وحفظه في أرشيف فتح الأبواب ✓', 'success');
@@ -13642,19 +13814,19 @@ function saveNewSafetyViolation() {
     violatorSignature: violatorSignature,
     officerSignature: officerSignature,
     status: actionTaken,
+    severity: 'high',
     routedTo: 'H1',
     routedToTitle: 'المشرف العام الملك خالد (H1)',
     headApprovalStatus: 'pending_head',
+    timestamp: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    updatedAtMs: Date.now()
+    updatedAtMs: Date.now(),
+    _isOfflinePending: true
   };
 
   state.safetyViolations.unshift(newViol);
-  saveSafetyViolations();
-  if (window.KSUOracleSync && typeof window.KSUOracleSync.saveSafetyViolation === 'function') {
-    window.KSUOracleSync.saveSafetyViolation(newViol);
-  }
+  saveSafetyViolations(newViol);
   closeNewSafetyViolationModal();
   showToast('تم اعتماد محضر مخالفة السلامة وإرساله للمشرف العام الملك خالد (H1).', 'success');
 }
@@ -13877,16 +14049,15 @@ function saveNewSmokingViolation() {
     routedTo: 'H1',
     routedToTitle: 'المشرف العام الملك خالد (H1)',
     headApprovalStatus: 'pending_head',
+    timestamp: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    updatedAtMs: Date.now()
+    updatedAtMs: Date.now(),
+    _isOfflinePending: true
   };
 
   state.smokingViolations.unshift(newViol);
-  saveSmokingViolations();
-  if (window.KSUOracleSync && typeof window.KSUOracleSync.saveSmokingViolation === 'function') {
-    window.KSUOracleSync.saveSmokingViolation(newViol);
-  }
+  saveSmokingViolations(newViol);
   closeNewSmokingViolationModal();
   showToast('تم حفظ محضر ضبط مخالفة التدخين وإرساله للمشرف العام الملك خالد (H1).', 'success');
 }
@@ -14101,12 +14272,15 @@ function submitShiftQuickIncident() {
     reportedBy: reporter,
     details: desc,
     actionTaken: action || 'تمت المباشرة الفورية وتأمين الموقع والتنسيق الميداني.',
+    severity: (type === 'elevator_trapped' || type === 'alarm_bell') ? 'critical' : 'medium',
     status: 'تمت المعالجة والإغلاق',
     routedTo: 'H1',
     routedToTitle: 'المشرف العام الملك خالد (H1)',
+    timestamp: now.toISOString(),
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
     updatedAtMs: Date.now(),
+    _isOfflinePending: true,
     ...extraMeta
   };
 
@@ -14131,12 +14305,14 @@ function submitShiftQuickIncident() {
       reportedBy: reporter,
       routedTo: 'H1',
       routedToTitle: 'المشرف العام الملك خالد (H1)',
+      timestamp: now.toISOString(),
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
-      updatedAtMs: Date.now()
+      updatedAtMs: Date.now(),
+      _isOfflinePending: true
     };
     state.alarms.unshift(newAlm);
-    saveAlarms();
+    saveAlarms(newAlm);
   }
 
   saveShiftIncidents();
@@ -15136,8 +15312,10 @@ function submitSafetyDeptReport() {
       headRouting,
       headNotes,
       headName,
+      timestamp: existingReport.timestamp || nowIso,
       updatedAt: nowIso,
-      updatedAtMs: Date.now()
+      updatedAtMs: Date.now(),
+      _isOfflinePending: true
     });
   } else {
     reportToSave = {
@@ -15146,6 +15324,7 @@ function submitSafetyDeptReport() {
       day,
       date,
       time,
+      timestamp: nowIso,
       building,
       buildingCode: bldCode,
       block,
@@ -15155,6 +15334,8 @@ function submitSafetyDeptReport() {
       details,
       action: action || 'تم الرصد والرفع للمتابعة الإدارية والفنية.',
       inspector,
+      inspectorId: (state.currentUser && (state.currentUser.id || state.currentUser.empId || state.currentUser.username)) || '',
+      inspectorUsername: (state.currentUser && state.currentUser.username) || '',
       shift,
       shiftKey: shiftKeyNormalized,
       signature,
@@ -15182,6 +15363,7 @@ function submitSafetyDeptReport() {
       updatedAt: nowIso,
       updatedAtMs: Date.now(),
       createdAt: nowIso,
+      _isOfflinePending: true,
       workflowHistory: [
         {
           stage: 'pending_h1',
@@ -16522,14 +16704,20 @@ function printSafetyViolation(id) {
     return;
   }
 
-  // إذا كانت المخالفة مصحوبة بكارت الفحص البصري المعتمد
-  if (v.cardInnerHtml) {
+  // إذا كانت المخالفة مصحوبة بكارت الفحص البصري المعتمد (سواء المخزن سابقاً أو المُعاد بناؤه ديناميكياً)
+  const visualCardHtml = v.cardInnerHtml || ((v.hasVisualInspectionCard || v.visionData) && typeof window.buildCardHtmlFromViolation === 'function'
+    ? window.buildCardHtmlFromViolation(v)
+    : '');
+  if (visualCardHtml) {
     if (typeof window.triggerIsolatedPrint === 'function') {
-      window.triggerIsolatedPrint(v.cardInnerHtml);
+      window.triggerIsolatedPrint(visualCardHtml);
       return;
     }
-    if (typeof window.printHtmlContent === 'function' && v.fullPageHtml) {
-      window.printHtmlContent(v.fullPageHtml, `كارت فحص ومحضر مخالفة - ${v.id}`);
+    const visualFullHtml = v.fullPageHtml || (typeof window.buildFullPageHtmlFromViolation === 'function'
+      ? window.buildFullPageHtmlFromViolation(v)
+      : '');
+    if (typeof window.printHtmlContent === 'function' && visualFullHtml) {
+      window.printHtmlContent(visualFullHtml, `كارت فحص ومحضر مخالفة - ${v.id}`);
       return;
     }
   }
@@ -20352,9 +20540,11 @@ function syncRoundsToShiftInspectionLog(silent = false) {
       headNotes: round.headNotes || '',
       supervisor: round.supervisor || 'مشرف الوردية المناوب',
       duration: round.duration || '15 دقيقة',
+      timestamp: round.timestamp || round.updatedAt || round.submittedAt || new Date().toISOString(),
       updatedAt: round.updatedAt || round.submittedAt || new Date().toISOString(),
       updatedAtMs: round.updatedAtMs || Date.now()
     };
+    if (round._isOfflinePending) mappedRecord._isOfflinePending = true;
 
     recordMap.set(recId, Object.assign({}, recordMap.get(recId) || {}, mappedRecord));
   });
@@ -20401,9 +20591,11 @@ function syncRoundsToShiftInspectionLog(silent = false) {
       headNotes: rep.headNotes || '',
       supervisor: rep.supName || 'مشرف الوردية',
       duration: '15 دقيقة',
+      timestamp: rep.timestamp || rep.updatedAt || rep.createdAt || new Date().toISOString(),
       updatedAt: rep.updatedAt || rep.createdAt || new Date().toISOString(),
       updatedAtMs: rep.updatedAtMs || Date.now()
     };
+    if (rep._isOfflinePending) mappedReport._isOfflinePending = true;
 
     recordMap.set(recId, Object.assign({}, recordMap.get(recId) || {}, mappedReport));
   });
@@ -21666,7 +21858,8 @@ function renderHomeRecentRounds() {
   const container = document.getElementById('home-recent-rounds-list');
   if (!container) return;
 
-  const rounds = (state.rounds && state.rounds.length) ? state.rounds.slice(0, 5) : [];
+  const scopedAll = getScopedRoundsForCurrentUser(state.rounds || [], 'none');
+  const rounds = scopedAll.length ? scopedAll.slice(0, 5) : [];
   if (rounds.length === 0) {
     container.innerHTML = `
       <div class="p-3 text-center text-gray-400 text-xs">
@@ -21684,16 +21877,16 @@ function renderHomeRecentRounds() {
   container.innerHTML = rounds.map(r => {
     let badgeHtml = '';
     let actionBtnHtml = '';
+    const roundShiftTitle = (typeof getShiftTitleArabic === 'function') ? getShiftTitleArabic(r.shift || r.shiftName) : 'الوردية المناوبة';
 
     if (r.workflowStatus === 'approved_cbahi' || r.workflowStatus === 'approved_quality') {
       badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black border border-emerald-300">معتمد CBAHI ✓</span>`;
     } else if (r.workflowStatus === 'pending_quality') {
-      badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[10px] font-black border border-sky-300">بانتظار الجودة</span>`;
+      badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[10px] font-black border border-sky-300">بانتظار اعتماد الجودة</span>`;
     } else if (r.workflowStatus === 'returned_by_quality') {
       badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-black border border-rose-300">معاد للتصحيح ⚠️</span>`;
     } else {
       const canApprove = (typeof canSupervisorApproveRound === 'function') ? canSupervisorApproveRound(currentUserObj, r) : false;
-      const roundShiftTitle = (typeof getShiftTitleArabic === 'function') ? getShiftTitleArabic(r.shift || r.shiftName) : 'الوردية المناوبة';
 
       if (canApprove) {
         badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black border border-amber-300">بانتظار اعتمادك (مشرف ${roundShiftTitle})</span>`;
@@ -24571,6 +24764,7 @@ function getUnifiedWorkflowItems() {
       building: r.building || 'المستشفى',
       floor: r.floor || 'الدور الأرضي (G)',
       inspector: r.inspector || 'مفتش السلامة',
+      inspectorId: r.inspectorId || '',
       inspectorUsername: r.inspectorUsername || '',
       badge: r.badge || 'KSU-SAF',
       shift: shiftKey,
@@ -25206,8 +25400,11 @@ function renderInspectorWorkflowTracker() {
   const alertBanner = document.getElementById('inspector-returned-alert-banner');
   if (!container && !alertBanner) return;
 
-  const items = getUnifiedWorkflowItems();
-  const returnedItems = items.filter(i => i.workflowStatus === 'returned_by_quality' || i.workflowStatus === 'returned_by_head');
+  const rawItems = getUnifiedWorkflowItems();
+  const scopedItems = getScopedRoundsForCurrentUser(rawItems, 'none');
+  const activeFilter = state.fieldRoundsFilter || 'all';
+  const items = activeFilter === 'all' ? scopedItems : getScopedRoundsForCurrentUser(rawItems, activeFilter);
+  const returnedItems = scopedItems.filter(i => i.workflowStatus === 'returned_by_quality' || i.workflowStatus === 'returned_by_head');
 
   if (alertBanner) {
     if (returnedItems.length > 0) {

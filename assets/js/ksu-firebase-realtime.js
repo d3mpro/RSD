@@ -35,6 +35,7 @@
             this.db = null;
             this.isConnected = false;
             this.isUpdatingFromRemote = false;
+            this._lastRetryPushAt = {};
             this.deviceId = this.getOrCreateDeviceId();
             this.lastResetTimestamp = parseInt(localStorage.getItem('ksumc_shift_log_reset_at') || '0', 10);
             this.ensureCleanProductionStorage();
@@ -316,7 +317,7 @@
         setupOperationalListeners() {
             if (!this.db) return;
 
-            // أ) مزامنة الجولات التفتيشية (rounds) - السحابة هي المصدر المعتمد
+            // أ) مزامنة الجولات التفتيشية (rounds) - السحابة هي المصدر المعتمد مع حفظ السجلات قيد الرفع
             this.db.ref('rounds').on('value', (snapshot) => {
                 const remoteVal = snapshot.val();
                 const remoteList = this.normalizeFirebaseCollection(remoteVal);
@@ -329,7 +330,7 @@
                     this.pushCollectionToFirebase('rounds', localList, 'id');
                     return;
                 }
-                const pendingOffline = localList.filter(item => item && item._isOfflinePending === true);
+                const pendingOffline = this.filterPendingOffline(localList, remoteList);
                 const finalList = pendingOffline.length > 0 ? this.mergeCollectionsById(remoteList, pendingOffline, 'id') : remoteList;
 
                 this.isUpdatingFromRemote = true;
@@ -341,7 +342,7 @@
                         window.state.rounds = finalList;
                     }
                     if (pendingOffline.length > 0 && this.isConnected) {
-                        this.pushCollectionToFirebase('rounds', pendingOffline, 'id');
+                        this.schedulePendingPush('rounds', pendingOffline, ['ksumc_safety_rounds', 'ksumc_field_rounds', 'ksumc_rounds_registry'], 'rounds');
                     }
                     this.refreshAllWorkflowUIs();
                 } finally {
@@ -354,14 +355,14 @@
                 const remoteVal = snapshot.val();
                 const remoteList = this.normalizeFirebaseCollection(remoteVal);
                 const localList = this.safeParseJSON('ksumc_quality_shift_inspection_logs', []);
-                const pendingOffline = localList.filter(item => item && item._isOfflinePending === true);
+                const pendingOffline = this.filterPendingOffline(localList, remoteList);
                 const finalList = pendingOffline.length > 0 ? this.mergeCollectionsById(remoteList, pendingOffline, 'id') : remoteList;
 
                 this.isUpdatingFromRemote = true;
                 try {
                     localStorage.setItem('ksumc_quality_shift_inspection_logs', JSON.stringify(finalList));
                     if (pendingOffline.length > 0 && this.isConnected) {
-                        this.pushCollectionToFirebase('shift_inspection_logs', pendingOffline, 'id');
+                        this.schedulePendingPush('shift_inspection_logs', pendingOffline, ['ksumc_quality_shift_inspection_logs'], null);
                     }
                     this.refreshAllWorkflowUIs();
                 } finally {
@@ -374,7 +375,7 @@
                 const remoteVal = snapshot.val();
                 const remoteList = this.normalizeFirebaseCollection(remoteVal);
                 const localList = this.safeParseJSON('ksumc_safety_dept_reports', []);
-                const pendingOffline = localList.filter(item => item && item._isOfflinePending === true);
+                const pendingOffline = this.filterPendingOffline(localList, remoteList);
                 const finalList = pendingOffline.length > 0 ? this.mergeCollectionsById(remoteList, pendingOffline, 'id') : remoteList;
 
                 this.isUpdatingFromRemote = true;
@@ -384,7 +385,7 @@
                         window.state.safetyDeptReports = finalList;
                     }
                     if (pendingOffline.length > 0 && this.isConnected) {
-                        this.pushCollectionToFirebase('safety_dept_reports', pendingOffline, 'id');
+                        this.schedulePendingPush('safety_dept_reports', pendingOffline, ['ksumc_safety_dept_reports'], 'safetyDeptReports');
                     }
                     this.refreshAllWorkflowUIs();
                 } finally {
@@ -397,7 +398,7 @@
                 const remoteVal = snapshot.val();
                 const remoteList = this.normalizeFirebaseCollection(remoteVal);
                 const localList = this.safeParseJSON('ksumc_compliance_registry', []);
-                const pendingOffline = localList.filter(item => item && item._isOfflinePending === true);
+                const pendingOffline = this.filterPendingOffline(localList, remoteList);
                 const finalList = pendingOffline.length > 0 ? this.mergeCollectionsById(remoteList, pendingOffline, 'id') : remoteList;
 
                 this.isUpdatingFromRemote = true;
@@ -407,7 +408,7 @@
                         window.state.complianceRegistry = finalList;
                     }
                     if (pendingOffline.length > 0 && this.isConnected) {
-                        this.pushCollectionToFirebase('compliance_registry', pendingOffline, 'id');
+                        this.schedulePendingPush('compliance_registry', pendingOffline, ['ksumc_compliance_registry'], 'complianceRegistry');
                     }
                     this.refreshAllWorkflowUIs();
                 } finally {
@@ -420,7 +421,7 @@
                 const remoteVal = snapshot.val();
                 const remoteList = this.normalizeFirebaseCollection(remoteVal);
                 const localList = this.safeParseJSON('ksumc_safety_doors', []);
-                const pendingOffline = localList.filter(item => item && item._isOfflinePending === true);
+                const pendingOffline = this.filterPendingOffline(localList, remoteList);
                 const finalList = pendingOffline.length > 0 ? this.mergeCollectionsById(remoteList, pendingOffline, 'id') : remoteList;
 
                 this.isUpdatingFromRemote = true;
@@ -430,7 +431,7 @@
                         window.state.doors = finalList;
                     }
                     if (pendingOffline.length > 0 && this.isConnected) {
-                        this.pushCollectionToFirebase('doors', pendingOffline, 'id');
+                        this.schedulePendingPush('doors', pendingOffline, ['ksumc_safety_doors'], 'doors');
                     }
                     this.refreshAllWorkflowUIs();
                 } finally {
@@ -443,7 +444,7 @@
                 const remoteVal = snapshot.val();
                 const remoteList = this.normalizeFirebaseCollection(remoteVal);
                 const localList = this.safeParseJSON('ksumc_safety_permits', []);
-                const pendingOffline = localList.filter(item => item && item._isOfflinePending === true);
+                const pendingOffline = this.filterPendingOffline(localList, remoteList);
                 const finalList = pendingOffline.length > 0 ? this.mergeCollectionsById(remoteList, pendingOffline, 'id') : remoteList;
 
                 this.isUpdatingFromRemote = true;
@@ -457,7 +458,7 @@
                         window.dispatchEvent(new CustomEvent('ksumc_permits_updated', { detail: { permits: finalList } }));
                     } catch (_) {}
                     if (pendingOffline.length > 0 && this.isConnected) {
-                        this.pushCollectionToFirebase('permits', pendingOffline, 'id');
+                        this.schedulePendingPush('permits', pendingOffline, ['ksumc_safety_permits'], 'permits');
                     }
                     this.refreshAllWorkflowUIs();
                 } finally {
@@ -470,7 +471,7 @@
                 const remoteVal = snapshot.val();
                 const remoteList = this.normalizeFirebaseCollection(remoteVal);
                 const localList = this.safeParseJSON('ksumc_safety_alarms', []);
-                const pendingOffline = localList.filter(item => item && item._isOfflinePending === true);
+                const pendingOffline = this.filterPendingOffline(localList, remoteList);
                 const finalList = pendingOffline.length > 0 ? this.mergeCollectionsById(remoteList, pendingOffline, 'id') : remoteList;
 
                 this.isUpdatingFromRemote = true;
@@ -480,7 +481,7 @@
                         window.state.alarms = finalList;
                     }
                     if (pendingOffline.length > 0 && this.isConnected) {
-                        this.pushCollectionToFirebase('alarms', pendingOffline, 'id');
+                        this.schedulePendingPush('alarms', pendingOffline, ['ksumc_safety_alarms'], 'alarms');
                     }
                     this.refreshAllWorkflowUIs();
                 } finally {
@@ -493,7 +494,7 @@
                 const remoteVal = snapshot.val();
                 const remoteList = this.normalizeFirebaseCollection(remoteVal);
                 const localList = this.safeParseJSON('ksumc_shift_incidents', []);
-                const pendingOffline = localList.filter(item => item && item._isOfflinePending === true);
+                const pendingOffline = this.filterPendingOffline(localList, remoteList);
                 const finalList = pendingOffline.length > 0 ? this.mergeCollectionsById(remoteList, pendingOffline, 'id') : remoteList;
 
                 this.isUpdatingFromRemote = true;
@@ -503,7 +504,7 @@
                         window.state.shiftIncidents = finalList;
                     }
                     if (pendingOffline.length > 0 && this.isConnected) {
-                        this.pushCollectionToFirebase('shift_incidents', pendingOffline, 'id');
+                        this.schedulePendingPush('shift_incidents', pendingOffline, ['ksumc_shift_incidents'], 'shiftIncidents');
                     }
                     this.refreshAllWorkflowUIs();
                 } finally {
@@ -516,7 +517,7 @@
                 const remoteVal = snapshot.val();
                 const remoteList = this.normalizeFirebaseCollection(remoteVal);
                 const localList = this.safeParseJSON('ksumc_safety_violations', []);
-                const pendingOffline = localList.filter(item => item && item._isOfflinePending === true);
+                const pendingOffline = this.filterPendingOffline(localList, remoteList);
                 const finalList = pendingOffline.length > 0 ? this.mergeCollectionsById(remoteList, pendingOffline, 'id') : remoteList;
 
                 this.isUpdatingFromRemote = true;
@@ -526,7 +527,7 @@
                         window.state.safetyViolations = finalList;
                     }
                     if (pendingOffline.length > 0 && this.isConnected) {
-                        this.pushCollectionToFirebase('safety_violations', pendingOffline, 'id');
+                        this.schedulePendingPush('safety_violations', pendingOffline, ['ksumc_safety_violations'], 'safetyViolations');
                     }
                     this.refreshAllWorkflowUIs();
                 } finally {
@@ -539,7 +540,7 @@
                 const remoteVal = snapshot.val();
                 const remoteList = this.normalizeFirebaseCollection(remoteVal);
                 const localList = this.safeParseJSON('ksumc_smoking_violations', []);
-                const pendingOffline = localList.filter(item => item && item._isOfflinePending === true);
+                const pendingOffline = this.filterPendingOffline(localList, remoteList);
                 const finalList = pendingOffline.length > 0 ? this.mergeCollectionsById(remoteList, pendingOffline, 'id') : remoteList;
 
                 this.isUpdatingFromRemote = true;
@@ -549,7 +550,33 @@
                         window.state.smokingViolations = finalList;
                     }
                     if (pendingOffline.length > 0 && this.isConnected) {
-                        this.pushCollectionToFirebase('smoking_violations', pendingOffline, 'id');
+                        this.schedulePendingPush('smoking_violations', pendingOffline, ['ksumc_smoking_violations'], 'smokingViolations');
+                    }
+                    this.refreshAllWorkflowUIs();
+                } finally {
+                    this.isUpdatingFromRemote = false;
+                }
+            });
+
+            // ي-2) مزامنة سجل الإجراءات التصحيحية والوقائية (capa_records)
+            this.db.ref('capa_records').on('value', (snapshot) => {
+                const remoteVal = snapshot.val();
+                const remoteList = this.normalizeFirebaseCollection(remoteVal);
+                const localReg = this.safeParseJSON('ksumc_capa_registry', []);
+                const localRec = this.safeParseJSON('ksumc_capa_records', []);
+                const combinedLocal = this.mergeCollectionsById(localRec, localReg, 'id');
+                const pendingOffline = this.filterPendingOffline(combinedLocal, remoteList);
+                const finalList = pendingOffline.length > 0 ? this.mergeCollectionsById(remoteList, pendingOffline, 'id') : remoteList;
+
+                this.isUpdatingFromRemote = true;
+                try {
+                    localStorage.setItem('ksumc_capa_registry', JSON.stringify(finalList));
+                    localStorage.setItem('ksumc_capa_records', JSON.stringify(finalList));
+                    if (window.state) {
+                        window.state.capa = finalList;
+                    }
+                    if (pendingOffline.length > 0 && this.isConnected) {
+                        this.schedulePendingPush('capa_records', pendingOffline, ['ksumc_capa_registry', 'ksumc_capa_records'], 'capa');
                     }
                     this.refreshAllWorkflowUIs();
                 } finally {
@@ -575,20 +602,131 @@
             this.db.ref('notifications').on('value', (snapshot) => {
                 const remoteVal = snapshot.val();
                 const remoteList = this.normalizeFirebaseCollection(remoteVal).filter(n => !n._deleted && n.status !== 'مغلق');
+                const localList = this.safeParseJSON('ksumc_notifications', []);
+                const pendingOffline = this.filterPendingOffline(localList, remoteList);
+                const finalList = pendingOffline.length > 0 ? this.mergeCollectionsById(remoteList, pendingOffline, 'id') : remoteList;
 
                 this.isUpdatingFromRemote = true;
                 try {
-                    localStorage.setItem('ksumc_notifications', JSON.stringify(remoteList));
+                    localStorage.setItem('ksumc_notifications', JSON.stringify(finalList));
                     if (window.state) {
-                        window.state.notifications = remoteList;
+                        window.state.notifications = finalList;
                     }
-                    window.dispatchEvent(new CustomEvent('ksumc_notifications_updated', { detail: { list: remoteList, source: 'firebase' } }));
-                    this.handleIncomingRealtimeNotifications(remoteList);
+                    if (pendingOffline.length > 0 && this.isConnected) {
+                        this.schedulePendingPush('notifications', pendingOffline, ['ksumc_notifications'], 'notifications');
+                    }
+                    window.dispatchEvent(new CustomEvent('ksumc_notifications_updated', { detail: { list: finalList, source: 'firebase' } }));
+                    this.handleIncomingRealtimeNotifications(finalList);
                     this.refreshAllWorkflowUIs();
                 } finally {
                     this.isUpdatingFromRemote = false;
                 }
             });
+        }
+
+        filterPendingOffline(localList, remoteList) {
+            const remoteMap = new Map();
+            (remoteList || []).forEach(r => {
+                if (r && (r.id || r.roundId || r.reportId)) {
+                    remoteMap.set(String(r.id || r.roundId || r.reportId), r);
+                }
+            });
+            return (localList || []).filter(item => {
+                if (!item || item._isOfflinePending !== true) return false;
+                const id = String(item.id || item.roundId || item.reportId || '');
+                if (!id) return false;
+                const remoteMatch = remoteMap.get(id);
+                if (!remoteMatch) return true;
+                const localTs = Number(item.updatedAtMs || new Date(item.updatedAt || item.timestamp || 0).getTime() || 0);
+                const remoteTs = Number(remoteMatch.updatedAtMs || new Date(remoteMatch.updatedAt || remoteMatch.timestamp || 0).getTime() || 0);
+                return localTs > remoteTs;
+            });
+        }
+
+        schedulePendingPush(nodeName, pendingList, storageKeys = [], stateProp = null) {
+            if (!this.db || !this.isConnected || !Array.isArray(pendingList) || pendingList.length === 0) return;
+            const now = Date.now();
+            if (this._lastRetryPushAt[nodeName] && (now - this._lastRetryPushAt[nodeName]) < 3000) return;
+            this._lastRetryPushAt[nodeName] = now;
+            this.pushCollectionToFirebase(nodeName, pendingList, 'id').then((ok) => {
+                if (ok && storageKeys.length > 0) {
+                    pendingList.forEach(item => this.markLocalPendingState(storageKeys, stateProp, item, false));
+                }
+            });
+        }
+
+        normalizeCloudPayload(nodeName, rawItem) {
+            if (!rawItem || typeof rawItem !== 'object') return null;
+            const item = JSON.parse(JSON.stringify(rawItem));
+            delete item._isOfflinePending;
+
+            let strId = String(item.id || item.roundId || item.reportId || (String(nodeName || 'REC').toUpperCase().slice(0, 4) + '-' + Date.now()));
+            if (strId.length >= 100) strId = strId.slice(0, 95);
+            item.id = strId;
+
+            const nowIso = new Date().toISOString();
+            if (!item.timestamp || typeof item.timestamp !== 'string') {
+                const candidateTs = item.timestamp || item.updatedAt || item.submittedAt || item.createdAt;
+                item.timestamp = (typeof candidateTs === 'string' && candidateTs.trim())
+                    ? candidateTs
+                    : (typeof candidateTs === 'number' && candidateTs > 0 ? new Date(candidateTs).toISOString() : nowIso);
+            }
+
+            if (nodeName === 'shift_inspection_logs' || nodeName === 'safety_dept_reports') {
+                if (!item.date) item.date = item.timestamp.split('T')[0];
+                if (!item.shift) item.shift = item.shiftName || 'shift1';
+            }
+            if (nodeName === 'compliance_registry') {
+                if (!item.standard) item.standard = item.cbahiCode || item.code || 'FMS.1';
+                if (!item.status) item.status = 'معتمد';
+            }
+            if (nodeName === 'shift_incidents') {
+                if (!item.severity) item.severity = item.priority || 'medium';
+            }
+            if (nodeName === 'safety_violations' && (item.visionData || item.hasVisualInspectionCard)) {
+                delete item.cardInnerHtml;
+                delete item.fullPageHtml;
+            }
+
+            return item;
+        }
+
+        markLocalPendingState(storageKeys, stateProp, itemObj, isPending) {
+            if (!itemObj || typeof itemObj !== 'object') return;
+            const itemId = String(itemObj.id || itemObj.roundId || itemObj.reportId || '');
+            if (!itemId) return;
+
+            (storageKeys || []).forEach((sKey, keyIndex) => {
+                try {
+                    const list = this.safeParseJSON(sKey, []);
+                    const idx = list.findIndex(x => x && String(x.id || x.roundId || x.reportId || '') === itemId);
+                    if (idx !== -1) {
+                        const copy = Object.assign({}, list[idx]);
+                        if (isPending) {
+                            copy._isOfflinePending = true;
+                        } else {
+                            delete copy._isOfflinePending;
+                        }
+                        list[idx] = copy;
+                        localStorage.setItem(sKey, JSON.stringify(list));
+                    } else if (isPending && keyIndex === 0) {
+                        const copy = Object.assign({}, itemObj, { _isOfflinePending: true });
+                        list.unshift(copy);
+                        localStorage.setItem(sKey, JSON.stringify(list));
+                    }
+                } catch (_) {}
+            });
+
+            if (stateProp && window.state && Array.isArray(window.state[stateProp])) {
+                const sIdx = window.state[stateProp].findIndex(x => x && String(x.id || x.roundId || x.reportId || '') === itemId);
+                if (sIdx !== -1 && window.state[stateProp][sIdx]) {
+                    if (isPending) {
+                        window.state[stateProp][sIdx]._isOfflinePending = true;
+                    } else {
+                        delete window.state[stateProp][sIdx]._isOfflinePending;
+                    }
+                }
+            }
         }
 
         normalizeFirebaseCollection(val) {
@@ -626,8 +764,8 @@
                 if (!existing) {
                     map.set(key, item);
                 } else {
-                    const existingTime = new Date(existing.updatedAt || existing.submittedAt || existing.createdAt || 0).getTime() || Number(existing.updatedAtMs || 0);
-                    const newTime = new Date(item.updatedAt || item.submittedAt || item.createdAt || 0).getTime() || Number(item.updatedAtMs || 0);
+                    const existingTime = new Date(existing.updatedAt || existing.submittedAt || existing.createdAt || existing.timestamp || 0).getTime() || Number(existing.updatedAtMs || 0);
+                    const newTime = new Date(item.updatedAt || item.submittedAt || item.createdAt || item.timestamp || 0).getTime() || Number(item.updatedAtMs || 0);
                     if (newTime >= existingTime) {
                         map.set(key, Object.assign({}, existing, item));
                     } else {
@@ -641,8 +779,8 @@
             (localList || []).forEach(addOrUpdate);
 
             return Array.from(map.values()).sort((a, b) => {
-                const tA = new Date(a.updatedAt || a.submittedAt || a.createdAt || a.date || 0).getTime() || 0;
-                const tB = new Date(b.updatedAt || b.submittedAt || b.createdAt || b.date || 0).getTime() || 0;
+                const tA = new Date(a.updatedAt || a.submittedAt || a.createdAt || a.timestamp || a.date || 0).getTime() || 0;
+                const tB = new Date(b.updatedAt || b.submittedAt || b.createdAt || b.timestamp || b.date || 0).getTime() || 0;
                 return tB - tA;
             });
         }
@@ -656,11 +794,15 @@
             const payload = {};
             list.forEach(item => {
                 if (!item) return;
-                const key = this.sanitizeFirebaseKey(item[idKey] || item.roundId || item.reportId);
-                payload[key] = JSON.parse(JSON.stringify(item));
+                const normalized = this.normalizeCloudPayload(nodeName, item);
+                if (!normalized) return;
+                const key = this.sanitizeFirebaseKey(normalized[idKey] || normalized.roundId || normalized.reportId);
+                payload[key] = normalized;
             });
-            return this.db.ref(nodeName).update(payload).catch(err => {
+            if (Object.keys(payload).length === 0) return Promise.resolve(true);
+            return this.db.ref(nodeName).update(payload).then(() => true).catch(err => {
                 console.warn(`[KSU-Firebase] تعذر رفع القائمة (${nodeName}):`, err);
+                return false;
             });
         }
 
@@ -668,24 +810,29 @@
             if (!this.db || !this.isConnected) return;
             // رفع البيانات التي أُنشئت أثناء عدم الاتصال حصراً (_isOfflinePending === true) لمنع إعادة حقن بيانات قديمة
             const collections = [
-                { key: 'ksumc_safety_rounds', node: 'rounds' },
-                { key: 'ksumc_quality_shift_inspection_logs', node: 'shift_inspection_logs' },
-                { key: 'ksumc_safety_dept_reports', node: 'safety_dept_reports' },
-                { key: 'ksumc_compliance_registry', node: 'compliance_registry' },
-                { key: 'ksumc_safety_doors', node: 'doors' },
-                { key: 'ksumc_safety_permits', node: 'permits' },
-                { key: 'ksumc_safety_alarms', node: 'alarms' },
-                { key: 'ksumc_shift_incidents', node: 'shift_incidents' },
-                { key: 'ksumc_safety_violations', node: 'safety_violations' },
-                { key: 'ksumc_smoking_violations', node: 'smoking_violations' },
-                { key: 'ksumc_notifications', node: 'notifications' }
+                { keys: ['ksumc_safety_rounds', 'ksumc_field_rounds', 'ksumc_rounds_registry'], stateProp: 'rounds', node: 'rounds' },
+                { keys: ['ksumc_quality_shift_inspection_logs'], stateProp: null, node: 'shift_inspection_logs' },
+                { keys: ['ksumc_safety_dept_reports'], stateProp: 'safetyDeptReports', node: 'safety_dept_reports' },
+                { keys: ['ksumc_compliance_registry'], stateProp: 'complianceRegistry', node: 'compliance_registry' },
+                { keys: ['ksumc_safety_doors'], stateProp: 'doors', node: 'doors' },
+                { keys: ['ksumc_safety_permits'], stateProp: 'permits', node: 'permits' },
+                { keys: ['ksumc_safety_alarms'], stateProp: 'alarms', node: 'alarms' },
+                { keys: ['ksumc_shift_incidents'], stateProp: 'shiftIncidents', node: 'shift_incidents' },
+                { keys: ['ksumc_safety_violations'], stateProp: 'safetyViolations', node: 'safety_violations' },
+                { keys: ['ksumc_smoking_violations'], stateProp: 'smokingViolations', node: 'smoking_violations' },
+                { keys: ['ksumc_capa_registry', 'ksumc_capa_records'], stateProp: 'capa', node: 'capa_records' },
+                { keys: ['ksumc_notifications'], stateProp: 'notifications', node: 'notifications' }
             ];
 
-            collections.forEach(({ key, node }) => {
-                const local = this.safeParseJSON(key, []);
+            collections.forEach(({ keys, stateProp, node }) => {
+                const local = this.safeParseJSON(keys[0], []);
                 const offlineOnly = local.filter(item => item && item._isOfflinePending === true);
                 if (offlineOnly.length > 0) {
-                    this.pushCollectionToFirebase(node, offlineOnly, 'id');
+                    this.pushCollectionToFirebase(node, offlineOnly, 'id').then((ok) => {
+                        if (ok) {
+                            offlineOnly.forEach(item => this.markLocalPendingState(keys, stateProp, item, false));
+                        }
+                    });
                 }
             });
         }
@@ -693,6 +840,9 @@
         refreshAllWorkflowUIs() {
             if (typeof window.syncRoundsToShiftInspectionLog === 'function') {
                 window.syncRoundsToShiftInspectionLog(true);
+            }
+            if (typeof window.updateDashboardKPIs === 'function') {
+                window.updateDashboardKPIs();
             }
             if (typeof window.renderQualityShiftInspectionLog === 'function') {
                 window.renderQualityShiftInspectionLog();
@@ -756,6 +906,9 @@
             }
             if (typeof window.renderSmokingViolationsTables === 'function') {
                 window.renderSmokingViolationsTables();
+            }
+            if (typeof window.renderFieldCAPARegistry === 'function') {
+                window.renderFieldCAPARegistry();
             }
             if (typeof window.renderShiftQuickIncidentsList === 'function') {
                 window.renderShiftQuickIncidentsList();
@@ -869,9 +1022,13 @@
 
         // 6. مزامنة جولة تفتيشية أو قائمة جولات
         syncRound(roundData) {
-            if (!this.db || !roundData) return Promise.resolve(false);
-            const key = this.sanitizeFirebaseKey(roundData.id);
-            const cleanData = JSON.parse(JSON.stringify(roundData));
+            if (!roundData) return Promise.resolve(false);
+            const roundKeys = ['ksumc_safety_rounds', 'ksumc_field_rounds', 'ksumc_rounds_registry'];
+            this.markLocalPendingState(roundKeys, 'rounds', roundData, true);
+            if (!this.db) return Promise.resolve(false);
+
+            const cleanData = this.normalizeCloudPayload('rounds', roundData);
+            const key = this.sanitizeFirebaseKey(cleanData.id);
             
             const p1 = this.db.ref('rounds/' + key).set(cleanData);
             let p2 = Promise.resolve();
@@ -881,16 +1038,20 @@
                     const shiftLogs = this.safeParseJSON('ksumc_quality_shift_inspection_logs', []);
                     const matchingLog = shiftLogs.find(l => String(l.id) === String(roundData.id) || String(l.roundId) === String(roundData.id));
                     if (matchingLog) {
-                        p2 = this.db.ref('shift_inspection_logs/' + key).set(JSON.parse(JSON.stringify(matchingLog)));
+                        this.markLocalPendingState(['ksumc_quality_shift_inspection_logs'], null, matchingLog, true);
+                        const cleanLog = this.normalizeCloudPayload('shift_inspection_logs', matchingLog);
+                        p2 = this.db.ref('shift_inspection_logs/' + key).set(cleanLog);
                     }
                 } catch (_) {}
             }
 
             return Promise.all([p1, p2]).then(() => {
+                this.markLocalPendingState(roundKeys, 'rounds', cleanData, false);
+                this.markLocalPendingState(['ksumc_quality_shift_inspection_logs'], null, cleanData, false);
                 this.notifySystemUpdate('sync_round_' + key);
                 return true;
             }).catch(err => {
-                console.warn('[KSU-Firebase] تعذر مزامنة الجولة:', err);
+                console.warn('[KSU-Firebase] تعذر مزامنة الجولة (محفوظة محلياً وسيعاد الرفع تلقائياً):', err);
                 return false;
             });
         }
@@ -902,10 +1063,15 @@
 
         // 7. مزامنة سجل التفتيش اليومي للورديات
         syncShiftLogRecord(record) {
-            if (!this.db || !record) return Promise.resolve(false);
-            const key = this.sanitizeFirebaseKey(record.id);
-            const cleanData = JSON.parse(JSON.stringify(record));
+            if (!record) return Promise.resolve(false);
+            const logKeys = ['ksumc_quality_shift_inspection_logs'];
+            this.markLocalPendingState(logKeys, null, record, true);
+            if (!this.db) return Promise.resolve(false);
+
+            const cleanData = this.normalizeCloudPayload('shift_inspection_logs', record);
+            const key = this.sanitizeFirebaseKey(cleanData.id);
             return this.db.ref('shift_inspection_logs/' + key).set(cleanData).then(() => {
+                this.markLocalPendingState(logKeys, null, cleanData, false);
                 this.notifySystemUpdate('sync_shift_log_' + key);
                 return true;
             }).catch(err => {
@@ -916,22 +1082,20 @@
 
         syncShiftLogs(recordsArray) {
             if (!this.db || this.isUpdatingFromRemote || !Array.isArray(recordsArray)) return Promise.resolve(false);
-            const payload = {};
-            recordsArray.forEach(item => {
-                if (!item || !item.id) return;
-                payload[this.sanitizeFirebaseKey(item.id)] = JSON.parse(JSON.stringify(item));
-            });
-            return this.db.ref('shift_inspection_logs').set(payload).catch(err => {
-                console.warn('[KSU-Firebase] تعذر مزامنة قائمة سجل الورديات:', err);
-            });
+            return this.pushCollectionToFirebase('shift_inspection_logs', recordsArray, 'id');
         }
 
         // 8. مزامنة تقارير إدارة السلامة الميدانية (-> H1)
         syncSafetyDeptReport(reportObj) {
-            if (!this.db || !reportObj) return Promise.resolve(false);
-            const key = this.sanitizeFirebaseKey(reportObj.id);
-            const cleanData = JSON.parse(JSON.stringify(reportObj));
+            if (!reportObj) return Promise.resolve(false);
+            const repKeys = ['ksumc_safety_dept_reports'];
+            this.markLocalPendingState(repKeys, 'safetyDeptReports', reportObj, true);
+            if (!this.db) return Promise.resolve(false);
+
+            const cleanData = this.normalizeCloudPayload('safety_dept_reports', reportObj);
+            const key = this.sanitizeFirebaseKey(cleanData.id);
             return this.db.ref('safety_dept_reports/' + key).set(cleanData).then(() => {
+                this.markLocalPendingState(repKeys, 'safetyDeptReports', cleanData, false);
                 this.notifySystemUpdate('sync_safety_report_' + key);
                 return true;
             }).catch(err => {
@@ -947,10 +1111,15 @@
 
         // 9. مزامنة سجل الامتثال لسباهي والاعتمادات الرسمية
         syncComplianceRecord(complianceObj) {
-            if (!this.db || !complianceObj) return Promise.resolve(false);
-            const key = this.sanitizeFirebaseKey(complianceObj.id);
-            const cleanData = JSON.parse(JSON.stringify(complianceObj));
+            if (!complianceObj) return Promise.resolve(false);
+            const compKeys = ['ksumc_compliance_registry'];
+            this.markLocalPendingState(compKeys, 'complianceRegistry', complianceObj, true);
+            if (!this.db) return Promise.resolve(false);
+
+            const cleanData = this.normalizeCloudPayload('compliance_registry', complianceObj);
+            const key = this.sanitizeFirebaseKey(cleanData.id);
             return this.db.ref('compliance_registry/' + key).set(cleanData).then(() => {
+                this.markLocalPendingState(compKeys, 'complianceRegistry', cleanData, false);
                 this.notifySystemUpdate('sync_compliance_' + key);
                 return true;
             }).catch(err => {
@@ -961,10 +1130,15 @@
 
         // 10. مزامنة طلبات فتح الأبواب وتصاريح العمل الساخن (-> Q1)
         syncDoor(doorObj) {
-            if (!this.db || !doorObj) return Promise.resolve(false);
-            const key = this.sanitizeFirebaseKey(doorObj.id);
-            const cleanData = JSON.parse(JSON.stringify(doorObj));
+            if (!doorObj) return Promise.resolve(false);
+            const doorKeys = ['ksumc_safety_doors'];
+            this.markLocalPendingState(doorKeys, 'doors', doorObj, true);
+            if (!this.db) return Promise.resolve(false);
+
+            const cleanData = this.normalizeCloudPayload('doors', doorObj);
+            const key = this.sanitizeFirebaseKey(cleanData.id);
             return this.db.ref('doors/' + key).set(cleanData).then(() => {
+                this.markLocalPendingState(doorKeys, 'doors', cleanData, false);
                 this.notifySystemUpdate('sync_door_' + key);
                 return true;
             }).catch(() => false);
@@ -976,10 +1150,15 @@
         }
 
         syncPermit(permitObj) {
-            if (!this.db || !permitObj) return Promise.resolve(false);
-            const key = this.sanitizeFirebaseKey(permitObj.id);
-            const cleanData = JSON.parse(JSON.stringify(permitObj));
+            if (!permitObj) return Promise.resolve(false);
+            const permitKeys = ['ksumc_safety_permits'];
+            this.markLocalPendingState(permitKeys, 'permits', permitObj, true);
+            if (!this.db) return Promise.resolve(false);
+
+            const cleanData = this.normalizeCloudPayload('permits', permitObj);
+            const key = this.sanitizeFirebaseKey(cleanData.id);
             return this.db.ref('permits/' + key).set(cleanData).then(() => {
+                this.markLocalPendingState(permitKeys, 'permits', cleanData, false);
                 this.notifySystemUpdate('sync_permit_' + key);
                 return true;
             }).catch(() => false);
@@ -990,12 +1169,17 @@
             return this.pushCollectionToFirebase('permits', permitsArray, 'id');
         }
 
-        // 11. مزامنة تقارير الأكواد، الحوادث السريعة، مخالفات السلامة، ومخالفات التدخين (-> H1)
+        // 11. مزامنة تقارير الأكواد، الحوادث السريعة، مخالفات السلامة، مخالفات التدخين، وإجراءات CAPA (-> H1)
         syncAlarm(alarmObj) {
-            if (!this.db || !alarmObj) return Promise.resolve(false);
-            const key = this.sanitizeFirebaseKey(alarmObj.id);
-            const cleanData = JSON.parse(JSON.stringify(alarmObj));
+            if (!alarmObj) return Promise.resolve(false);
+            const alarmKeys = ['ksumc_safety_alarms'];
+            this.markLocalPendingState(alarmKeys, 'alarms', alarmObj, true);
+            if (!this.db) return Promise.resolve(false);
+
+            const cleanData = this.normalizeCloudPayload('alarms', alarmObj);
+            const key = this.sanitizeFirebaseKey(cleanData.id);
             return this.db.ref('alarms/' + key).set(cleanData).then(() => {
+                this.markLocalPendingState(alarmKeys, 'alarms', cleanData, false);
                 this.notifySystemUpdate('sync_alarm_' + key);
                 return true;
             }).catch(() => false);
@@ -1007,10 +1191,15 @@
         }
 
         syncShiftIncident(incObj) {
-            if (!this.db || !incObj) return Promise.resolve(false);
-            const key = this.sanitizeFirebaseKey(incObj.id);
-            const cleanData = JSON.parse(JSON.stringify(incObj));
+            if (!incObj) return Promise.resolve(false);
+            const incKeys = ['ksumc_shift_incidents'];
+            this.markLocalPendingState(incKeys, 'shiftIncidents', incObj, true);
+            if (!this.db) return Promise.resolve(false);
+
+            const cleanData = this.normalizeCloudPayload('shift_incidents', incObj);
+            const key = this.sanitizeFirebaseKey(cleanData.id);
             return this.db.ref('shift_incidents/' + key).set(cleanData).then(() => {
+                this.markLocalPendingState(incKeys, 'shiftIncidents', cleanData, false);
                 this.notifySystemUpdate('sync_shift_inc_' + key);
                 return true;
             }).catch(() => false);
@@ -1022,10 +1211,15 @@
         }
 
         syncSafetyViolation(violObj) {
-            if (!this.db || !violObj) return Promise.resolve(false);
-            const key = this.sanitizeFirebaseKey(violObj.id);
-            const cleanData = JSON.parse(JSON.stringify(violObj));
+            if (!violObj) return Promise.resolve(false);
+            const violKeys = ['ksumc_safety_violations'];
+            this.markLocalPendingState(violKeys, 'safetyViolations', violObj, true);
+            if (!this.db) return Promise.resolve(false);
+
+            const cleanData = this.normalizeCloudPayload('safety_violations', violObj);
+            const key = this.sanitizeFirebaseKey(cleanData.id);
             return this.db.ref('safety_violations/' + key).set(cleanData).then(() => {
+                this.markLocalPendingState(violKeys, 'safetyViolations', cleanData, false);
                 this.notifySystemUpdate('sync_safety_viol_' + key);
                 return true;
             }).catch(() => false);
@@ -1037,10 +1231,15 @@
         }
 
         syncSmokingViolation(violObj) {
-            if (!this.db || !violObj) return Promise.resolve(false);
-            const key = this.sanitizeFirebaseKey(violObj.id);
-            const cleanData = JSON.parse(JSON.stringify(violObj));
+            if (!violObj) return Promise.resolve(false);
+            const smkKeys = ['ksumc_smoking_violations'];
+            this.markLocalPendingState(smkKeys, 'smokingViolations', violObj, true);
+            if (!this.db) return Promise.resolve(false);
+
+            const cleanData = this.normalizeCloudPayload('smoking_violations', violObj);
+            const key = this.sanitizeFirebaseKey(cleanData.id);
             return this.db.ref('smoking_violations/' + key).set(cleanData).then(() => {
+                this.markLocalPendingState(smkKeys, 'smokingViolations', cleanData, false);
                 this.notifySystemUpdate('sync_smoking_viol_' + key);
                 return true;
             }).catch(() => false);
@@ -1049,6 +1248,29 @@
         syncSmokingViolationsList(violArray) {
             if (!this.db || this.isUpdatingFromRemote || !Array.isArray(violArray)) return Promise.resolve(false);
             return this.pushCollectionToFirebase('smoking_violations', violArray, 'id');
+        }
+
+        syncCAPARecord(capaObj) {
+            if (!capaObj) return Promise.resolve(false);
+            const capaKeys = ['ksumc_capa_registry', 'ksumc_capa_records'];
+            this.markLocalPendingState(capaKeys, 'capa', capaObj, true);
+            if (!this.db) return Promise.resolve(false);
+
+            const cleanData = this.normalizeCloudPayload('capa_records', capaObj);
+            const key = this.sanitizeFirebaseKey(cleanData.id);
+            return this.db.ref('capa_records/' + key).set(cleanData).then(() => {
+                this.markLocalPendingState(capaKeys, 'capa', cleanData, false);
+                this.notifySystemUpdate('sync_capa_' + key);
+                return true;
+            }).catch(err => {
+                console.warn('[KSU-Firebase] تعذر مزامنة سجل CAPA:', err);
+                return false;
+            });
+        }
+
+        syncCAPAList(capaArray) {
+            if (!this.db || this.isUpdatingFromRemote || !Array.isArray(capaArray)) return Promise.resolve(false);
+            return this.pushCollectionToFirebase('capa_records', capaArray, 'id');
         }
 
         // 12. تصفير ومزامنة سجل التفتيش اليومي للورديات أو مسح جميع الجولات التجريبية سحابياً ومحلياً
@@ -1212,19 +1434,32 @@
 
         // 14. مزامنة البلاغات الميدانية
         syncIncident(incidentData) {
-            if (!this.db || !incidentData) return;
-            const incId = this.sanitizeFirebaseKey(incidentData.id || ('INC-' + Date.now()));
-            this.db.ref('incidents/' + incId).set(JSON.parse(JSON.stringify(incidentData)));
+            if (!incidentData) return Promise.resolve(false);
+            const incKeys = ['ksumc_incidents'];
+            this.markLocalPendingState(incKeys, 'incidents', incidentData, true);
+            if (!this.db) return Promise.resolve(false);
+
+            const cleanData = this.normalizeCloudPayload('incidents', incidentData);
+            const incId = this.sanitizeFirebaseKey(cleanData.id || ('INC-' + Date.now()));
+            return this.db.ref('incidents/' + incId).set(cleanData).then(() => {
+                this.markLocalPendingState(incKeys, 'incidents', cleanData, false);
+                return true;
+            }).catch(() => false);
         }
 
         // 15. مزامنة الإشعارات والتوجيهات التنفيذية اللحظية للمفتشين والمشرفين
         syncNotification(notifObj) {
-            if (!this.db || !notifObj) return Promise.resolve(false);
-            const key = this.sanitizeFirebaseKey(notifObj.id || ('DIR-' + Date.now()));
-            const cleanData = JSON.parse(JSON.stringify(Object.assign({}, notifObj, {
+            if (!notifObj) return Promise.resolve(false);
+            const notifKeys = ['ksumc_notifications'];
+            this.markLocalPendingState(notifKeys, 'notifications', notifObj, true);
+            if (!this.db) return Promise.resolve(false);
+
+            const cleanData = this.normalizeCloudPayload('notifications', Object.assign({}, notifObj, {
                 originDeviceId: notifObj.originDeviceId || this.deviceId
-            })));
+            }));
+            const key = this.sanitizeFirebaseKey(cleanData.id || ('DIR-' + Date.now()));
             return this.db.ref('notifications/' + key).set(cleanData).then(() => {
+                this.markLocalPendingState(notifKeys, 'notifications', cleanData, false);
                 this.notifySystemUpdate('sync_notification_' + key);
                 return true;
             }).catch(err => {
