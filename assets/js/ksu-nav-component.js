@@ -56,14 +56,7 @@
       url: 'profile.html',
       badgeBg: 'bg-emerald-50 text-emerald-800 border-emerald-300'
     },
-    developer: {
-      id: 'developer',
-      name: 'بوابة مطور النظام',
-      fullName: 'بوابة مطور النظام والتهيئة السحابية (رابط خاص)',
-      icon: 'terminal',
-      url: 'developer.html',
-      badgeBg: 'bg-slate-900 text-white border-slate-700'
-    },
+
     
   };
 
@@ -142,10 +135,10 @@
       const roleCat = (window.KSUAuth && typeof window.KSUAuth.getRoleCategory === 'function') ? window.KSUAuth.getRoleCategory(user) : (user?.roleCategory || 'guest');
       const currentPortal = PORTALS[activeKey] || PORTALS.field;
 
-      const userName = user ? user.name : 'أ. علي سليمان الصقري';
+      const userName = user ? user.name : 'مشرف الوردية';
       const userRole = user ? (user.role || 'مشرف السلامة الميدانية') : 'مشرف السلامة الميدانية';
-      const userInitials = userName.split(' ').filter(Boolean).map(n => n[0]).slice(0, 2).join('') || 'عص';
-      const userEmpId = user ? (user.empId || user.employeeId || '95972') : '95972';
+      const userInitials = userName.split(' ').filter(Boolean).map(n => n[0]).slice(0, 2).join('') || 'مش';
+      const userEmpId = user ? (user.empId || user.employeeId || 'S1') : 'S1';
       const userShift = user ? (user.shift || 'الوردية الأولى (صباحي)') : 'الوردية الأولى';
       const userFacility = user ? (user.facility || 'المدينة الطبية بجامعة الملك سعود - KSUMC') : 'المدينة الطبية بجامعة الملك سعود';
 
@@ -276,14 +269,8 @@
                   <span class="material-symbols-outlined text-xs text-slate-400">chevron_left</span>
                 </a>
 
+
                 ${isDeveloper ? `
-                <a href="developer.html" class="menu-item-row flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-all shadow-2xs" style="background-color: #faf5ff !important;">
-                  <span class="flex items-center gap-2.5">
-                    <span class="material-symbols-outlined text-base text-purple-700">terminal</span>
-                    <span>بوابة مطور النظام والتهيئة</span>
-                  </span>
-                  <span class="text-[9px] bg-purple-700 text-white px-1.5 py-0.5 rounded font-black">DEV</span>
-                </a>
                 <a href="admin.html" class="menu-item-row flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-800 bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-all shadow-2xs" style="background-color: #f8fafc !important;">
                   <span class="flex items-center gap-2.5">
                     <span class="material-symbols-outlined text-base text-slate-600">admin_panel_settings</span>

@@ -1,6 +1,6 @@
 {
   "rules": {
-    ".read": true,
+    ".read": false,
     ".write": false,
 
     "users": {
@@ -138,7 +138,7 @@
       ".indexOn": ["timestamp", "priority", "targetRole"],
       "$notifId": {
         ".write": true,
-        ".validate": "newData.hasChildren(['id', 'timestamp']) || !newData.exists()"
+        ".validate": "newData.hasChildren(['id']) && (newData.hasChild('timestamp') || newData.hasChild('createdAt') || newData.hasChild('date')) || !newData.exists()"
       }
     },
 
