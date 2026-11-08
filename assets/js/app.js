@@ -7256,6 +7256,12 @@ if (typeof KSU_WET_CHEM_ASSETS !== 'undefined' && Array.isArray(KSU_WET_CHEM_ASS
   if (wetToPush.length > 0) INITIAL_ASSETS.push(...wetToPush);
 }
 
+if (typeof KSU_FACP_ASSETS !== 'undefined' && Array.isArray(KSU_FACP_ASSETS)) {
+  const existingFacpIds = new Set(INITIAL_ASSETS.map(a => a.id));
+  const facpToPush = KSU_FACP_ASSETS.filter(a => !existingFacpIds.has(a.id));
+  if (facpToPush.length > 0) INITIAL_ASSETS.push(...facpToPush);
+}
+
 
 // -------------------------------------------------------------
 // DATE RANGE & TIMELINE FILTER UTILITY
@@ -9573,7 +9579,8 @@ function resolveCanonicalBuildingCode(rawBuilding) {
 
   // 3. كلية الطب (East Medicine College - Code C - Blocks 1, 2, 4, 5, 7, 8, 22, 23)
   if (
-    (b.includes('كلية الطب') || b.includes('كليه الطب') || b.includes('المبنى الشرقي لكلية الطب') || b.toLowerCase().includes('east medicine college')) &&
+    (b.includes('كلية الطب') || b.includes('كليه الطب') || b.includes('المبنى الشرقي') || b.toLowerCase().includes('east medicine college')) &&
+    !b.includes('المستشفى الشرقي') &&
     !b.includes('توسعة') &&
     !b.includes('توسعه') &&
     !b.includes('الغربي')
@@ -9733,6 +9740,16 @@ function getAllPlantRoomAssets() {
   return (typeof KSU_PLANT_ROOM_ASSETS !== 'undefined' && Array.isArray(KSU_PLANT_ROOM_ASSETS)) ? KSU_PLANT_ROOM_ASSETS : [];
 }
 
+function getAllFacpAssets() {
+  const fromState = (state.assets || []).filter(a =>
+    (a.category && (a.category.includes('لوحات') || a.category.includes('إنذار') || a.category.includes('الحريق'))) ||
+    (a.id && a.id.startsWith('FACP-')) ||
+    (a.type && a.type.includes('لوحة إنذار'))
+  );
+  if (fromState.length > 0) return fromState;
+  return (typeof KSU_FACP_ASSETS !== 'undefined' && Array.isArray(KSU_FACP_ASSETS)) ? KSU_FACP_ASSETS : [];
+}
+
 function populateRoundFloorOptions(selectedBuilding, desiredFloor = null) {
   const floorSelect = document.getElementById('inp-round-floor');
   if (!floorSelect) return;
@@ -9877,6 +9894,52 @@ function populateRoundFloorOptions(selectedBuilding, desiredFloor = null) {
     return;
   }
 
+  if (formType === 'fas_insp' || formType === 'fas_test') {
+    const facpAssets = getAllFacpAssets();
+    const bldFacpAssets = selectedBuilding === 'all'
+      ? facpAssets
+      : facpAssets.filter(a => matchBuilding(a.building || a.buildingTab, selectedBuilding));
+
+    let baseFloors = [];
+    if (selectedBuilding === 'all') {
+      baseFloors = ['القبو الثاني (B2)', 'القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)'];
+    } else {
+      baseFloors = [...(BUILDING_FLOOR_MAP[selectedBuilding] || ['القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)'])];
+    }
+
+    // Ensure any floor present in bldFacpAssets is included
+    bldFacpAssets.forEach(a => {
+      if (a.floor && !baseFloors.some(f => matchFloor(f, a.floor))) {
+        baseFloors.push(a.floor);
+      }
+    });
+
+    const optionsHtml = [
+      `<option value="all">جميع الأدوار (${bldFacpAssets.length} لوحة إنذار حريق)</option>`,
+      ...baseFloors.map(f => {
+        const cnt = bldFacpAssets.filter(a => matchFloor(a.floor, f)).length;
+        return `<option value="${f}">${f}${cnt > 0 ? ` — [${cnt} لوحة إنذار]` : ' — (لا يوجد)'}</option>`;
+      })
+    ];
+    floorSelect.innerHTML = optionsHtml.join('');
+
+    const targetFloor = desiredFloor || state.currentRoundDraft?.floor || 'all';
+    const targetCount = targetFloor === 'all' ? bldFacpAssets.length : bldFacpAssets.filter(a => matchFloor(a.floor, targetFloor)).length;
+
+    if (targetFloor === 'all') {
+      floorSelect.value = 'all';
+    } else if (baseFloors.includes(targetFloor) && targetCount > 0) {
+      floorSelect.value = targetFloor;
+    } else {
+      const firstFloorWithFacp = baseFloors.find(f => bldFacpAssets.some(a => matchFloor(a.floor, f)));
+      floorSelect.value = firstFloorWithFacp || 'all';
+    }
+    if (state.currentRoundDraft) {
+      state.currentRoundDraft.floor = floorSelect.value;
+    }
+    return;
+  }
+
   const floors = BUILDING_FLOOR_MAP[selectedBuilding] || ['الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)'];
   floorSelect.innerHTML = floors.map(f => `<option value="${f}">${f}</option>`).join('');
   const targetFloor = desiredFloor || state.currentRoundDraft?.floor || 'الدور الأرضي (G)';
@@ -9926,6 +9989,14 @@ function populateDynamicDropdowns() {
           const displayName = bldAliasLabels[b.name] || b.name;
           return `<option value="${b.name}">[${b.code}] ${displayName}${cnt > 0 ? ` — (${cnt} غرفة صناعية)` : ' — (0)'}</option>`;
         }).join('');
+    } else if (formType === 'fas_insp' || formType === 'fas_test') {
+      const facpAssets = getAllFacpAssets();
+      buildingSelect.innerHTML = `<option value="all">🚨 جميع مباني المدينة الطبية (${facpAssets.length} لوحة إنذار حريق)</option>` +
+        bldList.map(b => {
+          const cnt = facpAssets.filter(a => matchBuilding(a.building || a.buildingTab, b.name)).length;
+          const displayName = bldAliasLabels[b.name] || b.name;
+          return `<option value="${b.name}">[${b.code}] ${displayName}${cnt > 0 ? ` — (${cnt} لوحة إنذار حريق)` : ' — (0)'}</option>`;
+        }).join('');
     } else {
       buildingSelect.innerHTML = bldList.map(b => {
         const displayName = bldAliasLabels[b.name] || b.name;
@@ -9933,7 +10004,7 @@ function populateDynamicDropdowns() {
       }).join('');
     }
     const desiredBuilding = state.currentRoundDraft?.building || (bldList && bldList.length > 0 ? bldList[0].name : 'المستشفى');
-    if (desiredBuilding === 'all' && (formType === 'fm200' || formType === 'ind_room')) {
+    if (desiredBuilding === 'all' && (formType === 'fm200' || formType === 'ind_room' || formType === 'fas_insp' || formType === 'fas_test')) {
       buildingSelect.value = 'all';
     } else if (bldList.some(b => b.name === desiredBuilding)) {
       buildingSelect.value = desiredBuilding;
@@ -10030,6 +10101,11 @@ function onRoundBuildingChange(buildingName) {
 
   state.currentRoundDraft.floorAssetsStatus = null;
   renderFloorAssetsReconciliation();
+
+  const formType = (state.currentRoundDraft && state.currentRoundDraft.formType) || document.getElementById('inp-round-form-type')?.value;
+  if (typeof window.updateSpecializedFormFields === 'function') {
+    window.updateSpecializedFormFields(formType);
+  }
 }
 
 function onRoundFloorChange(floorName) {
@@ -10041,6 +10117,11 @@ function onRoundFloorChange(floorName) {
   }
   state.currentRoundDraft.floorAssetsStatus = null;
   renderFloorAssetsReconciliation();
+
+  const formType = (state.currentRoundDraft && state.currentRoundDraft.formType) || document.getElementById('inp-round-form-type')?.value;
+  if (typeof window.updateSpecializedFormFields === 'function') {
+    window.updateSpecializedFormFields(formType);
+  }
 }
 
 function onFm200RoundSearch(queryStr) {
@@ -10058,9 +10139,9 @@ function renderFloorAssetsReconciliation() {
   const formType = (state.currentRoundDraft && state.currentRoundDraft.formType) || document.getElementById('inp-round-form-type')?.value || 'fex';
   const fm200Search = (state.currentRoundDraft?.fm200SearchQuery || '').trim().toLowerCase();
 
-  // 5 inspection forms currently have registered assets in the system:
-  // Fire Extinguishers (fex), FM-200 (fm200), Emergency Exits (ext), Fire Hose Cabinets (fhc), Plant Rooms (ind_room)
-  const assetSupportedForms = ['fex', 'fm200', 'ext', 'fhc', 'ind_room'];
+  // 6 inspection forms currently have registered assets in the system:
+  // Fire Extinguishers (fex), FM-200 (fm200), Emergency Exits (ext), Fire Hose Cabinets (fhc), Plant Rooms (ind_room), Fire Alarm Panels (fas_insp, fas_test)
+  const assetSupportedForms = ['fex', 'fm200', 'ext', 'fhc', 'ind_room', 'fas_insp', 'fas_test'];
   if (!assetSupportedForms.includes(formType)) {
     container.classList.add('hidden');
     container.innerHTML = '';
@@ -10102,6 +10183,12 @@ function renderFloorAssetsReconciliation() {
   } else if (formType === 'ind_room') {
     const allPlantRooms = getAllPlantRoomAssets();
     floorAssets = allPlantRooms.filter(a =>
+      matchBuilding(a.building || a.buildingTab, currentBuilding) &&
+      matchFloor(a.floor, currentFloor)
+    );
+  } else if (formType === 'fas_insp' || formType === 'fas_test') {
+    const allFacp = getAllFacpAssets();
+    floorAssets = allFacp.filter(a =>
       matchBuilding(a.building || a.buildingTab, currentBuilding) &&
       matchFloor(a.floor, currentFloor)
     );
@@ -10168,9 +10255,11 @@ function renderFloorAssetsReconciliation() {
                 ? 'سجل أصول ومطابقة أنظمة الإطفاء بالغاز النظيف (FM-200) بالمدينة الطبية (61 نظام معتمد)'
                 : (formType === 'ind_room'
                     ? 'سجل أصول ومطابقة الغرف الصناعية ومحطات الخدمات بالمدينة الطبية (40 غرفة معتمدة)'
-                    : (formType === 'elevators'
-                        ? 'سجل ومطابقة مصاعد المبنى ومخارج الطوارئ بالدور'
-                        : 'سجل ومطابقة أصول السلامة والوقاية بالدور (شامل)')))));
+                    : (formType === 'fas_insp' || formType === 'fas_test'
+                        ? 'سجل أصول ومطابقة لوحات نظام إنذار الحريق (Fire Alarm Control Panels - 10 لوحات معتمدة)'
+                        : (formType === 'elevators'
+                            ? 'سجل ومطابقة مصاعد المبنى ومخارج الطوارئ بالدور'
+                            : 'سجل ومطابقة أصول السلامة والوقاية بالدور (شامل)'))))));
 
   const headerIcon = formType === 'ext' 
     ? 'sensor_door' 
@@ -10180,9 +10269,11 @@ function renderFloorAssetsReconciliation() {
             ? 'air' 
             : (formType === 'ind_room'
                 ? 'precision_manufacturing'
-                : (formType === 'elevators' 
-                    ? 'elevator' 
-                    : (formType === 'fex' ? 'fire_extinguisher' : 'fact_check')))));
+                : (formType === 'fas_insp' || formType === 'fas_test'
+                    ? 'emergency_home'
+                    : (formType === 'elevators' 
+                        ? 'elevator' 
+                        : (formType === 'fex' ? 'fire_extinguisher' : 'fact_check'))))));
 
   // Build FM-200 Quick Building & Floor Filter Bar if formType === 'fm200'
   let fm200FilterPanelHtml = '';
@@ -10360,6 +10451,90 @@ function renderFloorAssetsReconciliation() {
     `;
   }
 
+  // Build Fire Alarm Control Panels Quick Building & Floor Filter Bar if formType === 'fas_insp' || formType === 'fas_test'
+  let facpFilterPanelHtml = '';
+  if (formType === 'fas_insp' || formType === 'fas_test') {
+    const allFacp = getAllFacpAssets();
+    const facpBuildings = [
+      { key: 'all', label: 'جميع المباني', code: 'الكل', count: allFacp.length },
+      { key: 'كلية الطب', label: 'المبنى الشرقي (كلية الطب)', code: 'C', count: allFacp.filter(a => matchBuilding(a.building || a.buildingTab, 'كلية الطب')).length },
+      { key: 'المستشفى', label: 'مبنى المستشفى (الرئيسي)', code: 'A', count: allFacp.filter(a => matchBuilding(a.building || a.buildingTab, 'المستشفى')).length },
+      { key: 'المبنى الإداري', label: 'المبنى الإداري', code: 'D', count: allFacp.filter(a => matchBuilding(a.building || a.buildingTab, 'المبنى الإداري')).length },
+      { key: 'العناية المركزة', label: 'العناية المركزة', code: 'H', count: allFacp.filter(a => matchBuilding(a.building || a.buildingTab, 'العناية المركزة')).length },
+      { key: 'المستودعات الخارجية', label: 'المستودع الطبي المركزي O', code: 'O', count: allFacp.filter(a => matchBuilding(a.building || a.buildingTab, 'المستودعات الخارجية')).length }
+    ];
+
+    const bldFacpAssets = currentBuilding === 'all'
+      ? allFacp
+      : allFacp.filter(a => matchBuilding(a.building || a.buildingTab, currentBuilding));
+
+    const floorOrder = ['القبو الثاني (B2)', 'القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)'];
+    const activeFloorsInBld = floorOrder
+      .map(fl => ({ floor: fl, count: bldFacpAssets.filter(a => matchFloor(a.floor, fl)).length }))
+      .filter(item => item.count > 0);
+
+    facpFilterPanelHtml = `
+      <div class="rounded-xl bg-red-50/50 border border-red-200 p-3 flex flex-col gap-2.5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5 text-xs font-extrabold text-red-950">
+            <span class="material-symbols-outlined text-base text-red-600">emergency_home</span>
+            <span>فلترة لوحات إنذار الحريق حسب المبنى والدور (${allFacp.length} لوحة معتمدة):</span>
+          </div>
+          <span class="text-[11px] font-bold text-red-800 bg-red-100/70 px-2 py-0.5 rounded-lg border border-red-200">SBC 801 • NFPA 72</span>
+        </div>
+
+        <!-- Building Filter Pills -->
+        <div class="flex flex-col gap-1">
+          <span class="text-[10px] font-bold text-slate-600">1. اختر المبنى لمعاينة عدد اللوحات المخصصة له:</span>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            ${facpBuildings.map(b => {
+              const isSelected = (currentBuilding === 'all' && b.key === 'all') || (b.key !== 'all' && matchBuilding(currentBuilding, b.key));
+              return `
+                <button type="button" onclick="onRoundBuildingChange('${b.key}')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-red-700 text-white shadow-xs ring-2 ring-red-300'
+                    : 'bg-white hover:bg-red-50 text-slate-800 border border-slate-300'
+                }">
+                  <span class="px-1 rounded text-[9px] font-mono ${isSelected ? 'bg-white/20 text-white' : 'bg-red-100 text-red-800'}">${b.code}</span>
+                  <span>${b.label}</span>
+                  <span class="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${isSelected ? 'bg-amber-400 text-amber-950' : 'bg-red-50 text-red-700 border border-red-200'}">${b.count}</span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Floor Filter Pills -->
+        <div class="flex flex-col gap-1 pt-1 border-t border-red-200/60">
+          <span class="text-[10px] font-bold text-slate-600">2. اختر الدور المتواجدة به اللوحة في (${currentBuilding === 'all' ? 'جميع المباني' : currentBuilding}):</span>
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <button type="button" onclick="onRoundFloorChange('all')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 ${
+              currentFloor === 'all'
+                ? 'bg-slate-800 text-white shadow-xs'
+                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-300'
+            }">
+              <span>جميع الأدوار بالمبنى</span>
+              <span class="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${currentFloor === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'}">${bldFacpAssets.length}</span>
+            </button>
+            ${activeFloorsInBld.map(fl => {
+              const isFlSelected = currentFloor !== 'all' && matchFloor(currentFloor, fl.floor);
+              return `
+                <button type="button" onclick="onRoundFloorChange('${fl.floor}')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 ${
+                  isFlSelected
+                    ? 'bg-red-600 text-white shadow-xs'
+                    : 'bg-white hover:bg-red-50 text-red-950 border border-red-300'
+                }">
+                  <span>${fl.floor}</span>
+                  <span class="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${isFlSelected ? 'bg-white/20 text-white' : 'bg-red-100 text-red-800'}">${fl.count}</span>
+                </button>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   container.innerHTML = `
     <!-- Top Header of the Reconciliation Card (Image 2) -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-outline-variant/30">
@@ -10386,6 +10561,7 @@ function renderFloorAssetsReconciliation() {
 
     ${fm200FilterPanelHtml}
     ${indRoomFilterPanelHtml}
+    ${facpFilterPanelHtml}
 
     <!-- 5 KPI Summary Boxes (Image 2) -->
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
@@ -10446,9 +10622,10 @@ function renderFloorAssetsReconciliation() {
           const isFhcAsset = (asset.category && (asset.category.includes('صناديق') || asset.category.includes('خراطيم'))) || (asset.type && (asset.type.includes('صندوق') || asset.type.includes('خرطوم'))) || (asset.id && (asset.id.startsWith('FHC-') || asset.id.startsWith('FH-') || asset.id.startsWith('PL0') || asset.id.startsWith('PL')));
           const isFm200Asset = (asset.category && (asset.category.includes('FM') || asset.category.includes('غاز'))) || (asset.id && asset.id.startsWith('FM'));
           const isIndAsset = (asset.category && asset.category.includes('الغرف الصناعية')) || (asset.id && asset.id.startsWith('IND-'));
+          const isFacpAsset = (asset.category && (asset.category.includes('إنذار') || asset.category.includes('لوحات'))) || (asset.id && asset.id.startsWith('FACP-'));
           const isExtAsset = asset.category === 'طفايات الحريق' || (asset.id && (asset.id.startsWith('FE-') || asset.id.startsWith('EXT-')));
-          const assetIconName = isExitAsset ? 'sensor_door' : (isFhcAsset ? 'fire_hydrant' : (isFm200Asset ? 'air' : (isIndAsset ? 'precision_manufacturing' : (isExtAsset ? 'fire_extinguisher' : 'inventory_2'))));
-          const assetBadgeColor = isExitAsset ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : (isFhcAsset ? 'bg-red-50 text-red-800 border-red-200' : (isFm200Asset ? 'bg-sky-50 text-sky-900 border-sky-200' : (isIndAsset ? 'bg-indigo-50 text-indigo-900 border-indigo-200' : 'bg-amber-50 text-amber-800 border-amber-200')));
+          const assetIconName = isFacpAsset ? 'emergency_home' : (isExitAsset ? 'sensor_door' : (isFhcAsset ? 'fire_hydrant' : (isFm200Asset ? 'air' : (isIndAsset ? 'precision_manufacturing' : (isExtAsset ? 'fire_extinguisher' : 'inventory_2')))));
+          const assetBadgeColor = isFacpAsset ? 'bg-red-50 text-red-900 border-red-200' : (isExitAsset ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : (isFhcAsset ? 'bg-red-50 text-red-800 border-red-200' : (isFm200Asset ? 'bg-sky-50 text-sky-900 border-sky-200' : (isIndAsset ? 'bg-indigo-50 text-indigo-900 border-indigo-200' : 'bg-amber-50 text-amber-800 border-amber-200'))));
           
           return `
             <div class="rounded-xl border ${isCompliant ? 'border-emerald-500 bg-emerald-50/20' : (isObservation ? 'border-red-400 bg-red-50/20' : 'border-outline-variant/50 bg-surface-container-lowest')} p-3 flex flex-col sm:flex-row items-center justify-between gap-2 transition-all hover:shadow-sm">
@@ -10476,6 +10653,9 @@ function renderFloorAssetsReconciliation() {
                     <span>${asset.category || 'أصل سلامة'}</span>
                   </span>
                   ${asset.block ? `<span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-bold font-mono">${asset.block}</span>` : ''}
+                  ${asset.loopsCount ? `<span class="px-2 py-0.5 rounded-full bg-red-100 text-red-950 border border-red-300 text-[10px] font-bold font-mono">🔄 ${asset.loopsCount} دوائر</span>` : ''}
+                  ${asset.devicesCount ? `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-300 text-[10px] font-bold font-mono">📡 ${asset.devicesCount.toLocaleString()} نقطة/جهاز</span>` : ''}
+                  ${asset.zone ? `<span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-bold">التغطية: ${asset.zone}</span>` : ''}
                   ${asset.manufacturer ? `<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-[10px] font-bold">${asset.manufacturer}${asset.model ? ' - ' + asset.model : ''}</span>` : ''}
                   ${isCompliant 
                     ? `<span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold"><span class="material-symbols-outlined text-xs">check</span> فحصت وسليمة</span>`
@@ -10527,6 +10707,16 @@ function verifyAllFloorAssets() {
       matchBuilding(a.building || a.buildingTab, currentBuilding) &&
       matchFloor(a.floor, currentFloor)
     );
+  } else if (formType === 'fas_insp' || formType === 'fas_test') {
+    floorAssets = getAllFacpAssets().filter(a =>
+      matchBuilding(a.building || a.buildingTab, currentBuilding) &&
+      matchFloor(a.floor, currentFloor)
+    );
+  } else if (formType === 'ind_room') {
+    floorAssets = getAllPlantRoomAssets().filter(a =>
+      matchBuilding(a.building || a.buildingTab, currentBuilding) &&
+      matchFloor(a.floor, currentFloor)
+    );
   } else {
     floorAssets = (state.assets || []).filter(a => matchBuilding(a.building, currentBuilding) && matchFloor(a.floor, currentFloor));
     if (formType === 'fex') floorAssets = floorAssets.filter(a => a.category === 'طفايات الحريق' || (a.id && (a.id.startsWith('FE-') || a.id.startsWith('EXT-'))));
@@ -10543,7 +10733,7 @@ function verifyAllFloorAssets() {
   });
 
   renderFloorAssetsReconciliation();
-  const label = formType === 'ext' ? 'مخارج طوارئ' : (formType === 'fhc' ? 'صناديق حريق' : (formType === 'fm200' ? 'أنظمة الإطفاء بغاز FM-200' : 'أصول سلامة'));
+  const label = formType === 'ext' ? 'مخارج طوارئ' : (formType === 'fhc' ? 'صناديق حريق' : (formType === 'fm200' ? 'أنظمة الإطفاء بغاز FM-200' : ((formType === 'fas_insp' || formType === 'fas_test') ? 'لوحات إنذار الحريق' : (formType === 'ind_room' ? 'الغرف الصناعية' : 'أصول سلامة'))));
   showToast(`تم فحص وتأكيد جاهزية جميع ${label} (${floorAssets.length}) بنجاح بنسبة 100%.`, 'success');
 }
 
@@ -10556,6 +10746,8 @@ function toggleFloorAssetStatus(assetId, status) {
       showToast('تعليمات فحص صندوق الحريق: التأكد من سلامة الصندوق والزجاج، خلو الممر من العوائق، سلامة محبس المياه والبكرة وفوهة القذف وعدم وجود أي تسريب مياه.', 'info');
     } else if (formType === 'fm200') {
       showToast('تعليمات فحص نظام FM-200: التحقق من ضغط الأسطوانات في النطاق الأخضر، سلامة لوحة التحكم وخلوها من أعطال (Fault/Trouble)، وجود مسمار الأمان على وحدة الإطلاق اليدوي، سلامة الفوهات، وإحكام إغلاق الغرفة.', 'info');
+    } else if (formType === 'fas_insp' || formType === 'fas_test') {
+      showToast('تعليمات فحص لوحة إنذار الحريق: التأكد من خلو اللوحة من إشارات الأعطال (Trouble)، استقرار التيار الكهربائي AC، سلامة شحن البطاريات، وسلامة مصابيح البيان ومفاتيح التشغيل.', 'info');
     } else {
       showToast('تعليمات فحص الطفاية: التأكد من مؤشر الضغط في النطاق الأخضر، سريان بطاقة الفحص الشهرية، سلامة مسمار الأمان والخرطوم، وسهولة الوصول إليها.', 'info');
     }
@@ -11996,6 +12188,8 @@ function saveNewInspectionRound() {
     const actualPressure = document.getElementById('inp-round-pressure')?.value || '';
     const loopNo = document.getElementById('inp-round-loop')?.value || '';
     const devicesNo = document.getElementById('inp-round-devices')?.value || '';
+    const zone = document.getElementById('inp-round-zone')?.value || '';
+    const facpAssetId = document.getElementById('sel-round-facp-asset')?.value || '';
     const ppmDate = document.getElementById('inp-round-ppm-date')?.value || '';
     const blok = document.getElementById('inp-round-blok')?.value || '';
     const photos = (window.roundPhotosList && window.roundPhotosList.length > 0) ? [...window.roundPhotosList] : (state.currentRoundDraft?.photos || []);
@@ -12161,6 +12355,8 @@ function saveNewInspectionRound() {
       actualPressure,
       loopNo,
       devicesNo,
+      zone,
+      facpAssetId,
       ppmDate,
       blok,
       photos,

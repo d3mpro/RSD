@@ -673,7 +673,68 @@
           </div>
         </div>
       `;
-    } else if (formType === 'wet_chem' || formType === 'fas_insp' || formType === 'fm200') {
+    } else if (formType === 'fas_insp' || formType === 'fas_test') {
+      container.classList.remove('hidden');
+      const curBld = document.getElementById('inp-round-building')?.value || (window.state && window.state.currentRoundDraft && window.state.currentRoundDraft.building) || 'المستشفى';
+      const curFlr = document.getElementById('inp-round-floor')?.value || (window.state && window.state.currentRoundDraft && window.state.currentRoundDraft.floor) || 'all';
+
+      const allFacp = (typeof getAllFacpAssets === 'function') ? getAllFacpAssets() : ((typeof KSU_FACP_ASSETS !== 'undefined') ? KSU_FACP_ASSETS : []);
+      const bldFacp = curBld === 'all'
+        ? allFacp
+        : allFacp.filter(a => (typeof matchBuilding === 'function') ? matchBuilding(a.building || a.buildingTab, curBld) : true);
+      
+      const floorFacp = curFlr === 'all'
+        ? bldFacp
+        : bldFacp.filter(a => (typeof matchFloor === 'function') ? matchFloor(a.floor, curFlr) : true);
+
+      const targetList = floorFacp.length > 0 ? floorFacp : bldFacp;
+      const initialPanel = targetList[0] || null;
+
+      container.innerHTML = `
+        <div class="p-3.5 rounded-2xl bg-red-50/70 border border-red-200 flex flex-col gap-2.5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+            <span class="text-xs font-bold text-red-950 flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-base text-red-700">emergency_home</span>
+              <span>لوحة إنذار الحريق المستهدفة بالفحص (FACP Selection):</span>
+            </span>
+            <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-red-100 text-red-900 border border-red-200">
+              المتوفر بالمبنى: ${bldFacp.length} لوحة | بالدور: ${floorFacp.length} لوحة
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div>
+              <label class="text-[10px] font-bold text-slate-700 block mb-1">اختر اللوحة المسجلة في هذا المبنى والدور:</label>
+              <select id="sel-round-facp-asset" onchange="window.onFacpPanelSelectChange(this.value)" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-red-300 text-xs font-bold text-red-950 outline-none focus:ring-2 focus:ring-red-500">
+                ${bldFacp.length === 0 ? `<option value="">(لا توجد لوحات مسجلة بهذا المبنى)</option>` :
+                  bldFacp.map(p => `<option value="${p.id}" ${initialPanel && initialPanel.id === p.id ? 'selected' : ''}>[${p.controlNo}] ${p.name} — ${p.floor}</option>`).join('')
+                }
+                <option value="custom">✏️ إدخال لوحة يدوياً / أخرى...</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-[10px] font-bold text-slate-700 block mb-1">منطقة التغطية (Zone Coverage):</label>
+              <input type="text" id="inp-round-zone" placeholder="مثال: كامل المبنى أو B2/B1/0/1/2" value="${initialPanel ? (initialPanel.zone || '') : ''}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-red-300 text-xs font-bold text-slate-800 outline-none">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div>
+              <label class="text-[10px] font-bold text-slate-700 block mb-1">رقم الدائرة (Loop NO):</label>
+              <input type="text" id="inp-round-loop" placeholder="مثال: 10 دوائر" value="${initialPanel ? initialPanel.loopsCount : '1'}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-red-300 text-xs font-bold text-slate-800 outline-none">
+            </div>
+            <div>
+              <label class="text-[10px] font-bold text-slate-700 block mb-1">عدد الأجهزة والحساسات (Devices NO):</label>
+              <input type="text" id="inp-round-devices" placeholder="مثال: 1487 جهازاً" value="${initialPanel ? (initialPanel.devicesCount || '') : ''}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-red-300 text-xs font-bold text-slate-800 outline-none">
+            </div>
+            <div>
+              <label class="text-[10px] font-bold text-slate-700 block mb-1">تاريخ الـ PPM القادم:</label>
+              <input type="date" id="inp-round-ppm-date" value="${initialPanel && initialPanel.nextPpmDate ? initialPanel.nextPpmDate : ''}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-red-300 text-xs font-bold text-slate-800 outline-none">
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (formType === 'wet_chem' || formType === 'fm200') {
       container.classList.remove('hidden');
       container.innerHTML = `
         <div class="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 flex flex-col gap-2">
@@ -1083,6 +1144,44 @@
       </html>
     `);
     printWin.document.close();
+  };
+
+  /**
+   * دالة المزامنة التلقائية عند اختيار لوحة إنذار حريق من القائمة
+   */
+  window.onFacpPanelSelectChange = function(panelId) {
+    if (!panelId || panelId === 'custom') return;
+    const allFacp = (typeof getAllFacpAssets === 'function') ? getAllFacpAssets() : ((typeof KSU_FACP_ASSETS !== 'undefined') ? KSU_FACP_ASSETS : []);
+    const panel = allFacp.find(p => p.id === panelId);
+    if (!panel) return;
+
+    const loopInp = document.getElementById('inp-round-loop');
+    const devInp = document.getElementById('inp-round-devices');
+    const zoneInp = document.getElementById('inp-round-zone');
+    const ppmInp = document.getElementById('inp-round-ppm-date');
+    const roomInp = document.getElementById('inp-round-room');
+
+    if (loopInp) loopInp.value = panel.loopsCount || '';
+    if (devInp) devInp.value = panel.devicesCount || '';
+    if (zoneInp) zoneInp.value = panel.zone || '';
+    if (ppmInp && panel.nextPpmDate) ppmInp.value = panel.nextPpmDate;
+    if (roomInp && panel.room) roomInp.value = panel.room;
+
+    if (panel.floor) {
+      const floorSelect = document.getElementById('inp-round-floor');
+      if (floorSelect && typeof window.matchFloor === 'function' && !window.matchFloor(floorSelect.value, panel.floor)) {
+        const matchOpt = Array.from(floorSelect.options).find(o => window.matchFloor(o.value, panel.floor));
+        if (matchOpt) {
+          floorSelect.value = matchOpt.value;
+          if (window.state && window.state.currentRoundDraft) {
+            window.state.currentRoundDraft.floor = matchOpt.value;
+          }
+          if (typeof renderFloorAssetsReconciliation === 'function') {
+            renderFloorAssetsReconciliation();
+          }
+        }
+      }
+    }
   };
 
 })();
