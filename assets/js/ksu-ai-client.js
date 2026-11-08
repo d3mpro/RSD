@@ -4260,8 +4260,8 @@
               </div>
             </td>
             <td style="width: 32%; text-align: center; vertical-align: top; font-size: 8px; padding: 2px;">
-              <div style="font-weight: bold; color: #334155; margin-bottom: 14px;">مشرف الوردية / رئيس القسم</div>
-              <div style="font-weight: 600; color: #082B49;">إدارة السلامة والأمن الميداني</div>
+              <div style="font-weight: bold; color: #334155; margin-bottom: 14px;">رئيس إدارة السلامة</div>
+              <div style="font-weight: 600; color: #082B49;">إدارة السلامة</div>
               <div style="font-size: 7px; color: #64748b;">الاعتماد: ___________________</div>
             </td>
           </tr>
@@ -4523,7 +4523,7 @@
           <tr>
             <td style="width: 33%; text-align: center; vertical-align: top; font-size: 8px; padding: 2px;">
               <div style="font-weight: bold; color: #334155; margin-bottom: 14px;">إعداد: مشرف العمليات المناوب</div>
-              <div style="font-weight: 600; color: #082B49;">وحدة السلامة والأمن الميداني</div>
+              <div style="font-weight: 600; color: #082B49;">إدارة السلامة</div>
               <div style="font-size: 7px; color: #64748b;">التوقيع: ___________________</div>
             </td>
             <td style="width: 34%; text-align: center; vertical-align: middle; padding: 2px;">
@@ -4657,7 +4657,7 @@
               </div>
             </td>
             <td style="width: 33%; text-align: center; vertical-align: top; font-size: 8px; padding: 2px;">
-              <div style="font-weight: bold; color: #334155; margin-bottom: 14px;">رئيس إدارة السلامة والأمن</div>
+              <div style="font-weight: bold; color: #334155; margin-bottom: 14px;">رئيس إدارة السلامة</div>
               <div style="font-weight: 600; color: #082B49;">المدينة الطبية الجامعية</div>
               <div style="font-size: 7px; color: #64748b;">الاعتماد: ___________________</div>
             </td>

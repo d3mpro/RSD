@@ -18026,7 +18026,7 @@ function printSingleRound(roundId) {
       <td colspan="2" style="border: 1px solid #000; padding: 4px 8px; vertical-align: middle;">
         <div style="display: flex; justify-content: space-between; font-weight: 800; margin-bottom: 2px; font-size: 10px;">
           <span style="font-family: Arial, sans-serif;">Head Of Department</span>
-          <span>رئيس الادارة</span>
+          <span>رئيس إدارة السلامة</span>
         </div>
         <div style="font-weight: 800; color: #000; text-align: center; font-size: 11px;">
           مصعب عبد الله الحماد

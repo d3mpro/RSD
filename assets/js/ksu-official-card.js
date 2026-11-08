@@ -430,9 +430,9 @@
               </div>
             </td>
             <td style="width: 32%; text-align: center; vertical-align: top; font-size: 8px; padding: 2px;">
-              <div style="font-weight: bold; color: #334155; margin-bottom: 12px;">مشرف الوردية / رئيس الإدارة</div>
+              <div style="font-weight: bold; color: #334155; margin-bottom: 12px;">رئيس إدارة السلامة</div>
               <div style="font-weight: bold; color: #082B49;">${headOfDept}</div>
-              <div style="font-size: 7px; color: #004B87; font-weight: bold; margin-top: 2px;">رئيس إدارة السلامة والأمن الميداني</div>
+              <div style="font-size: 7px; color: #004B87; font-weight: bold; margin-top: 2px;">إدارة السلامة</div>
             </td>
           </tr>
         </table>
@@ -483,13 +483,13 @@
 
     modal = document.createElement('div');
     modal.id = 'ksu-official-card-modal';
-    modal.className = 'fixed inset-0 z-[9999] bg-slate-900/85 backdrop-blur-md flex flex-col items-center justify-start p-3 sm:p-6 overflow-y-auto font-cairo';
+    modal.className = 'fixed inset-0 z-[9999] bg-slate-900/85 backdrop-blur-md flex flex-col items-center justify-start p-2.5 sm:p-6 overflow-y-auto font-cairo pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(1.75rem,env(safe-area-inset-bottom))]';
     modal.style.direction = 'rtl';
 
     const cardContentHtml = window.generateOfficialInspectionCardHtml(round);
 
     modal.innerHTML = `
-      <div class="max-w-4xl w-full flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200 my-auto">
+      <div class="max-w-4xl w-full flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200 my-0 sm:my-auto">
         
         <!-- Top Action Bar (no-print) -->
         <div class="no-print bg-slate-800 text-white px-4 py-3 rounded-2xl flex items-center justify-between shadow-xl border border-slate-700">
