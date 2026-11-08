@@ -31,7 +31,7 @@ const KSU_SCOPES = [
 ];
 
 const KSU_SHAREPOINT_SAFETY_SITE_URL = 'https://ksusa.sharepoint.com/sites/safty';
-const KSU_ONEDRIVE_1TB_URL = 'https://ksusa-my.sharepoint.com';
+const KSU_ONEDRIVE_1TB_URL = 'https://ksusa-my.sharepoint.com/:f:/r/personal/aalsaqri_ksu_edu_sa/Documents/RSD-ARSHIF?d=w2a3f0d59821549b4b63102cc80dc59a8&csf=1&web=1&e=U7ue9B';
 const ARCHIVED_IDS_STORAGE_KEY = 'ksumc_archived_card_ids';
 const CUSTOM_FOLDER_URL_KEY = 'ksumc_custom_sharepoint_folder_url';
 
@@ -1073,7 +1073,7 @@ class KSUCloudSyncEngine {
               </a>
               <a href="${KSU_ONEDRIVE_1TB_URL}" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 12px;border-radius:11px;background:#0284c7;color:#ffffff;text-decoration:none;font-size:12px;font-weight:800;">
                 <span class="material-symbols-outlined" style="font-size:18px;">cloud_done</span>
-                <span>فتح مستودع OneDrive الجامعي (1 TB)</span>
+                <span>فتح مجلد الأرشيف السحابي RSD-ARSHIF (1 TB)</span>
               </a>
             </div>
             <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
