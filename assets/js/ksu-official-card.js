@@ -702,200 +702,18 @@
           </div>
         </div>
       `;
-    } else if (formType === 'fas_insp' || formType === 'fas_test') {
+    } else if (formType === 'wet_chem' || formType === 'fas_insp' || formType === 'fas_test' || formType === 'fm200') {
       container.classList.remove('hidden');
       const curBld = document.getElementById('inp-round-building')?.value || (window.state && window.state.currentRoundDraft && window.state.currentRoundDraft.building) || 'المستشفى';
-      const allFacp = (typeof getAllFacpAssets === 'function') ? getAllFacpAssets() : ((typeof KSU_FACP_ASSETS !== 'undefined') ? KSU_FACP_ASSETS : []);
-      const draftAssetId = window.state && window.state.currentRoundDraft && window.state.currentRoundDraft.facpAssetId;
-      
-      let initialPanel = null;
-      if (draftAssetId) {
-        initialPanel = allFacp.find(p => p.id === draftAssetId || p.controlNo === draftAssetId) || null;
-      }
-      if (!initialPanel && curBld && curBld !== 'all') {
-        initialPanel = allFacp.find(a => (typeof matchBuilding === 'function') ? matchBuilding(a.building || a.buildingTab, curBld) : true) || null;
-      }
-      if (!initialPanel && allFacp.length > 0) {
-        initialPanel = allFacp[0];
-      }
+      const curFl = document.getElementById('inp-round-floor')?.value || (window.state && window.state.currentRoundDraft && window.state.currentRoundDraft.floor) || 'الدور الأرضي (G)';
+      const allFacp = (typeof getAllFacpAssets === 'function') ? getAllFacpAssets() : [];
+      const floorPanels = allFacp.filter(a => (typeof matchBuilding === 'function' ? matchBuilding(a.building || a.buildingTab, curBld) : true) && (typeof matchFloor === 'function' ? matchFloor(a.floor, curFl) : true));
+      const activePanel = floorPanels[0] || allFacp.find(a => (typeof matchBuilding === 'function' ? matchBuilding(a.building || a.buildingTab, curBld) : true)) || null;
 
-      const panelsCardsHtml = allFacp.map(panel => {
-        const isTrouble = (panel.controlNo === 'NM-0022113') || (panel.operationalStatus && panel.operationalStatus.includes('Trouble')) || (panel.status && panel.status.includes('عطل'));
-        const isSelected = initialPanel && initialPanel.id === panel.id;
+      const defaultLoop = (activePanel && activePanel.loopsCount) ? `${activePanel.loopsCount}` : 'LOOP-01';
+      const defaultDevices = (activePanel && activePanel.devicesCount) ? `${activePanel.devicesCount}` : '32 نقطة';
+      const defaultPpm = (activePanel && activePanel.nextPpmDate) ? activePanel.nextPpmDate : '';
 
-        return `
-          <div id="facp-card-${panel.id}"
-               data-panel-id="${panel.id}"
-               data-control-no="${panel.controlNo}"
-               data-building-code="${panel.buildingCode}"
-               data-zone="${panel.zone || ''}"
-               onclick="window.selectFacpPanelCard('${panel.id}')"
-               class="facp-panel-card cursor-pointer p-3 rounded-xl border-2 transition-all flex flex-col justify-between gap-2 shadow-2xs ${
-                 isSelected
-                   ? 'border-red-600 bg-red-50/90 ring-1 ring-red-400'
-                   : (isTrouble ? 'border-amber-300 bg-amber-50/40 hover:border-amber-400' : 'border-slate-200 bg-white hover:border-red-300 hover:bg-slate-50/60')
-               }">
-            
-            <!-- Card Top Header -->
-            <div class="flex items-center justify-between gap-1.5">
-              <div class="flex items-center gap-1.5">
-                <span class="material-symbols-outlined text-sm text-slate-500">apartment</span>
-                <span class="text-[11px] font-extrabold text-[#002B49]">${panel.buildingTab || panel.building} (${panel.buildingCode}) • ${panel.floor}</span>
-              </div>
-              ${isTrouble ? `
-                <span class="px-2 py-0.5 rounded-full text-[9.5px] font-black bg-amber-100 text-amber-950 border border-amber-400 flex items-center gap-1 shadow-2xs">
-                  <span class="material-symbols-outlined text-xs text-amber-700">warning</span>
-                  <span>يوجد إشارة عطل (Trouble)</span>
-                </span>
-              ` : `
-                <span class="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                  <span class="material-symbols-outlined text-xs text-emerald-600">check_circle</span>
-                  <span>سليم وتعمل (Active)</span>
-                </span>
-              `}
-            </div>
-
-            <!-- Card Body -->
-            <div class="flex items-center justify-between gap-2 pt-0.5">
-              <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined facp-card-radio text-lg ${isSelected ? 'text-red-600' : 'text-slate-400'}">
-                  ${isSelected ? 'radio_button_checked' : 'radio_button_unchecked'}
-                </span>
-                <div>
-                  <div class="flex items-center gap-1.5">
-                    <span class="font-mono font-black text-xs px-1.5 py-0.5 rounded bg-slate-100 border border-slate-300 text-red-950">${panel.controlNo}</span>
-                    <span class="text-xs font-bold text-slate-900 truncate max-w-[190px]">${panel.name}</span>
-                  </div>
-                  <span class="text-[10px] font-medium text-slate-600 block mt-0.5">منطقة: <strong class="text-slate-800">${panel.zone}</strong></span>
-                </div>
-              </div>
-            </div>
-
-            ${isTrouble ? `
-              <div class="text-[9.5px] font-bold text-amber-900 bg-amber-100/70 p-1.5 rounded-lg border border-amber-300 flex items-center gap-1">
-                <span class="material-symbols-outlined text-xs text-amber-700">report</span>
-                <span>تنبيه: اللوحة مسجل عليها إشارة عطل - تتطلب معاينة دقيقة وملاحظات تصحيحية (CAPA)</span>
-              </div>
-            ` : ''}
-
-            <!-- Card Footer Metrics -->
-            <div class="flex items-center justify-between pt-1 border-t border-slate-200/80 text-[10px] font-bold text-slate-600">
-              <div class="flex items-center gap-3">
-                <span>الدوائر: <strong class="text-red-700 font-mono">${panel.loopsCount}</strong> Loops</span>
-                <span>الأجهزة: <strong class="text-slate-800 font-mono">${panel.devicesCount}</strong></span>
-              </div>
-              <span class="text-slate-500 font-medium">PPM: ${panel.nextPpmDate || 'محدث'}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-
-      const dropdownOptionsHtml = allFacp.map(p =>
-        `<option value="${p.id}" ${initialPanel && initialPanel.id === p.id ? 'selected' : ''}>[${p.controlNo}] ${p.name} — ${p.floor}</option>`
-      ).join('') + `<option value="custom">✏️ إدخال لوحة يدوياً / أخرى...</option>`;
-
-      container.innerHTML = `
-        <div class="p-4 rounded-2xl bg-gradient-to-b from-red-50/70 to-slate-50/80 border-2 border-red-200 shadow-sm space-y-3">
-          <!-- Header Bar -->
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-red-100">
-            <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-red-600 text-xl">emergency_home</span>
-              <div>
-                <h4 class="text-xs font-black text-[#002B49] flex items-center gap-1.5">
-                  <span>سجل لوحات إنذار الحريق المعتمدة</span>
-                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-800 border border-red-300">FACP Registry</span>
-                </h4>
-                <p class="text-[10px] font-semibold text-slate-500">اختر لوحة التحكم المستهدفة بالفحص والمطابقة الدورية (SBC 801 / NFPA 72)</p>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <span class="text-[11px] font-bold px-2.5 py-1 rounded-xl bg-white border border-slate-200 text-slate-700 shadow-2xs">
-                إجمالي: <strong class="text-red-600">10 لوحات</strong> | <strong class="text-slate-800">47 دائرة</strong>
-              </span>
-            </div>
-          </div>
-
-          <!-- Building Filter Pills -->
-          <div>
-            <label class="text-[11px] font-bold text-slate-700 block mb-1.5">تصفية سريعة حسب المبنى المعتمد:</label>
-            <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
-              <button type="button" onclick="window.setFacpBuildingFilter('all')" data-facp-pill="all" class="facp-filter-pill px-3 py-1.5 rounded-xl font-bold transition-all shadow-2xs bg-red-600 text-white">الكل (10)</button>
-              <button type="button" onclick="window.setFacpBuildingFilter('C')" data-facp-pill="C" class="facp-filter-pill px-3 py-1.5 rounded-xl font-semibold transition-all bg-white border border-slate-300 text-slate-700 hover:bg-slate-100">المبنى الشرقي C (2)</button>
-              <button type="button" onclick="window.setFacpBuildingFilter('A')" data-facp-pill="A" class="facp-filter-pill px-3 py-1.5 rounded-xl font-semibold transition-all bg-white border border-slate-300 text-slate-700 hover:bg-slate-100">المستشفى الرئيسي A (5)</button>
-              <button type="button" onclick="window.setFacpBuildingFilter('D')" data-facp-pill="D" class="facp-filter-pill px-3 py-1.5 rounded-xl font-semibold transition-all bg-white border border-slate-300 text-slate-700 hover:bg-slate-100">الإداري D (1)</button>
-              <button type="button" onclick="window.setFacpBuildingFilter('H')" data-facp-pill="H" class="facp-filter-pill px-3 py-1.5 rounded-xl font-semibold transition-all bg-white border border-slate-300 text-slate-700 hover:bg-slate-100">العناية المركزة H (1)</button>
-              <button type="button" onclick="window.setFacpBuildingFilter('O')" data-facp-pill="O" class="facp-filter-pill px-3 py-1.5 rounded-xl font-semibold transition-all bg-white border border-slate-300 text-slate-700 hover:bg-slate-100">المستودعات O (1)</button>
-            </div>
-          </div>
-
-          <!-- Live Search Bar -->
-          <div class="relative">
-            <span class="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-lg">search</span>
-            <input type="text" id="inp-facp-search" oninput="window.filterFacpPanels()" placeholder="بحث فوري برقم اللوحة (مثال: FA0074...)، المنطقة، أو المبنى..." class="w-full pr-10 pl-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-semibold text-slate-800 outline-none focus:border-red-500 focus:ring-1 focus:ring-red-400">
-          </div>
-
-          <!-- Visual Panels Grid -->
-          <div id="facp-panels-grid" class="grid grid-cols-1 md:grid-cols-2 gap-2.5 max-h-[340px] overflow-y-auto pr-1">
-            ${panelsCardsHtml}
-          </div>
-          <div id="facp-empty-state" class="hidden p-6 rounded-xl bg-white border border-dashed border-slate-300 text-center flex flex-col items-center gap-1.5">
-            <span class="material-symbols-outlined text-2xl text-slate-400">search_off</span>
-            <span class="text-xs font-bold text-slate-700">لا توجد لوحات مطابقة للبحث أو التصفية الحالية</span>
-          </div>
-
-          <!-- Selected Panel Banner & Synchronized Form Fields -->
-          <div id="facp-selected-panel-banner" class="p-3 rounded-xl bg-white border border-red-300 shadow-2xs space-y-2.5">
-            <!-- Dropdown (Synchronized with selectFacpPanelCard) -->
-            <div class="flex items-center justify-between gap-2">
-              <div class="flex items-center gap-1.5">
-                <span class="material-symbols-outlined text-red-600 text-base">check_circle</span>
-                <span class="text-[11px] font-bold text-[#002B49]">اللوحة المختارة المعتمدة:</span>
-                <span id="facp-selected-panel-title" class="text-xs font-black text-red-700">${initialPanel ? `[${initialPanel.controlNo}] ${initialPanel.name} — ${initialPanel.floor}` : 'لم يتم التحديد'}</span>
-              </div>
-              <select id="sel-round-facp-asset" onchange="window.onFacpPanelSelectChange(this.value)" class="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-100 border border-slate-300 text-slate-800 outline-none">
-                ${dropdownOptionsHtml}
-              </select>
-            </div>
-
-            <!-- Synchronized Form Inputs -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div>
-                <label class="text-[10px] font-bold text-slate-700 block mb-0.5">منطقة التغطية (Zone Coverage):</label>
-                <input type="text" id="inp-round-zone" value="${initialPanel ? (initialPanel.zone || '') : ''}" placeholder="مثال: كامل المبنى أو B2/B1/0/1/2" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-red-500">
-              </div>
-              <div>
-                <label class="text-[10px] font-bold text-slate-700 block mb-0.5">موقع اللوحة / الغرفة الفنية:</label>
-                <input type="text" id="inp-round-room" value="${initialPanel ? (initialPanel.room || '') : ''}" placeholder="غرفة لوحات الإنذار" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-red-500">
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <div>
-                <label class="text-[10px] font-bold text-slate-700 block mb-0.5">عدد الدوائر (Loops NO):</label>
-                <input type="text" id="inp-round-loop" value="${initialPanel ? initialPanel.loopsCount : '1'}" placeholder="مثال: 10" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-red-500">
-              </div>
-              <div>
-                <label class="text-[10px] font-bold text-slate-700 block mb-0.5">عدد الأجهزة والنقاط (Devices NO):</label>
-                <input type="text" id="inp-round-devices" value="${initialPanel ? (initialPanel.devicesCount || '') : ''}" placeholder="مثال: 1487" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-red-500">
-              </div>
-              <div>
-                <label class="text-[10px] font-bold text-slate-700 block mb-0.5">تاريخ الصيانة الدورية (PPM Date):</label>
-                <input type="date" id="inp-round-ppm-date" value="${initialPanel && initialPanel.nextPpmDate ? initialPanel.nextPpmDate : ''}" class="w-full px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-300 text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-red-500">
-              </div>
-            </div>
-          </div>
-        </div>
-      `;
-
-      if (initialPanel) {
-        setTimeout(() => {
-          if (typeof window.selectFacpPanelCard === 'function') {
-            window.selectFacpPanelCard(initialPanel.id);
-          }
-        }, 10);
-      }
-    } else if (formType === 'wet_chem' || formType === 'fm200') {
-      container.classList.remove('hidden');
       container.innerHTML = `
         <div class="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 flex flex-col gap-2">
           <div class="flex items-center justify-between">
@@ -908,15 +726,15 @@
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
               <label class="text-[10px] font-bold text-slate-700 block mb-1">رقم الدائرة (Loop NO):</label>
-              <input type="text" id="inp-round-loop" placeholder="مثال: LOOP-01" value="LOOP-01" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 outline-none">
+              <input type="text" id="inp-round-loop" placeholder="مثال: LOOP-01" value="${defaultLoop}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 outline-none">
             </div>
             <div>
               <label class="text-[10px] font-bold text-slate-700 block mb-1">عدد النقاط (Devices):</label>
-              <input type="text" id="inp-round-devices" placeholder="مثال: 24 نقطة" value="32 نقطة" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 outline-none">
+              <input type="text" id="inp-round-devices" placeholder="مثال: 24 نقطة" value="${defaultDevices}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 outline-none">
             </div>
             <div>
               <label class="text-[10px] font-bold text-slate-700 block mb-1">تاريخ الـ PPM القادم:</label>
-              <input type="date" id="inp-round-ppm-date" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 outline-none">
+              <input type="date" id="inp-round-ppm-date" value="${defaultPpm}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 outline-none">
             </div>
           </div>
         </div>

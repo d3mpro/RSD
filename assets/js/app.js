@@ -9526,7 +9526,7 @@ window.printAllPortalCards = printAllPortalCards;
 const BUILDING_FLOOR_MAP = {
   'المستشفى': ['القبو الثاني (B2)', 'القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'الدور الرابع (4)', 'الدور الخامس (5)', 'الدور السادس (6)', 'السطح (Roof)'],
   'التوسعة الشرقية': ['القبو الثاني (B2)', 'القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'الدور الرابع (4)', 'الدور الخامس (5)', 'ملحق السطح والخدمات (Roof)'],
-  'كلية الطب': ['الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'السطح (Roof)'],
+  'كلية الطب': ['القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'السطح (Roof)'],
   'توسعة كلية الطب': ['القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'السطح (Roof)'],
   'المبنى الإداري': ['القبو الثاني (B2)', 'القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'الدور الرابع (4)', 'السطح (Roof)'],
   'مبنى العيادات': ['القبو الأول (B1)', 'القبو (B)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'السطح (Roof)'],
@@ -9908,55 +9908,13 @@ function populateRoundFloorOptions(selectedBuilding, desiredFloor = null) {
     return;
   }
 
-  if (formType === 'fas_insp' || formType === 'fas_test') {
-    const facpAssets = getAllFacpAssets();
-    const bldFacpAssets = selectedBuilding === 'all'
-      ? facpAssets
-      : facpAssets.filter(a => matchBuilding(a.building || a.buildingTab, selectedBuilding));
-
-    let baseFloors = [];
-    if (selectedBuilding === 'all') {
-      baseFloors = ['القبو الثاني (B2)', 'القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)'];
-    } else {
-      baseFloors = [...(BUILDING_FLOOR_MAP[selectedBuilding] || ['القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)'])];
-    }
-
-    // Ensure any floor present in bldFacpAssets is included
-    bldFacpAssets.forEach(a => {
-      if (a.floor && !baseFloors.some(f => matchFloor(f, a.floor))) {
-        baseFloors.push(a.floor);
-      }
-    });
-
-    const optionsHtml = [
-      `<option value="all">جميع الأدوار (${bldFacpAssets.length} لوحة إنذار حريق)</option>`,
-      ...baseFloors.map(f => {
-        const cnt = bldFacpAssets.filter(a => matchFloor(a.floor, f)).length;
-        return `<option value="${f}">${f}${cnt > 0 ? ` — [${cnt} لوحة إنذار]` : ' — (لا يوجد)'}</option>`;
-      })
-    ];
-    floorSelect.innerHTML = optionsHtml.join('');
-
-    const targetFloor = desiredFloor || state.currentRoundDraft?.floor || 'all';
-    const targetCount = targetFloor === 'all' ? bldFacpAssets.length : bldFacpAssets.filter(a => matchFloor(a.floor, targetFloor)).length;
-
-    if (targetFloor === 'all') {
-      floorSelect.value = 'all';
-    } else if (baseFloors.includes(targetFloor) && targetCount > 0) {
-      floorSelect.value = targetFloor;
-    } else {
-      const firstFloorWithFacp = baseFloors.find(f => bldFacpAssets.some(a => matchFloor(a.floor, f)));
-      floorSelect.value = firstFloorWithFacp || 'all';
-    }
-    if (state.currentRoundDraft) {
-      state.currentRoundDraft.floor = floorSelect.value;
-    }
-    return;
-  }
-
   const floors = BUILDING_FLOOR_MAP[selectedBuilding] || ['الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)'];
   floorSelect.innerHTML = floors.map(f => `<option value="${f}">${f}</option>`).join('');
-  const targetFloor = desiredFloor || state.currentRoundDraft?.floor || 'الدور الأرضي (G)';
+  let defaultTargetFloor = 'الدور الأرضي (G)';
+  if ((formType === 'fas_insp' || formType === 'fas_test') && matchBuilding(selectedBuilding, 'كلية الطب')) {
+    defaultTargetFloor = 'القبو الأول (B1)';
+  }
+  const targetFloor = desiredFloor || (state.currentRoundDraft && state.currentRoundDraft.building === selectedBuilding ? state.currentRoundDraft.floor : null) || defaultTargetFloor;
   if (floors.includes(targetFloor)) {
     floorSelect.value = targetFloor;
   } else {
@@ -10003,14 +9961,6 @@ function populateDynamicDropdowns() {
           const displayName = bldAliasLabels[b.name] || b.name;
           return `<option value="${b.name}">[${b.code}] ${displayName}${cnt > 0 ? ` — (${cnt} غرفة صناعية)` : ' — (0)'}</option>`;
         }).join('');
-    } else if (formType === 'fas_insp' || formType === 'fas_test') {
-      const facpAssets = getAllFacpAssets();
-      buildingSelect.innerHTML = `<option value="all">🚨 جميع مباني المدينة الطبية (${facpAssets.length} لوحة إنذار حريق)</option>` +
-        bldList.map(b => {
-          const cnt = facpAssets.filter(a => matchBuilding(a.building || a.buildingTab, b.name)).length;
-          const displayName = bldAliasLabels[b.name] || b.name;
-          return `<option value="${b.name}">[${b.code}] ${displayName}${cnt > 0 ? ` — (${cnt} لوحة إنذار حريق)` : ' — (0)'}</option>`;
-        }).join('');
     } else {
       buildingSelect.innerHTML = bldList.map(b => {
         const displayName = bldAliasLabels[b.name] || b.name;
@@ -10018,7 +9968,7 @@ function populateDynamicDropdowns() {
       }).join('');
     }
     const desiredBuilding = state.currentRoundDraft?.building || (bldList && bldList.length > 0 ? bldList[0].name : 'المستشفى');
-    if (desiredBuilding === 'all' && (formType === 'fm200' || formType === 'ind_room' || formType === 'fas_insp' || formType === 'fas_test')) {
+    if (desiredBuilding === 'all' && (formType === 'fm200' || formType === 'ind_room')) {
       buildingSelect.value = 'all';
     } else if (bldList.some(b => b.name === desiredBuilding)) {
       buildingSelect.value = desiredBuilding;
@@ -10465,90 +10415,6 @@ function renderFloorAssetsReconciliation() {
     `;
   }
 
-  // Build Fire Alarm Control Panels Quick Building & Floor Filter Bar if formType === 'fas_insp' || formType === 'fas_test'
-  let facpFilterPanelHtml = '';
-  if (formType === 'fas_insp' || formType === 'fas_test') {
-    const allFacp = getAllFacpAssets();
-    const facpBuildings = [
-      { key: 'all', label: 'جميع المباني', code: 'الكل', count: allFacp.length },
-      { key: 'كلية الطب', label: 'المبنى الشرقي (كلية الطب)', code: 'C', count: allFacp.filter(a => matchBuilding(a.building || a.buildingTab, 'كلية الطب')).length },
-      { key: 'المستشفى', label: 'مبنى المستشفى (الرئيسي)', code: 'A', count: allFacp.filter(a => matchBuilding(a.building || a.buildingTab, 'المستشفى')).length },
-      { key: 'المبنى الإداري', label: 'المبنى الإداري', code: 'D', count: allFacp.filter(a => matchBuilding(a.building || a.buildingTab, 'المبنى الإداري')).length },
-      { key: 'العناية المركزة', label: 'العناية المركزة', code: 'H', count: allFacp.filter(a => matchBuilding(a.building || a.buildingTab, 'العناية المركزة')).length },
-      { key: 'المستودعات الخارجية', label: 'المستودع الطبي المركزي O', code: 'O', count: allFacp.filter(a => matchBuilding(a.building || a.buildingTab, 'المستودعات الخارجية')).length }
-    ];
-
-    const bldFacpAssets = currentBuilding === 'all'
-      ? allFacp
-      : allFacp.filter(a => matchBuilding(a.building || a.buildingTab, currentBuilding));
-
-    const floorOrder = ['القبو الثاني (B2)', 'القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)'];
-    const activeFloorsInBld = floorOrder
-      .map(fl => ({ floor: fl, count: bldFacpAssets.filter(a => matchFloor(a.floor, fl)).length }))
-      .filter(item => item.count > 0);
-
-    facpFilterPanelHtml = `
-      <div class="rounded-xl bg-red-50/50 border border-red-200 p-3 flex flex-col gap-2.5">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div class="flex items-center gap-1.5 text-xs font-extrabold text-red-950">
-            <span class="material-symbols-outlined text-base text-red-600">emergency_home</span>
-            <span>فلترة لوحات إنذار الحريق حسب المبنى والدور (${allFacp.length} لوحة معتمدة):</span>
-          </div>
-          <span class="text-[11px] font-bold text-red-800 bg-red-100/70 px-2 py-0.5 rounded-lg border border-red-200">SBC 801 • NFPA 72</span>
-        </div>
-
-        <!-- Building Filter Pills -->
-        <div class="flex flex-col gap-1">
-          <span class="text-[10px] font-bold text-slate-600">1. اختر المبنى لمعاينة عدد اللوحات المخصصة له:</span>
-          <div class="flex items-center gap-1.5 flex-wrap">
-            ${facpBuildings.map(b => {
-              const isSelected = (currentBuilding === 'all' && b.key === 'all') || (b.key !== 'all' && matchBuilding(currentBuilding, b.key));
-              return `
-                <button type="button" onclick="onRoundBuildingChange('${b.key}')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 ${
-                  isSelected
-                    ? 'bg-red-700 text-white shadow-xs ring-2 ring-red-300'
-                    : 'bg-white hover:bg-red-50 text-slate-800 border border-slate-300'
-                }">
-                  <span class="px-1 rounded text-[9px] font-mono ${isSelected ? 'bg-white/20 text-white' : 'bg-red-100 text-red-800'}">${b.code}</span>
-                  <span>${b.label}</span>
-                  <span class="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${isSelected ? 'bg-amber-400 text-amber-950' : 'bg-red-50 text-red-700 border border-red-200'}">${b.count}</span>
-                </button>
-              `;
-            }).join('')}
-          </div>
-        </div>
-
-        <!-- Floor Filter Pills -->
-        <div class="flex flex-col gap-1 pt-1 border-t border-red-200/60">
-          <span class="text-[10px] font-bold text-slate-600">2. اختر الدور المتواجدة به اللوحة في (${currentBuilding === 'all' ? 'جميع المباني' : currentBuilding}):</span>
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <button type="button" onclick="onRoundFloorChange('all')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 ${
-              currentFloor === 'all'
-                ? 'bg-slate-800 text-white shadow-xs'
-                : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-300'
-            }">
-              <span>جميع الأدوار بالمبنى</span>
-              <span class="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${currentFloor === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'}">${bldFacpAssets.length}</span>
-            </button>
-            ${activeFloorsInBld.map(fl => {
-              const isFlSelected = currentFloor !== 'all' && matchFloor(currentFloor, fl.floor);
-              return `
-                <button type="button" onclick="onRoundFloorChange('${fl.floor}')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 ${
-                  isFlSelected
-                    ? 'bg-red-600 text-white shadow-xs'
-                    : 'bg-white hover:bg-red-50 text-red-950 border border-red-300'
-                }">
-                  <span>${fl.floor}</span>
-                  <span class="px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${isFlSelected ? 'bg-white/20 text-white' : 'bg-red-100 text-red-800'}">${fl.count}</span>
-                </button>
-              `;
-            }).join('')}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
   container.innerHTML = `
     <!-- Top Header of the Reconciliation Card (Image 2) -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-outline-variant/30">
@@ -10575,7 +10441,6 @@ function renderFloorAssetsReconciliation() {
 
     ${fm200FilterPanelHtml}
     ${indRoomFilterPanelHtml}
-    ${facpFilterPanelHtml}
 
     <!-- 5 KPI Summary Boxes (Image 2) -->
     <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
@@ -10775,6 +10640,22 @@ function toggleFloorAssetStatus(assetId, status) {
     state.currentRoundDraft.floorAssetsStatus[assetId] = 'pending';
   } else {
     state.currentRoundDraft.floorAssetsStatus[assetId] = status;
+    if (status === 'compliant' && (formType === 'fas_insp' || formType === 'fas_test')) {
+      const allFacp = (typeof getAllFacpAssets === 'function') ? getAllFacpAssets() : [];
+      const panel = allFacp.find(p => p.id === assetId || p.controlNo === assetId);
+      if (panel) {
+        state.currentRoundDraft.facpAssetId = panel.id;
+        state.currentRoundDraft.zone = panel.zone;
+        state.currentRoundDraft.loopNo = panel.loopsCount;
+        state.currentRoundDraft.devicesNo = panel.devicesCount;
+        const inpLoop = document.getElementById('inp-round-loop');
+        const inpDev = document.getElementById('inp-round-devices');
+        const inpPpm = document.getElementById('inp-round-ppm-date');
+        if (inpLoop && panel.loopsCount) inpLoop.value = String(panel.loopsCount);
+        if (inpDev && panel.devicesCount) inpDev.value = String(panel.devicesCount);
+        if (inpPpm && panel.nextPpmDate) inpPpm.value = panel.nextPpmDate;
+      }
+    }
   }
   renderFloorAssetsReconciliation();
 }
