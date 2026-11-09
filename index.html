@@ -722,6 +722,10 @@
       const statusArea = document.getElementById('user-status-area');
 
       const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('page') === 'api' || window.location.hash === '#/api' || window.location.hash === '#api') {
+        window.location.href = './api.html';
+        return;
+      }
       const forceLogin = urlParams.get('login') === '1' || urlParams.get('switch') === '1';
 
       const isDemo = (window.KSUSystemMode && typeof window.KSUSystemMode.isDemo === 'function')

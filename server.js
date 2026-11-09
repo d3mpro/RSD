@@ -50,7 +50,9 @@ const ROUTE_ALIASES = {
   '/quality': '/quality.html',
   '/dashboard': '/dashboard.html',
   '/profile': '/profile.html',
-  '/developer': '/developer.html'
+  '/developer': '/developer.html',
+  '/api': '/api.html',
+  '/api.html': '/api.html'
 };
 
 function serveFile(res, targetPath) {

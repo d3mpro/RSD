@@ -65,6 +65,46 @@
     },
 
     /**
+     * جلب مفاتيح الذكاء الاصطناعي المركزية سحابياً من Firebase RTDB بصمت تام في الخلفية
+     */
+    async fetchCloudKeysSilently() {
+      try {
+        const rtdbUrl = (typeof window !== 'undefined' && window.KSU_FIREBASE_RTDB_URL)
+          || (typeof localStorage !== 'undefined' && localStorage.getItem('ksumc_rtdb_url'))
+          || 'https://rsd-ksu-default-rtdb.firebaseio.com';
+        const url = `${rtdbUrl.replace(/\/+$/, '')}/system_config/ai_keys.json`;
+        const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const timer = controller ? setTimeout(() => controller.abort(), 4000) : null;
+        const resp = await fetch(url, controller ? { signal: controller.signal } : {});
+        if (timer) clearTimeout(timer);
+        if (resp && resp.ok) {
+          const cfg = await resp.json();
+          if (cfg) {
+            let cloudGemini = '';
+            if (cfg.gemini_api_keys) cloudGemini = cfg.gemini_api_keys;
+            else if (Array.isArray(cfg.gemini_keys) && cfg.gemini_keys.length) cloudGemini = cfg.gemini_keys.join(',');
+            if (cloudGemini) {
+              this.geminiApiKey = cloudGemini;
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('ksumc_gemini_api_keys', cloudGemini);
+                localStorage.setItem('ksumc_gemini_api_key', cloudGemini);
+              }
+            }
+            if (cfg.qwen_api_key) {
+              this.qwenApiKey = cfg.qwen_api_key;
+              if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('ksumc_qwen_api_key', cfg.qwen_api_key);
+                localStorage.setItem('ksumc_qwen_api_keys', cfg.qwen_api_key);
+              }
+            }
+          }
+        }
+      } catch (_) {
+        // فحص صامت لا يعطل الواجهة أو يظهر أي أخطاء للمفتشين
+      }
+    },
+
+    /**
      * حفظ إعدادات وكيل أوراكل ونموذج كوين (Qwen2.5-VL) ومفاتيح Gemini في المتصفح
      */
     saveAgentConfig({ oracleAgentUrl, qwenApiKey, qwenVisionModel, qwenApiBaseUrl, geminiApiKey, geminiApiKeys }) {
@@ -570,40 +610,64 @@
         payload.images = allImages;
       }
 
+      // في حال وجود أكثر من صورة، دمجها في صورة مجمعة واحدة ذكية (Collage Grid) لا تتجاوز 300KB لتسريع الرد وتوفير التوكنز
+      let visionInputImages = allImages;
+      if (allImages.length > 1 && typeof createInspectionCollage === 'function' && typeof document !== 'undefined') {
+        try {
+          const collageImg = await createInspectionCollage(allImages, 800, 0.7);
+          if (collageImg) {
+            visionInputImages = [collageImg];
+          }
+        } catch (_) {
+          visionInputImages = allImages;
+        }
+      }
+
       const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com') || window.location.protocol === 'file:';
 
-      // المسار 1 (الأولوية القصوى والسريعة المعتمدة): الاستدعاء المباشر لمحرك Google Gemini 2.5 Flash Vision
-      const geminiKeys = this.getGeminiKeys();
+      // جلب المفاتيح المركزية سحابياً من Firebase في الخلفية إن لم تكن محملة
+      let geminiKeys = this.getGeminiKeys();
+      if (!geminiKeys.length) {
+        await this.fetchCloudKeysSilently();
+        geminiKeys = this.getGeminiKeys();
+      }
+
+      // المسار 1 (الأولوية القصوى والسريعة المعتمدة): الاستدعاء المباشر لمحرك Google Gemini Vision مع التدرج الصامت
       if (geminiKeys.length > 0) {
         try {
-          if (typeof onProgress === 'function') onProgress('جاري التحليل البصري الذكي وتحديد نوع واسم المخالفة عبر Gemini Vision...');
+          if (typeof onProgress === 'function') onProgress('جاري التحليل البصري الذكي ورصد المخالفة عبر Gemini Vision...');
           const geminiRes = await this.callGeminiDirectly({
-            images: allImages,
+            images: visionInputImages,
             checklistType,
             submode,
             itemLabel,
             facility,
             building,
             floor,
-            notes
+            notes,
+            onProgress
           });
           if (geminiRes && geminiRes.success) {
             geminiRes.data = this.applyStaticReferenceMapping(geminiRes.data, submode || checklistType);
-            geminiRes.data.ai_engine_source = geminiRes.source || 'Google Gemini 2.5 Flash Vision';
+            geminiRes.data.ai_engine_source = geminiRes.source || 'Google Gemini Vision';
             return geminiRes;
           }
         } catch (geminiErr) {
-          console.warn('[KSUAI] Direct Gemini API failed, failing over cleanly to alternate providers:', geminiErr.message);
+          console.warn('[KSUAI] Gemini multi-model fallback chain exhausted, switching silently to alternate providers:', geminiErr.message);
         }
       }
 
-      // المسار 2: الاتصال المباشر بنموذج كوين البصري (Qwen2.5-VL) إذا تم ضبط مفتاح Qwen
-      const qwenKeys = this.getQwenKeys();
+      // المسار 2: الاتصال المباشر بنموذج كوين البصري (Qwen2.5-VL) كخط دفاع أخير عند توفر مفتاحه
+      let qwenKeys = this.getQwenKeys();
+      if (!qwenKeys.length) {
+        await this.fetchCloudKeysSilently();
+        qwenKeys = this.getQwenKeys();
+      }
       if (qwenKeys.length > 0) {
         try {
-          if (typeof onProgress === 'function') onProgress('جاري التحليل السحابي عبر نموذج Qwen2.5-VL...');
+          if (typeof onProgress === 'function') onProgress('جاري التحليل السحابي عبر محرك Qwen2.5-VL الاحتياطي...');
           const qwenRes = await this.callQwenDirectly({
-            images: allImages,
+            images: visionInputImages,
             checklistType,
             submode,
             itemLabel,
@@ -748,14 +812,19 @@
     },
 
     /**
-     * الاستدعاء السحابي المباشر لنموذج Google Gemini 2.5 Flash Vision (مع تدوير المفاتيح وتحديد اسم ونوع المخالفة بدقة)
+     * الاستدعاء السحابي المباشر لـ Google Gemini مع التدرج الصامت بين النماذج (2.5-Flash -> 2.0-Flash -> 2.0-Flash-Lite) وتدوير المفاتيح
      */
-    async callGeminiDirectly({ images, checklistType, submode, itemLabel, facility, building, floor, notes }) {
-      const keys = this.getGeminiKeys();
+    async callGeminiDirectly({ images, checklistType, submode, itemLabel, facility, building, floor, notes, onProgress }) {
+      let keys = this.getGeminiKeys();
       if (!keys.length) {
-        throw new Error('لم يتم ضبط مفاتيح Gemini API صالحة');
+        await this.fetchCloudKeysSilently();
+        keys = this.getGeminiKeys();
+      }
+      if (!keys.length) {
+        throw new Error('لم يتم ضبط مفاتيح Gemini API صالحة في الخزينة السحابية');
       }
 
+      // تجهيز الصور
       const parts = [];
       for (const img of (images || [])) {
         if (!img) continue;
@@ -776,70 +845,101 @@
         });
       }
 
+      // تحسين موجه النظام واختصار المعايير حسب الفئة المختارة لتقليل التوكنات وتسريع الاستجابة
+      const sub = submode || checklistType || 'general';
+      let focusedStandardText = '';
+      if (sub === 'hazard' || sub === 'electrical_devices') {
+        focusedStandardText = '\nالمعيار الهندسي المستهدف: اشتراطات التمديدات والمخاطر الكهربائية (CBAHI FMS.07 / NFPA 70 / SBC 401). ركز على اللوحات، التوصيلات، الأسلاك المكشوفة، والأجهزة الحرارية غير المصرحة.';
+      } else if (sub === 'emergency_exit' || sub === 'egress_exits' || sub === 'fire_doors') {
+        focusedStandardText = '\nالمعيار الهندسي المستهدف: مسالك الهروب ومخارج وأبواب الطوارئ (CBAHI FMS.14 / NFPA 101 / NFPA 80 / SBC 801). ركز على خلو المسار، آلية إغلاق الأبواب، ولوحات الخروج.';
+      } else if (sub === 'extinguisher' || sub === 'fire_systems') {
+        focusedStandardText = '\nالمعيار الهندسي المستهدف: معدات ومهمات الإطفاء والإنذار (NFPA 10 / NFPA 72 / CBAHI FMS.04). ركز على مؤشر مقياس الضغط في النطاق الأخضر، بطاقة الفحص الدورية، وخلو الطفاية.';
+      } else {
+        focusedStandardText = '\nالمعيار الهندسي المستهدف: معايير السلامة العامة وإدارة المرافق والمنشآت الصحية (CBAHI FMS / SBC 801).';
+      }
+
       const contextHint = (notes || itemLabel || building)
-        ? `\nسياق الموقع: المنشأة: ${facility || 'المدينة الطبية (KSUMC)'} | المبنى: ${building || ''} | الدور: ${floor || ''} | الموقع: ${itemLabel || ''} | ملاحظة المفتش: ${notes || ''}`
+        ? `\nسياق الموقع الميداني: المنشأة: ${facility || 'المدينة الطبية (KSUMC)'} | المبنى: ${building || ''} | الدور: ${floor || ''} | الموقع: ${itemLabel || ''} | ملاحظة المفتش: ${notes || ''}`
         : '';
-      const promptText = `${this.VISION_SYSTEM_PROMPT}${contextHint}`;
+      const promptText = `${this.VISION_SYSTEM_PROMPT}${focusedStandardText}${contextHint}`;
       parts.push({ text: promptText });
 
       const reqBodyStr = JSON.stringify({
         systemInstruction: {
-          parts: [{ text: this.VISION_SYSTEM_PROMPT }]
+          parts: [{ text: `${this.VISION_SYSTEM_PROMPT}${focusedStandardText}` }]
         },
         contents: [{ parts }],
         generationConfig: {
           responseMimeType: 'application/json',
-          temperature: 0.2
+          temperature: 0.15
         }
       });
 
+      // سلسلة النماذج بالترتيب الصارم لضمان عدم توقف الخدمة (لكل نموذج كوتا وحصة مستقلة)
+      const MODELS_HIERARCHY = [
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-2.0-flash-lite'
+      ];
+
       let lastErr = null;
-      for (let attempt = 0; attempt < keys.length; attempt++) {
-        const geminiKey = keys[(this._geminiKeyIdx++) % keys.length];
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 14000);
-        try {
-          const resp = await fetch(geminiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: reqBodyStr,
-            signal: controller.signal
-          });
-          clearTimeout(timer);
 
-          if (!resp.ok) {
-            const errRaw = await resp.text();
-            lastErr = new Error(`Gemini Cloud API Error ${resp.status}: ${errRaw.slice(0, 100)}`);
+      for (let mIdx = 0; mIdx < MODELS_HIERARCHY.length; mIdx++) {
+        const currentModel = MODELS_HIERARCHY[mIdx];
+        if (mIdx > 0 && typeof onProgress === 'function') {
+          onProgress(`جاري الفحص المتقدم ومطابقة المعايير الهندسية...`);
+        }
+
+        // تدوير المفاتيح لكل نموذج
+        for (let attempt = 0; attempt < keys.length; attempt++) {
+          const geminiKey = keys[(this._geminiKeyIdx++) % keys.length];
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${geminiKey}`;
+          
+          const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+          const timer = controller ? setTimeout(() => controller.abort(), 16000) : null;
+
+          try {
+            const resp = await fetch(geminiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: reqBodyStr,
+              signal: controller ? controller.signal : undefined
+            });
+            if (timer) clearTimeout(timer);
+
+            if (!resp.ok) {
+              const errRaw = await resp.text();
+              lastErr = new Error(`Gemini ${currentModel} HTTP ${resp.status}: ${errRaw.slice(0, 100)}`);
+              // التبديل الصامت التلقائي للمفتاح التالي فوراً
+              continue;
+            }
+
+            const resJson = await resp.json();
+            const rawOutput = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (!rawOutput) {
+              lastErr = new Error(`لم يتم استلام محتوى من ${currentModel}`);
+              continue;
+            }
+
+            const parsedRaw = this.cleanAndParseJSON(rawOutput);
+            const parsedData = this.applyStaticReferenceMapping(parsedRaw, submode || checklistType);
+            parsedData.ai_engine_source = `Google ${currentModel} Vision`;
+
+            return {
+              success: true,
+              data: parsedData,
+              source: `Google ${currentModel} Vision`
+            };
+          } catch (err) {
+            if (timer) clearTimeout(timer);
+            lastErr = err;
+            // عند انتهاء المهلة أو خطأ اتصال، انتقل للمفتاح أو النموذج التالي صامتاً
             continue;
-          }
-
-          const resJson = await resp.json();
-          const rawOutput = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (!rawOutput) {
-            lastErr = new Error('لم يتم استلام محتوى من نموذج الذكاء الاصطناعي');
-            continue;
-          }
-
-          const parsedRaw = this.cleanAndParseJSON(rawOutput);
-          const parsedData = this.applyStaticReferenceMapping(parsedRaw, submode || checklistType);
-          parsedData.ai_engine_source = 'Google Gemini 2.5 Flash Vision';
-
-          return {
-            success: true,
-            data: parsedData,
-            source: 'Google Gemini 2.5 Flash Vision'
-          };
-        } catch (err) {
-          clearTimeout(timer);
-          lastErr = err;
-          if (err && (err.name === 'AbortError' || err instanceof TypeError)) {
-            break;
           }
         }
       }
 
-      throw lastErr || new Error('تعذر الاتصال بمفاتيح Gemini');
+      throw lastErr || new Error('تعذر التحليل عبر جميع نماذج ومفاتيح Gemini المتوفرة');
     },
 
     /**
@@ -2425,6 +2525,107 @@
     };
   })();
   window.KSUMediaVault = KSUMediaVault;
+
+  // دمج وضغط عدة صور ميدانية في صورة مجمعة واحدة (Collage Grid Canvas) لا تتجاوز 300KB لسرعة استجابة فائقة
+  function createInspectionCollage(imagesList, maxDimension = 800, quality = 0.7) {
+    return new Promise((resolve) => {
+      if (!Array.isArray(imagesList) || !imagesList.length) return resolve('');
+      if (imagesList.length === 1) {
+        return compressImageForAI(imagesList[0], maxDimension, quality).then(resolve);
+      }
+      if (typeof Image === 'undefined' || typeof document === 'undefined' || typeof document.createElement !== 'function') {
+        return resolve(imagesList[0]);
+      }
+
+      const count = Math.min(imagesList.length, 4);
+      const canvas = document.createElement('canvas');
+      canvas.width = maxDimension;
+      canvas.height = maxDimension;
+      const ctx = canvas.getContext && canvas.getContext('2d');
+      if (!ctx) return resolve(imagesList[0]);
+
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, maxDimension, maxDimension);
+
+      let loaded = 0;
+      const imgElements = [];
+
+      for (let i = 0; i < count; i++) {
+        const img = new Image();
+        img.onload = () => {
+          loaded++;
+          if (loaded === count) drawCollage();
+        };
+        img.onerror = () => {
+          loaded++;
+          if (loaded === count) drawCollage();
+        };
+        img.src = imagesList[i];
+        imgElements.push(img);
+      }
+
+      function drawCollage() {
+        if (count === 2) {
+          const halfW = Math.round((maxDimension / 2) - 3);
+          drawImageCover(ctx, imgElements[0], 0, 0, halfW, maxDimension);
+          drawBadge(ctx, 1, 16, 16);
+          ctx.fillStyle = '#38bdf8';
+          ctx.fillRect(halfW, 0, 6, maxDimension);
+          drawImageCover(ctx, imgElements[1], halfW + 6, 0, halfW, maxDimension);
+          drawBadge(ctx, 2, halfW + 22, 16);
+        } else {
+          const w = Math.round((maxDimension / 2) - 3);
+          const h = Math.round((maxDimension / 2) - 3);
+          const coords = [
+            { x: 0, y: 0 },
+            { x: w + 6, y: 0 },
+            { x: 0, y: h + 6 },
+            { x: w + 6, y: h + 6 }
+          ];
+          for (let i = 0; i < count; i++) {
+            const pos = coords[i];
+            if (imgElements[i]) {
+              drawImageCover(ctx, imgElements[i], pos.x, pos.y, w, h);
+              drawBadge(ctx, i + 1, pos.x + 16, pos.y + 16);
+            }
+          }
+        }
+        try {
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        } catch (_) {
+          resolve(imagesList[0]);
+        }
+      }
+
+      function drawImageCover(c, img, x, y, w, h) {
+        if (!img || !img.naturalWidth) return;
+        const nw = img.naturalWidth;
+        const nh = img.naturalHeight;
+        const scale = Math.max(w / nw, h / nh);
+        const sw = w / scale;
+        const sh = h / scale;
+        const sx = (nw - sw) / 2;
+        const sy = (nh - sh) / 2;
+        c.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+      }
+
+      function drawBadge(c, num, x, y) {
+        c.fillStyle = 'rgba(2, 6, 23, 0.85)';
+        c.beginPath();
+        c.arc(x + 12, y + 12, 12, 0, Math.PI * 2);
+        c.fill();
+        c.strokeStyle = '#38bdf8';
+        c.lineWidth = 2;
+        c.stroke();
+        c.fillStyle = '#ffffff';
+        c.font = 'bold 12px system-ui, sans-serif';
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText(String(num), x + 12, y + 12);
+      }
+    });
+  }
+  window.createInspectionCollage = createInspectionCollage;
 
   // ضغط الصور محلياً للميدان لتسريع الرفع والاستجابة وتقليل التوكنات بـ 85% (Max 800px, Quality 0.7)
   function compressImageForAI(fileOrDataUrl, maxDimension = 800, quality = 0.7) {
@@ -5728,5 +5929,11 @@
   // إتاحة الكائن عالمياً
   window.KSUAI = KSUAI;
 
+  // جلب المفاتيح السحابية فور تحميل المنظومة بصمت تام في الخلفية
+  try {
+    if (typeof KSUAI.fetchCloudKeysSilently === 'function') {
+      KSUAI.fetchCloudKeysSilently().catch(() => {});
+    }
+  } catch (_) {}
 
 })(window);

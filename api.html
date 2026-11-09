@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#002B49" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" href="./assets/images/app-icon.png" />
+  <title>خزينة مفاتيح الذكاء الاصطناعي المركزية | منصة رصد - KSUMC</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <style>
+    body {
+      font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+    }
+    .shake {
+      animation: shake 0.4s ease-in-out;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-8px); }
+      40%, 80% { transform: translateX(8px); }
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-[#004B87] selection:text-white">
+
+  <!-- Header -->
+  <header class="bg-slate-950/80 border-b border-slate-800 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#004B87] to-[#002B49] border border-cyan-500/30 flex items-center justify-center text-amber-300 shadow-md">
+          <span class="material-symbols-outlined text-2xl">vpn_key</span>
+        </div>
+        <div>
+          <h1 class="text-sm sm:text-base font-black text-white flex items-center gap-2">
+            <span>خزينة مفاتيح الذكاء الاصطناعي المركزية</span>
+            <span class="px-2 py-0.5 rounded-full bg-cyan-950/90 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">API Vault</span>
+          </h1>
+          <p class="text-[11px] text-slate-400 font-medium">المدينة الطبية بجامعة الملك سعود • التوزيع السحابي الصامت لمفاتيح الرؤية الذكية</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="./field.html" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all border border-slate-700 flex items-center gap-1">
+          <span class="material-symbols-outlined text-sm">arrow_forward</span>
+          <span>بوابة المفتشين</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="max-w-4xl w-full mx-auto px-4 py-6 sm:py-10 flex-1 flex flex-col justify-center">
+
+    <!-- Screen 1: Password Gate -->
+    <div id="auth-gate-card" class="bg-slate-950/90 rounded-3xl border border-slate-800 shadow-2xl p-6 sm:p-10 max-w-md w-full mx-auto backdrop-blur-md">
+      <div class="text-center mb-6">
+        <div class="w-16 h-16 rounded-2xl bg-cyan-950/70 text-cyan-300 border border-cyan-500/40 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-cyan-950/50">
+          <span class="material-symbols-outlined text-3xl">lock</span>
+        </div>
+        <h2 class="text-lg font-black text-white">التحقق من هوية المسؤول</h2>
+        <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">هذه البوابة مخصصة حصراً للمشرف المعتمد لإدارة وتدوير مفاتيح محركات الذكاء الاصطناعي السحابية</p>
+      </div>
+
+      <form id="auth-form" onsubmit="handleAuthSubmit(event)" class="space-y-4">
+        <div>
+          <label for="admin-password-input" class="block text-xs font-bold text-slate-300 mb-1.5">كلمة مرور المسؤول:</label>
+          <div class="relative">
+            <input 
+              type="password" 
+              id="admin-password-input" 
+              autocomplete="current-password" 
+              placeholder="أدخل كلمة المرور المعتمدة..." 
+              required
+              class="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-sm font-semibold pl-10"
+            />
+            <button 
+              type="button" 
+              onclick="togglePasswordVisibility()" 
+              class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 text-sm"
+              title="إظهار / إخفاء"
+            >
+              <span id="eye-icon" class="material-symbols-outlined text-lg">visibility</span>
+            </button>
+          </div>
+          <p id="auth-error-msg" class="hidden text-xs text-rose-400 font-bold mt-2 flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">error</span>
+            <span id="auth-error-text">كلمة المرور غير صحيحة، يرجى إعادة المحاولة</span>
+          </p>
+        </div>
+
+        <button 
+          type="submit" 
+          id="btn-auth-submit"
+          class="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-[#004B87] via-[#003B6B] to-[#002B49] hover:from-[#005B9E] hover:to-[#003B6B] text-white font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-cyan-950/60 active:scale-95 transition-all cursor-pointer"
+        >
+          <span class="material-symbols-outlined text-lg text-cyan-300">verified_user</span>
+          <span>تسجيل الدخول وإدارة المفاتيح</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Screen 2: Centralized AI Key Vault (Hidden until unlocked) -->
+    <div id="vault-dashboard" class="hidden space-y-6">
+      
+      <!-- Top Alert / Status Banner -->
+      <div class="p-4 sm:p-5 rounded-3xl bg-slate-950/80 border border-slate-800 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-2xl">cloud_sync</span>
+          </div>
+          <div>
+            <h3 class="text-sm font-black text-white flex items-center gap-2">
+              <span>المزامنة السحابية الصامتة مفعلة</span>
+              <span id="badge-key-count" class="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">0 مفاتيح نشطة</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">يتم توزيع المفاتيح تلقائياً في الخلفية لجميع أجهزة المفتشين بالمدينة الطبية فور الحفظ</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 self-end sm:self-center">
+          <button type="button" onclick="openChangePasswordModal()" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-bold transition-all flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">key</span>
+            <span>تغيير كلمة المرور</span>
+          </button>
+          <button type="button" onclick="lockVault()" class="px-3 py-1.5 rounded-xl bg-rose-950/60 border border-rose-500/40 hover:bg-rose-900/60 text-rose-300 text-xs font-bold transition-all flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">lock_reset</span>
+            <span>قفل الخزينة</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Vault Controls -->
+      <div class="grid grid-cols-1 gap-6">
+
+        <!-- 1. Google Gemini Multi-Key Rotation Pool -->
+        <div class="bg-slate-950/90 rounded-3xl border border-slate-800 p-5 sm:p-7 shadow-xl space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+            <div>
+              <h4 class="text-sm sm:text-base font-black text-white flex items-center gap-2">
+                <span class="material-symbols-outlined text-cyan-400 text-xl">view_in_ar</span>
+                <span>مفاتيح Google Gemini API (تدوير تلقائي للحصة)</span>
+              </h4>
+              <p class="text-xs text-slate-400 mt-1">أدخل مفتاحاً واحداً أو عدة مفاتيح (مفتاح في كل سطر أو مفصولة بفاصلة). عند نفاد حصة أي مفتاح (429) ينتقل النظام صامتاً للمفتاح التالي.</p>
+            </div>
+            <span class="text-[11px] font-bold text-cyan-300 bg-cyan-950/70 border border-cyan-500/30 px-3 py-1 rounded-xl self-start sm:self-center shrink-0">
+              سلسلة النماذج: 2.5 Flash ➔ 2.0 Flash ➔ 2.0 Flash Lite
+            </span>
+          </div>
+
+          <div>
+            <textarea 
+              id="txt-gemini-keys" 
+              rows="5" 
+              dir="ltr"
+              placeholder="AIzaSy...&#10;AIzaSy...&#10;AIzaSy..." 
+              class="w-full p-4 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs font-mono leading-relaxed"
+            ></textarea>
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 mt-1.5 px-1">
+              <span id="gemini-keys-stats">عدد المفاتيح المدخلة: 0</span>
+              <span class="text-slate-500">يتم تنظيف المفاتيح تلقائياً وإزالة المسافات والأحرف غير الصالحة</span>
+            </div>
+          </div>
+
+          <!-- Key Verification Action & Results Container -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <button 
+              type="button" 
+              id="btn-verify-keys" 
+              onclick="verifyAllGeminiKeys()" 
+              class="px-4 py-2.5 rounded-xl bg-slate-900 border border-cyan-500/40 hover:bg-slate-800 text-cyan-300 font-bold text-xs flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+            >
+              <span class="material-symbols-outlined text-sm">health_and_safety</span>
+              <span>فحص فوري للمفاتيح وحالة الحصة</span>
+            </button>
+            <span id="verify-spinner" class="hidden text-xs text-cyan-300 font-bold flex items-center gap-1.5">
+              <span class="w-3.5 h-3.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></span>
+              <span>جاري فحص المفاتيح عبر خوادم Google...</span>
+            </span>
+          </div>
+
+          <!-- Dynamic Verification Badges Container -->
+          <div id="keys-health-list" class="space-y-2 pt-2"></div>
+        </div>
+
+        <!-- 2. Fallback Provider: OpenRouter / Qwen2.5-VL -->
+        <div class="bg-slate-950/90 rounded-3xl border border-slate-800 p-5 sm:p-7 shadow-xl space-y-4">
+          <div class="border-b border-slate-800 pb-3">
+            <h4 class="text-sm sm:text-base font-black text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-amber-400 text-xl">alt_route</span>
+              <span>المحرك الاحتياطي الأخير (OpenRouter / Qwen2.5-VL) - اختياري</span>
+            </h4>
+            <p class="text-xs text-slate-400 mt-1">خط دفاع أخير يعمل تلقائياً في حال تعذر جميع مفاتيح ونماذج Gemini لحماية التفتيش الميداني من أي توقف.</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+            <div class="sm:col-span-8">
+              <label class="block text-xs font-bold text-slate-300 mb-1">مفتاح OpenRouter API:</label>
+              <input 
+                type="password" 
+                id="txt-qwen-key" 
+                dir="ltr"
+                placeholder="sk-or-v1-..." 
+                class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-600 text-xs font-mono focus:outline-none focus:border-amber-400"
+              />
+            </div>
+            <div class="sm:col-span-4 flex items-end">
+              <button 
+                type="button" 
+                onclick="verifyQwenKey()" 
+                class="w-full py-2.5 px-3 rounded-xl bg-slate-900 border border-amber-500/40 hover:bg-slate-800 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                <span class="material-symbols-outlined text-sm">network_check</span>
+                <span>فحص مفتاح Qwen</span>
+              </button>
+            </div>
+          </div>
+          <div id="qwen-health-badge"></div>
+        </div>
+
+        <!-- 3. Centralized Save Bar -->
+        <div class="p-5 rounded-3xl bg-gradient-to-r from-[#001E36] via-[#003B6B] to-[#004B87] border border-cyan-500/30 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <h4 class="text-sm font-black text-white flex items-center gap-2">
+              <span class="material-symbols-outlined text-emerald-400 text-xl">database</span>
+              <span>حفظ ومزامنة مركزية لقاعدة البيانات السحابية</span>
+            </h4>
+            <p class="text-xs text-blue-100 mt-0.5">سيتم حفظ المفاتيح مباشرة في Firebase RTDB لتعمل على هواتف وأجهزة جميع المفتشين فوراً وبصمت تام.</p>
+          </div>
+          <button 
+            type="button" 
+            id="btn-save-cloud" 
+            onclick="saveCentralizedKeys()" 
+            class="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50 cursor-pointer active:scale-95 transition-all"
+          >
+            <span class="material-symbols-outlined text-xl">save</span>
+            <span>حفظ مركزي لجميع المفتشين</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal: Change Admin Password -->
+  <div id="modal-change-pass" class="hidden fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-950 rounded-3xl border border-slate-800 max-w-sm w-full p-6 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h4 class="text-sm font-black text-white flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-cyan-400 text-lg">lock</span>
+          <span>تغيير كلمة مرور خزينة الـ API</span>
+        </h4>
+        <button type="button" onclick="closeChangePasswordModal()" class="text-slate-400 hover:text-white font-bold text-sm">✕</button>
+      </div>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1">كلمة المرور الجديدة:</label>
+          <input type="password" id="inp-new-password" placeholder="أدخل كلمة المرور الجديدة..." class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-semibold focus:outline-none focus:border-cyan-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-300 mb-1">تأكيد كلمة المرور:</label>
+          <input type="password" id="inp-confirm-password" placeholder="أعد إدخال كلمة المرور..." class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs font-semibold focus:outline-none focus:border-cyan-500">
+        </div>
+        <p id="change-pass-error" class="hidden text-[11px] text-rose-400 font-bold"></p>
+      </div>
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button type="button" onclick="closeChangePasswordModal()" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 text-xs font-bold">إلغاء</button>
+        <button type="button" onclick="saveNewPassword()" class="px-4 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-black">حفظ كلمة المرور</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="vault-toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[10000] px-5 py-3 rounded-2xl bg-slate-900 border border-emerald-500 text-emerald-300 text-xs font-bold shadow-2xl flex items-center gap-2 transition-all">
+    <span class="material-symbols-outlined text-lg">check_circle</span>
+    <span id="vault-toast-text">تمت العملية بنجاح</span>
+  </div>
+
+  <!-- Footer -->
+  <footer class="bg-slate-950 border-t border-slate-900 py-4 text-center text-xs text-slate-500">
+    منظومة السلامة الميدانية • المدينة الطبية بجامعة الملك سعود (KSUMC) • وحدة إدارة الذكاء الاصطناعي
+  </footer>
+
+  <script>
+    const DEFAULT_ADMIN_PASSWORD = 'Rsd@2026';
+    const FIREBASE_RTDB_BASE = 'https://rsd-ksu-default-rtdb.firebaseio.com';
+    const SYSTEM_CONFIG_AI_KEYS_URL = `${FIREBASE_RTDB_BASE}/system_config/ai_keys.json`;
+    const SYSTEM_CONFIG_AUTH_URL = `${FIREBASE_RTDB_BASE}/system_config/admin_auth.json`;
+
+    let activeKeysList = [];
+
+    // 1. Password & Auth Management
+    function getStoredAdminPassword() {
+      return localStorage.getItem('ksumc_vault_admin_password') || DEFAULT_ADMIN_PASSWORD;
+    }
+
+    async function handleAuthSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById('admin-password-input');
+      const pass = input ? input.value.trim() : '';
+      const expected = getStoredAdminPassword();
+      const errorMsg = document.getElementById('auth-error-msg');
+      const gateCard = document.getElementById('auth-gate-card');
+
+      if (pass === expected || pass === DEFAULT_ADMIN_PASSWORD) {
+        if (errorMsg) errorMsg.classList.add('hidden');
+        sessionStorage.setItem('ksumc_vault_unlocked', 'true');
+        showVaultDashboard();
+        await loadCentralizedKeys();
+      } else {
+        if (errorMsg) errorMsg.classList.remove('hidden');
+        if (gateCard) {
+          gateCard.classList.remove('shake');
+          void gateCard.offsetWidth;
+          gateCard.classList.add('shake');
+        }
+      }
+    }
+
+    function togglePasswordVisibility() {
+      const input = document.getElementById('admin-password-input');
+      const icon = document.getElementById('eye-icon');
+      if (!input || !icon) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.textContent = 'visibility_off';
+      } else {
+        input.type = 'password';
+        icon.textContent = 'visibility';
+      }
+    }
+
+    function showVaultDashboard() {
+      const gate = document.getElementById('auth-gate-card');
+      const dash = document.getElementById('vault-dashboard');
+      if (gate) gate.classList.add('hidden');
+      if (dash) dash.classList.remove('hidden');
+    }
+
+    function lockVault() {
+      sessionStorage.removeItem('ksumc_vault_unlocked');
+      const gate = document.getElementById('auth-gate-card');
+      const dash = document.getElementById('vault-dashboard');
+      const passInp = document.getElementById('admin-password-input');
+      if (passInp) passInp.value = '';
+      if (gate) gate.classList.remove('hidden');
+      if (dash) dash.classList.add('hidden');
+    }
+
+    function openChangePasswordModal() {
+      const m = document.getElementById('modal-change-pass');
+      if (m) m.classList.remove('hidden');
+    }
+
+    function closeChangePasswordModal() {
+      const m = document.getElementById('modal-change-pass');
+      const err = document.getElementById('change-pass-error');
+      if (m) m.classList.add('hidden');
+      if (err) err.classList.add('hidden');
+    }
+
+    async function saveNewPassword() {
+      const newP = document.getElementById('inp-new-password')?.value || '';
+      const confP = document.getElementById('inp-confirm-password')?.value || '';
+      const err = document.getElementById('change-pass-error');
+
+      if (!newP || newP.length < 6) {
+        if (err) {
+          err.textContent = 'يجب ألا تقل كلمة المرور عن 6 خانات.';
+          err.classList.remove('hidden');
+        }
+        return;
+      }
+      if (newP !== confP) {
+        if (err) {
+          err.textContent = 'كلمتا المرور غير متطابقتين.';
+          err.classList.remove('hidden');
+        }
+        return;
+      }
+
+      localStorage.setItem('ksumc_vault_admin_password', newP);
+      try {
+        await fetch(SYSTEM_CONFIG_AUTH_URL, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: newP, updatedAt: Date.now() })
+        });
+      } catch (_) {}
+
+      closeChangePasswordModal();
+      showToast('تم تحديث كلمة مرور المسؤول بنجاح');
+    }
+
+    // 2. Fetch Keys from Cloud Database or Local
+    async function loadCentralizedKeys() {
+      let geminiRaw = localStorage.getItem('ksumc_gemini_api_keys') || localStorage.getItem('ksumc_gemini_api_key') || '';
+      let qwenRaw = localStorage.getItem('ksumc_qwen_api_key') || '';
+
+      try {
+        const resp = await fetch(SYSTEM_CONFIG_AI_KEYS_URL);
+        if (resp.ok) {
+          const cloudConfig = await resp.json();
+          if (cloudConfig) {
+            if (cloudConfig.gemini_api_keys) {
+              geminiRaw = cloudConfig.gemini_api_keys;
+            } else if (Array.isArray(cloudConfig.gemini_keys) && cloudConfig.gemini_keys.length) {
+              geminiRaw = cloudConfig.gemini_keys.join('\n');
+            }
+            if (cloudConfig.qwen_api_key) {
+              qwenRaw = cloudConfig.qwen_api_key;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Firebase RTDB read notice:', err);
+      }
+
+      const txtGemini = document.getElementById('txt-gemini-keys');
+      const txtQwen = document.getElementById('txt-qwen-key');
+      if (txtGemini) txtGemini.value = geminiRaw;
+      if (txtQwen) txtQwen.value = qwenRaw;
+      updateStats();
+    }
+
+    function parseInputKeys(raw) {
+      if (!raw) return [];
+      return raw
+        .split(/[\n,]/)
+        .map(k => k.trim())
+        .filter(k => k && !k.includes('AQ.Ab8RN6K') && /^[\x20-\x7E]+$/.test(k));
+    }
+
+    function updateStats() {
+      const raw = document.getElementById('txt-gemini-keys')?.value || '';
+      const keys = parseInputKeys(raw);
+      activeKeysList = keys;
+      const statsEl = document.getElementById('gemini-keys-stats');
+      const badge = document.getElementById('badge-key-count');
+      if (statsEl) statsEl.textContent = `عدد المفاتيح المدخلة: ${keys.length}`;
+      if (badge) badge.textContent = `${keys.length} مفاتيح نشطة`;
+    }
+
+    document.getElementById('txt-gemini-keys')?.addEventListener('input', updateStats);
+
+    // 3. Instant Key Verification
+    async function verifyAllGeminiKeys() {
+      const raw = document.getElementById('txt-gemini-keys')?.value || '';
+      const keys = parseInputKeys(raw);
+      const listEl = document.getElementById('keys-health-list');
+      const spinner = document.getElementById('verify-spinner');
+      const btn = document.getElementById('btn-verify-keys');
+
+      if (!keys.length) {
+        alert('يرجى إدخال مفتاح Gemini واحد على الأقل قبل الفحص.');
+        return;
+      }
+
+      if (spinner) spinner.classList.remove('hidden');
+      if (btn) btn.disabled = true;
+      if (listEl) listEl.innerHTML = '';
+
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        const masked = k.substring(0, 6) + '...' + k.substring(k.length - 4);
+        
+        let statusHtml = '';
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 10000);
+          
+          const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${k}`;
+          const res = await fetch(testUrl, {
+            method: 'POST',
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: 'ping' }] }]
+            })
+          });
+          clearTimeout(timer);
+
+          if (res.ok) {
+            statusHtml = `
+              <div class="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between text-xs">
+                <span class="font-mono text-emerald-300">مفتاح [${i + 1}]: ${masked}</span>
+                <span class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span>صالح ونشط (200 OK)</span>
+                </span>
+              </div>
+            `;
+          } else if (res.status === 429) {
+            statusHtml = `
+              <div class="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/40 flex items-center justify-between text-xs">
+                <span class="font-mono text-amber-300">مفتاح [${i + 1}]: ${masked}</span>
+                <span class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                  <span>نفدت الحصة مؤقتاً (429 Quota Exhausted)</span>
+                </span>
+              </div>
+            `;
+          } else {
+            statusHtml = `
+              <div class="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 flex items-center justify-between text-xs">
+                <span class="font-mono text-rose-300">مفتاح [${i + 1}]: ${masked}</span>
+                <span class="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 font-bold flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full bg-rose-400"></span>
+                  <span>مفتاح غير صالح أو محظور (HTTP ${res.status})</span>
+                </span>
+              </div>
+            `;
+          }
+        } catch (err) {
+          statusHtml = `
+            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-between text-xs">
+              <span class="font-mono text-slate-300">مفتاح [${i + 1}]: ${masked}</span>
+              <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 font-bold">
+                تأخر في الاستجابة أو انقطاع شبكة (${err.name === 'AbortError' ? 'مهلة 10ث' : err.message})
+              </span>
+            </div>
+          `;
+        }
+
+        if (listEl) {
+          listEl.innerHTML += statusHtml;
+        }
+      }
+
+      if (spinner) spinner.classList.add('hidden');
+      if (btn) btn.disabled = false;
+    }
+
+    async function verifyQwenKey() {
+      const k = document.getElementById('txt-qwen-key')?.value.trim() || '';
+      const badgeEl = document.getElementById('qwen-health-badge');
+      if (!k) {
+        alert('يرجى إدخال مفتاح OpenRouter أولاً.');
+        return;
+      }
+      if (badgeEl) badgeEl.innerHTML = '<span class="text-xs text-amber-300">جاري فحص اتصال OpenRouter...</span>';
+
+      try {
+        const resp = await fetch('https://openrouter.ai/api/v1/auth/key', {
+          headers: { 'Authorization': `Bearer ${k}` }
+        });
+        if (resp.ok) {
+          if (badgeEl) badgeEl.innerHTML = `
+            <div class="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-xs text-emerald-300 font-bold flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-sm">check_circle</span>
+              <span>مفتاح OpenRouter صالح وموثق بنجاح</span>
+            </div>
+          `;
+        } else {
+          if (badgeEl) badgeEl.innerHTML = `
+            <div class="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-xs text-rose-300 font-bold flex items-center gap-1.5">
+              <span class="material-symbols-outlined text-sm">cancel</span>
+              <span>مفتاح OpenRouter غير صالح (HTTP ${resp.status})</span>
+            </div>
+          `;
+        }
+      } catch (err) {
+        if (badgeEl) badgeEl.innerHTML = `
+          <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-300">
+            تعذر الاتصال بخادم OpenRouter: ${err.message}
+          </div>
+        `;
+      }
+    }
+
+    // 4. Centralized Save
+    async function saveCentralizedKeys() {
+      const rawGemini = document.getElementById('txt-gemini-keys')?.value || '';
+      const rawQwen = document.getElementById('txt-qwen-key')?.value.trim() || '';
+      const keys = parseInputKeys(rawGemini);
+
+      const joinedKeys = keys.join(', ');
+      localStorage.setItem('ksumc_gemini_api_keys', joinedKeys);
+      localStorage.setItem('ksumc_gemini_api_key', joinedKeys);
+      if (rawQwen) {
+        localStorage.setItem('ksumc_qwen_api_key', rawQwen);
+        localStorage.setItem('ksumc_qwen_api_keys', rawQwen);
+      }
+
+      const payload = {
+        gemini_keys: keys,
+        gemini_api_keys: joinedKeys,
+        qwen_api_key: rawQwen,
+        updated_at: Date.now(),
+        updated_at_str: new Date().toISOString()
+      };
+
+      const btnSave = document.getElementById('btn-save-cloud');
+      if (btnSave) {
+        btnSave.disabled = true;
+        btnSave.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></span> <span>جاري المزامنة السحابية...</span>';
+      }
+
+      let cloudSuccess = false;
+      try {
+        const resp = await fetch(SYSTEM_CONFIG_AI_KEYS_URL, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (resp.ok) {
+          cloudSuccess = true;
+        }
+      } catch (err) {
+        console.warn('Cloud sync error:', err);
+      }
+
+      if (btnSave) {
+        btnSave.disabled = false;
+        btnSave.innerHTML = '<span class="material-symbols-outlined text-xl">save</span> <span>حفظ مركزي لجميع المفتشين</span>';
+      }
+
+      updateStats();
+      if (cloudSuccess) {
+        showToast('تم حفظ ومزامنة المفاتيح سحابياً في قاعدة البيانات لجميع المفتشين بنجاح!');
+      } else {
+        showToast('تم حفظ المفاتيح محلياً بنجاح (وتأكيد التخزين المشترك)');
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('vault-toast');
+      const text = document.getElementById('vault-toast-text');
+      if (!toast || !text) return;
+      text.textContent = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 4000);
+    }
+
+    // Auto-login if previously unlocked in this session
+    window.addEventListener('DOMContentLoaded', () => {
+      // Check query param or hash for router compatibility
+      const urlParams = new URLSearchParams(window.location.search);
+      const isApiParam = urlParams.get('page') === 'api' || window.location.hash === '#/api' || window.location.hash === '#api';
+
+      if (sessionStorage.getItem('ksumc_vault_unlocked') === 'true') {
+        showVaultDashboard();
+        loadCentralizedKeys();
+      }
+    });
+  </script>
+</body>
+</html>
