@@ -4439,14 +4439,7 @@
     </div>
   </div>
 
-  <!-- Live Camera Stream & Reticle Overlay Viewport Template -->
-  <div id="vision-live-camera-modal-template" class="hidden">
-    <div id="vision-live-camera-wrap" class="relative rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center min-h-[260px] max-h-[340px] border border-slate-700 shadow-xl">
-      <video id="vision-camera-video" playsinline autoplay muted class="w-full h-full object-cover min-h-[260px] max-h-[340px]"></video>
-      <div id="vision-reticle-container" class="ksu-reticle-overlay absolute inset-0 pointer-events-none z-10"></div>
-      <button type="button" id="btn-capture-live-frame" class="px-5 py-2.5 rounded-2xl bg-emerald-600 text-white font-black text-xs">التقاط الصورة</button>
-    </div>
-  </div>
+  <!-- Live camera and reticle elements are dynamically mounted inside modal dropzone -->
 
   <script src="assets/js/qrcode.min.js" charset="UTF-8"></script>
   <script src="assets/js/jsqr.min.js" charset="UTF-8"></script>
@@ -4462,8 +4455,8 @@
   <script src="assets/js/ksu-official-card.js?v=6.6.4" charset="UTF-8"></script>
   <script src="assets/js/app.js?v=8.2.0" charset="UTF-8"></script>
   <script src="assets/js/ksu-integrations.js?v=6.0" charset="UTF-8"></script>
-  <script src="assets/js/vision-reticle-helper.js?v=7.2.1" charset="UTF-8"></script>
-  <script src="assets/js/ksu-ai-client.js?v=7.3.0" charset="UTF-8"></script>
+  <script src="assets/js/vision-reticle-helper.js?v=7.2.2" charset="UTF-8"></script>
+  <script src="assets/js/ksu-ai-client.js?v=7.3.1" charset="UTF-8"></script>
 
   <!-- Enhanced Live Camera Stream, Reticle Viewfinder & Inspection Flow Control -->
   <script>
@@ -4497,13 +4490,14 @@
         const dropzone = modal.querySelector('#vision-dropzone');
         if (!dropzone) return;
 
-        // Create or locate the live camera container
-        let liveWrap = document.getElementById('vision-live-camera-wrap');
+        // Create or locate the live camera container inside dropzone
+        let liveWrap = dropzone.querySelector('#vision-live-camera-wrap');
         if (!liveWrap) {
           liveWrap = document.createElement('div');
           liveWrap.id = 'vision-live-camera-wrap';
           liveWrap.className = 'hidden flex flex-col gap-2.5 w-full relative';
           liveWrap.innerHTML = `
+            <!-- id="vision-live-camera-wrap" -->
             <div class="relative rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center min-h-[260px] max-h-[340px] border border-slate-700 shadow-xl" id="vision-live-video-screen">
               <video id="vision-camera-video" playsinline autoplay muted class="w-full h-full object-cover min-h-[260px] max-h-[340px]"></video>
               
@@ -4538,10 +4532,10 @@
         }
 
         // Attach Capture Button Action
-        const btnCapture = document.getElementById('btn-capture-live-frame');
+        const btnCapture = liveWrap.querySelector('#btn-capture-live-frame') || document.getElementById('btn-capture-live-frame');
         if (btnCapture) {
           btnCapture.onclick = function() {
-            const videoEl = document.getElementById('vision-camera-video');
+            const videoEl = liveWrap.querySelector('#vision-camera-video') || document.getElementById('vision-camera-video');
             let dataUrl = '';
             if (window.KSUReticleHelper && typeof window.KSUReticleHelper.captureFrame === 'function') {
               dataUrl = window.KSUReticleHelper.captureFrame(videoEl);
@@ -4552,8 +4546,12 @@
               canvas.height = videoEl.videoHeight || 720;
               const ctx = canvas.getContext('2d');
               if (ctx) {
-                ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-                dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                try {
+                  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+                  dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                } catch (e) {
+                  console.warn('Canvas capture error:', e);
+                }
               }
             }
 
@@ -4565,25 +4563,29 @@
 
               // Hide live camera wrap, show preview
               if (liveWrap) liveWrap.classList.add('hidden');
-              const emptyState = document.getElementById('vision-empty-state');
+              const emptyState = modal.querySelector('#vision-empty-state') || document.getElementById('vision-empty-state');
               if (emptyState) emptyState.classList.add('hidden');
 
               // Put in image list
-              if (!window.visionImagesList) window.visionImagesList = [];
-              window.visionImagesList.push(dataUrl);
-              window.currentActivePreviewIndex = window.visionImagesList.length - 1;
+              if (typeof window.addVisionImage === 'function') {
+                window.addVisionImage(dataUrl);
+              } else {
+                if (!Array.isArray(window.visionImagesList)) window.visionImagesList = [];
+                window.visionImagesList.push(dataUrl);
+                window.currentActivePreviewIndex = window.visionImagesList.length - 1;
+              }
 
               if (typeof window.renderVisionImagesGallery === 'function') {
                 window.renderVisionImagesGallery();
               } else {
-                const previewState = document.getElementById('vision-preview-state');
-                const imgPreview = document.getElementById('img-vision-preview');
+                const previewState = modal.querySelector('#vision-preview-state') || document.getElementById('vision-preview-state');
+                const imgPreview = modal.querySelector('#img-vision-preview') || document.getElementById('img-vision-preview');
                 if (previewState) previewState.classList.remove('hidden');
                 if (imgPreview) imgPreview.src = dataUrl;
               }
 
               // Enable manual inspection button (Feature 8 Flow Control: NO 350ms premature auto-trigger!)
-              const btnRun = document.getElementById('btn-run-vision-ai');
+              const btnRun = modal.querySelector('#btn-run-vision-ai') || document.getElementById('btn-run-vision-ai');
               if (btnRun) {
                 btnRun.disabled = false;
                 btnRun.classList.remove('opacity-50');
@@ -4597,24 +4599,25 @@
         }
 
         // Attach cancel / switch to file upload
-        const btnCancelCam = document.getElementById('btn-cancel-live-camera');
+        const btnCancelCam = liveWrap.querySelector('#btn-cancel-live-camera') || document.getElementById('btn-cancel-live-camera');
         if (btnCancelCam) {
           btnCancelCam.onclick = function() {
             if (window.KSUReticleHelper && typeof window.KSUReticleHelper.stopLiveCameraStream === 'function') {
               window.KSUReticleHelper.stopLiveCameraStream();
             }
             if (liveWrap) liveWrap.classList.add('hidden');
-            const emptyState = document.getElementById('vision-empty-state');
-            if (emptyState && (!window.visionImagesList || window.visionImagesList.length === 0)) {
+            const emptyState = modal.querySelector('#vision-empty-state') || document.getElementById('vision-empty-state');
+            const imagesList = window.getVisionImagesList ? window.getVisionImagesList() : window.visionImagesList;
+            if (emptyState && (!imagesList || imagesList.length === 0)) {
               emptyState.classList.remove('hidden');
             }
-            const inpCam = document.getElementById('inp-vision-camera');
+            const inpCam = modal.querySelector('#inp-vision-camera') || document.getElementById('inp-vision-camera');
             if (inpCam) inpCam.click();
           };
         }
 
         // Intercept "فتح الكاميرا الميدانية" button in empty state to launch live stream first with fallback
-        const emptyState = document.getElementById('vision-empty-state');
+        const emptyState = modal.querySelector('#vision-empty-state') || document.getElementById('vision-empty-state');
         if (emptyState) {
           const btns = emptyState.querySelectorAll('button');
           btns.forEach(btn => {
@@ -4623,8 +4626,8 @@
                 e.preventDefault();
                 e.stopPropagation();
 
-                const videoEl = document.getElementById('vision-camera-video');
-                const reticleContainer = document.getElementById('vision-reticle-container');
+                const videoEl = liveWrap.querySelector('#vision-camera-video') || document.getElementById('vision-camera-video');
+                const reticleContainer = liveWrap.querySelector('#vision-reticle-container') || document.getElementById('vision-reticle-container');
                 const isSupported = window.KSUReticleHelper && typeof window.KSUReticleHelper.isCameraSupported === 'function'
                   ? window.KSUReticleHelper.isCameraSupported()
                   : (typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia);
@@ -4641,18 +4644,21 @@
                       console.warn('[Field Vision] Live camera fallback to file picker:', err);
                       if (liveWrap) liveWrap.classList.add('hidden');
                       if (emptyState) emptyState.classList.remove('hidden');
-                      document.getElementById('inp-vision-camera')?.click();
+                      const inpCam = modal.querySelector('#inp-vision-camera') || document.getElementById('inp-vision-camera');
+                      inpCam?.click();
                     }
                   });
 
                   if (!res.success) {
                     if (liveWrap) liveWrap.classList.add('hidden');
                     if (emptyState) emptyState.classList.remove('hidden');
-                    document.getElementById('inp-vision-camera')?.click();
+                    const inpCam = modal.querySelector('#inp-vision-camera') || document.getElementById('inp-vision-camera');
+                    inpCam?.click();
                   }
                 } else {
                   // Fallback directly if mediaDevices unsupported
-                  document.getElementById('inp-vision-camera')?.click();
+                  const inpCam = modal.querySelector('#inp-vision-camera') || document.getElementById('inp-vision-camera');
+                  inpCam?.click();
                 }
               };
             }

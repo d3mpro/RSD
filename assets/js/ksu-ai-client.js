@@ -2493,6 +2493,25 @@
   let currentVisionSubmode = 'general';
   let isReticleGuideVisible = true;
 
+  // Unified global image list management for camera and gallery integrations
+  window.visionImagesList = visionImagesList;
+  window.compressImageForAI = compressImageForAI;
+  window.getVisionImagesList = function() { return visionImagesList; };
+  window.setVisionImagesList = function(list) {
+    visionImagesList = Array.isArray(list) ? list : [];
+    window.visionImagesList = visionImagesList;
+    currentActivePreviewIndex = Math.max(0, visionImagesList.length - 1);
+    window.currentActivePreviewIndex = currentActivePreviewIndex;
+  };
+  window.addVisionImage = function(img) {
+    if (!Array.isArray(visionImagesList)) visionImagesList = [];
+    visionImagesList.push(img);
+    window.visionImagesList = visionImagesList;
+    currentActivePreviewIndex = visionImagesList.length - 1;
+    window.currentActivePreviewIndex = currentActivePreviewIndex;
+    return visionImagesList.length;
+  };
+
   /**
    * فتح نافذة التدقيق البصري الذكي الشاملة لصور السلامة (Multimodal Vision Modal)
    */
@@ -2502,7 +2521,9 @@
 
     window.activeVisionAssetId = options.assetId || (options.asset && options.asset.id) || null;
     visionImagesList = [];
+    window.visionImagesList = visionImagesList;
     currentActivePreviewIndex = 0;
+    window.currentActivePreviewIndex = 0;
 
     modal = document.createElement('div');
     modal.id = 'ksu-ai-vision-modal';
@@ -2901,28 +2922,32 @@
   }
 
   window.handleVisionModalFileSelected = async function(e) {
-    const files = e.target.files;
+    const files = e?.target?.files;
     if (files && files.length > 0) {
+      if (!Array.isArray(visionImagesList)) visionImagesList = [];
       for (let i = 0; i < files.length; i++) {
         const compressed = await compressImageForAI(files[i], 1280, 0.78);
         if (compressed) {
           visionImagesList.push(compressed);
         }
       }
+      window.visionImagesList = visionImagesList;
       currentActivePreviewIndex = visionImagesList.length - 1;
+      window.currentActivePreviewIndex = currentActivePreviewIndex;
       renderVisionImagesGallery();
-      e.target.value = '';
+      if (e?.target) e.target.value = '';
 
-      // البدء التلقائي في الفحص وتحديد المخالفة بمجرد إرفاق الصورة من الاستوديو أو الكاميرا
-      setTimeout(() => {
-        if (typeof window.runVisionModalAnalysis === 'function' && visionImagesList && visionImagesList.length > 0) {
-          window.runVisionModalAnalysis();
-        }
-      }, 350);
+      // Enable manual analysis button - Feature 8: Full inspector control without premature auto-trigger
+      const btnRun = document.getElementById('btn-run-vision-ai');
+      if (btnRun) {
+        btnRun.disabled = false;
+        btnRun.classList.remove('opacity-50');
+      }
     }
   };
 
-  async function processVisionModalFile(fileOrUrl, autoRun = true) {
+  async function processVisionModalFile(fileOrUrl, autoRun = false) {
+    if (!Array.isArray(visionImagesList)) visionImagesList = [];
     if (Array.isArray(fileOrUrl)) {
       for (let item of fileOrUrl) {
         const compressed = await compressImageForAI(item, 1280, 0.78);
@@ -2932,15 +2957,15 @@
       const compressed = await compressImageForAI(fileOrUrl, 1280, 0.78);
       if (compressed) visionImagesList.push(compressed);
     }
+    window.visionImagesList = visionImagesList;
     currentActivePreviewIndex = visionImagesList.length - 1;
+    window.currentActivePreviewIndex = currentActivePreviewIndex;
     renderVisionImagesGallery();
 
     if (autoRun && visionImagesList && visionImagesList.length > 0) {
-      setTimeout(() => {
-        if (typeof window.runVisionModalAnalysis === 'function' && visionImagesList && visionImagesList.length > 0) {
-          window.runVisionModalAnalysis();
-        }
-      }, 350);
+      if (typeof window.runVisionModalAnalysis === 'function') {
+        window.runVisionModalAnalysis();
+      }
     }
   }
 
@@ -2954,6 +2979,13 @@
     const stripEl = document.getElementById('vision-thumbnails-strip');
     const btnPrev = document.getElementById('btn-vision-prev');
     const btnNext = document.getElementById('btn-vision-next');
+
+    // Keep closure list in sync with window.visionImagesList if external helper added images
+    if (Array.isArray(window.visionImagesList) && window.visionImagesList.length > 0 && (!visionImagesList || visionImagesList.length === 0)) {
+      visionImagesList = window.visionImagesList;
+    } else if (Array.isArray(visionImagesList)) {
+      window.visionImagesList = visionImagesList;
+    }
 
     if (!visionImagesList || visionImagesList.length === 0) {
       if (emptyState) emptyState.classList.remove('hidden');
@@ -3030,6 +3062,9 @@
     }
   }
 
+  window.renderVisionImagesGallery = renderVisionImagesGallery;
+  window.processVisionModalFile = processVisionModalFile;
+
   window.setActiveVisionImage = function(idx) {
     if (idx >= 0 && idx < visionImagesList.length) {
       currentActivePreviewIndex = idx;
@@ -3056,6 +3091,7 @@
   window.deleteVisionImageAt = function(idx) {
     if (idx >= 0 && idx < visionImagesList.length) {
       visionImagesList.splice(idx, 1);
+      window.visionImagesList = visionImagesList;
       if (currentActivePreviewIndex >= visionImagesList.length) {
         currentActivePreviewIndex = Math.max(0, visionImagesList.length - 1);
       }
@@ -3065,7 +3101,9 @@
 
   window.resetVisionModalImage = function() {
     visionImagesList = [];
+    window.visionImagesList = visionImagesList;
     currentActivePreviewIndex = 0;
+    window.currentActivePreviewIndex = 0;
     photoCache.general = null;
     const resultsArea = document.getElementById('vision-results-area');
     if (resultsArea) resultsArea.classList.add('hidden');
@@ -3073,6 +3111,9 @@
   };
 
   window.runVisionModalAnalysis = async function() {
+    if (Array.isArray(window.visionImagesList) && window.visionImagesList.length > 0 && (!visionImagesList || visionImagesList.length === 0)) {
+      visionImagesList = window.visionImagesList;
+    }
     if (!visionImagesList || visionImagesList.length === 0) {
       alert('يرجى التقاط أو اختيار صورة واحدة على الأقل.');
       return;

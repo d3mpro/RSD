@@ -936,19 +936,25 @@
       const files = e?.target?.files;
       if (!files || files.length === 0) return;
 
-      if (!window.visionImagesList) window.visionImagesList = [];
-
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const compressed = (typeof window.compressImageForAI === 'function')
-          ? await window.compressImageForAI(file, 1280, 0.78)
-          : await readFileAsBase64(file);
+        let compressed = null;
+        if (typeof window.compressImageForAI === 'function') {
+          compressed = await window.compressImageForAI(file, 1280, 0.78);
+        } else {
+          compressed = await readFileAsBase64(file);
+        }
         if (compressed) {
-          window.visionImagesList.push(compressed);
+          if (typeof window.addVisionImage === 'function') {
+            window.addVisionImage(compressed);
+          } else {
+            if (!Array.isArray(window.visionImagesList)) window.visionImagesList = [];
+            window.visionImagesList.push(compressed);
+          }
         }
       }
 
-      window.currentActivePreviewIndex = window.visionImagesList.length - 1;
+      window.currentActivePreviewIndex = ((window.getVisionImagesList ? window.getVisionImagesList() : window.visionImagesList) || []).length - 1;
       if (typeof window.renderVisionImagesGallery === 'function') {
         window.renderVisionImagesGallery();
       }
