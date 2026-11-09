@@ -760,6 +760,225 @@
     };
   }
 
+  let activeCameraStream = null;
+  let activeVideoElement = null;
+  let activeReticleContainer = null;
+  let activeInspectionSubmode = 'general';
+
+  /**
+   * Check if live media camera stream is supported in the current environment
+   */
+  function isCameraSupported(options = {}) {
+    const md = options.mediaDevices ||
+      (typeof navigator !== 'undefined' && navigator.mediaDevices) ||
+      (typeof globalThis !== 'undefined' && globalThis.navigator && globalThis.navigator.mediaDevices);
+    return !!(md && typeof md.getUserMedia === 'function');
+  }
+
+  function triggerFallbackInput(inputEl) {
+    try {
+      const el = typeof inputEl === 'string' ? (typeof document !== 'undefined' ? document.querySelector(inputEl) : null) : inputEl;
+      if (el && typeof el.click === 'function') {
+        el.click();
+      }
+    } catch (e) {
+      console.warn('[KSUReticleHelper] Fallback input trigger failed:', e);
+    }
+  }
+
+  /**
+   * Start live camera stream with environment-facing video and dynamic reticle overlay
+   * @param {HTMLVideoElement|string} videoEl - Video element or selector
+   * @param {HTMLElement|string} containerEl - Reticle container element or selector
+   * @param {Object} options - Stream and reticle options
+   * @returns {Promise<{ success: boolean, stream?: MediaStream, fallback?: boolean, error?: any }>}
+   */
+  async function startLiveCameraStream(videoEl, containerEl, options = {}) {
+    const video = (typeof videoEl === 'string') ? (typeof document !== 'undefined' ? document.querySelector(videoEl) : null) : videoEl;
+    const container = (typeof containerEl === 'string') ? (typeof document !== 'undefined' ? document.querySelector(containerEl) : null) : containerEl;
+    const submode = options.submode || activeInspectionSubmode || 'general';
+    activeInspectionSubmode = submode;
+
+    const mediaDevices = options.mediaDevices ||
+      (typeof navigator !== 'undefined' && navigator.mediaDevices) ||
+      (typeof globalThis !== 'undefined' && globalThis.navigator && globalThis.navigator.mediaDevices);
+
+    // Check device support
+    if (!mediaDevices || typeof mediaDevices.getUserMedia !== 'function') {
+      const notSupportedErr = new Error('MediaDevices.getUserMedia is not supported');
+      if (typeof options.onError === 'function') options.onError(notSupportedErr);
+      if (options.fallbackInput) triggerFallbackInput(options.fallbackInput);
+      return { success: false, fallback: true, error: notSupportedErr };
+    }
+
+    // Stop existing stream if running
+    stopLiveCameraStream();
+
+    const constraints = options.constraints || {
+      video: {
+        facingMode: options.facingMode || 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: false
+    };
+
+    try {
+      const stream = await mediaDevices.getUserMedia(constraints);
+      activeCameraStream = stream;
+      activeVideoElement = video;
+      activeReticleContainer = container;
+
+      if (video) {
+        video.srcObject = stream;
+        video.setAttribute('playsinline', '');
+        video.setAttribute('autoplay', '');
+        video.muted = true;
+        try {
+          await video.play();
+        } catch (playErr) {
+          console.warn('[KSUReticleHelper] Video autoplay notice:', playErr);
+        }
+      }
+
+      if (container) {
+        renderReticleInto(container, submode, options);
+      }
+
+      return { success: true, stream };
+    } catch (err) {
+      console.warn('[KSUReticleHelper] getUserMedia error, activating fallback:', err);
+      if (typeof options.onError === 'function') {
+        options.onError(err);
+      }
+      if (options.fallbackInput) {
+        triggerFallbackInput(options.fallbackInput);
+      }
+      return { success: false, fallback: true, error: err };
+    }
+  }
+
+  /**
+   * Stop active camera stream tracks safely
+   */
+  function stopLiveCameraStream(targetStream) {
+    const stream = targetStream || activeCameraStream;
+    if (stream) {
+      try {
+        const tracks = typeof stream.getTracks === 'function' ? stream.getTracks() : [];
+        tracks.forEach(track => {
+          try {
+            if (track && typeof track.stop === 'function') track.stop();
+          } catch (e) {}
+        });
+      } catch (e) {}
+      if (stream === activeCameraStream) {
+        activeCameraStream = null;
+      }
+    }
+    if (activeVideoElement) {
+      try {
+        activeVideoElement.srcObject = null;
+      } catch (e) {}
+      activeVideoElement = null;
+    }
+    activeReticleContainer = null;
+  }
+
+  /**
+   * Capture a single snapshot frame from live video element to JPEG base64 DataURL
+   * @param {HTMLVideoElement|string} videoEl - Video element or selector
+   * @param {Object} options - Capture quality & dimension options
+   * @returns {string} Image JPEG base64 data URL
+   */
+  function captureFrame(videoEl, options = {}) {
+    const video = (typeof videoEl === 'string') ? (typeof document !== 'undefined' ? document.querySelector(videoEl) : null) : videoEl;
+    if (!video || typeof document === 'undefined') return '';
+
+    const width = video.videoWidth || options.width || 1280;
+    const height = video.videoHeight || options.height || 720;
+    const quality = typeof options.quality === 'number' ? options.quality : 0.85;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return '';
+
+    // Draw video frame to canvas safely
+    try {
+      ctx.drawImage(video, 0, 0, width, height);
+      return canvas.toDataURL('image/jpeg', quality);
+    } catch (drawErr) {
+      console.warn('[KSUReticleHelper] Canvas drawImage failed:', drawErr);
+      return '';
+    }
+  }
+
+  /**
+   * Get active camera stream reference
+   */
+  function getActiveCameraStream() {
+    return activeCameraStream;
+  }
+
+  /**
+   * Setup inspection flow control on the vision modal:
+   * - Eliminates premature 350ms auto-trigger timeout
+   * - Displays photo preview cleanly
+   * - Gives inspector full control to adjust building, floor, room, notes
+   * - Provides explicit manual trigger button ("تحليل الصورة بالذكاء الاصطناعي" / "بدء الفحص")
+   */
+  function setupInspectionFlowControl(modalEl, options = {}) {
+    if (typeof window === 'undefined') return;
+
+    window.handleVisionModalFileSelected = async function(e) {
+      const files = e?.target?.files;
+      if (!files || files.length === 0) return;
+
+      if (!window.visionImagesList) window.visionImagesList = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const compressed = (typeof window.compressImageForAI === 'function')
+          ? await window.compressImageForAI(file, 1280, 0.78)
+          : await readFileAsBase64(file);
+        if (compressed) {
+          window.visionImagesList.push(compressed);
+        }
+      }
+
+      window.currentActivePreviewIndex = window.visionImagesList.length - 1;
+      if (typeof window.renderVisionImagesGallery === 'function') {
+        window.renderVisionImagesGallery();
+      }
+
+      // Feature 8: Full inspector control - enable button without premature auto-trigger
+      const btnRun = document.getElementById('btn-run-vision-ai');
+      if (btnRun) {
+        btnRun.disabled = false;
+        btnRun.classList.remove('opacity-50');
+        btnRun.innerHTML = `
+          <span class="material-symbols-outlined text-lg">psychology</span>
+          <span>🧠 تحليل الصورة بالذكاء الاصطناعي (بدء الفحص)</span>
+        `;
+      }
+
+      if (e?.target) e.target.value = '';
+      // NOTE: Premature setTimeout(..., 350) cliff has been completely eliminated!
+    };
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve) => {
+      if (!file || typeof FileReader === 'undefined') return resolve('');
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  }
+
   return {
     getReticleSvg,
     getSubmodeList,
@@ -773,6 +992,12 @@
     mapVisionToChecklistFields,
     prepareViolationFromVision,
     prepareNewRoundFromVision,
+    isCameraSupported,
+    startLiveCameraStream,
+    stopLiveCameraStream,
+    captureFrame,
+    getActiveCameraStream,
+    setupInspectionFlowControl,
     GUIDANCE_MAP
   };
 });

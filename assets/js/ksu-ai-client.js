@@ -15,39 +15,85 @@
     locale: 'ar-SA',
     apiBaseUrl: '/safety/api',
     apiKeyHeader: 'ksu_sec_token_95972_riyadh',
-    // رابط خادم وكيل أوراكل الجديد للرؤية البصرية (Qwen2.5-VL Agent)
-    oracleAgentUrl: localStorage.getItem('ksumc_oracle_agent_url') || 'https://rsdsafety.online',
+    // رابط خادم وكيل أوراكل للرؤية البصرية (Qwen2.5-VL Agent)
+    oracleAgentUrl: (typeof localStorage !== 'undefined' ? localStorage.getItem('ksumc_oracle_agent_url') : null) || 'https://rsdsafety.online',
     // إعدادات نموذج كوين البصري المباشر (OpenRouter / Alibaba DashScope)
-    qwenApiBaseUrl: localStorage.getItem('ksumc_qwen_base_url') || 'https://openrouter.ai/api/v1/chat/completions',
-    qwenApiKey: localStorage.getItem('ksumc_qwen_api_key') || '',
-    qwenVisionModel: localStorage.getItem('ksumc_qwen_vision_model') || 'qwen/qwen2.5-vl-72b-instruct:free',
-    // مفتاح أو عدة مفاتيح Gemini مفصولة بفاصلة للتدوير التلقائي
-    geminiApiKey: localStorage.getItem('ksumc_gemini_api_keys') || 'AQ.Ab8RN6K-cWBO2DLr-uuccKEbUvakPdEhwL9qMV4DMjeYggHF0w',
+    qwenApiBaseUrl: (typeof localStorage !== 'undefined' ? localStorage.getItem('ksumc_qwen_base_url') : null) || 'https://openrouter.ai/api/v1/chat/completions',
+    qwenApiKey: (typeof localStorage !== 'undefined' ? (localStorage.getItem('ksumc_qwen_api_key') || localStorage.getItem('ksumc_qwen_api_keys') || '') : ''),
+    qwenVisionModel: (typeof localStorage !== 'undefined' ? localStorage.getItem('ksumc_qwen_vision_model') : null) || 'qwen/qwen2.5-vl-72b-instruct:free',
+    // مفتاح أو عدة مفاتيح Gemini مفصولة بفاصلة للتدوير التلقائي (قراءة ديناميكية نظيفة بدون مفتاح تالف افتراضي)
+    geminiApiKey: (typeof localStorage !== 'undefined' ? (localStorage.getItem('ksumc_gemini_api_key') || localStorage.getItem('ksumc_gemini_api_keys') || '') : ''),
     _geminiKeyIdx: 0,
 
     /**
-     * حفظ إعدادات وكيل أوراكل ونموذج كوين (Qwen2.5-VL) في المتصفح
+     * تنظيف وفلترة مفاتيح الـ API وإزالة المسافات والأحرف غير الصالحة والمفاتيح التالفة
      */
-    saveAgentConfig({ oracleAgentUrl, qwenApiKey, qwenVisionModel, qwenApiBaseUrl, geminiApiKeys }) {
+    getSanitizedKeys(keyString) {
+      if (!keyString || typeof keyString !== 'string') return [];
+      return keyString
+        .split(',')
+        .map(k => k.replace(/["'\r\n]/g, '').trim())
+        .filter(k => {
+          if (!k) return false;
+          // استبعاد المفتاح التالف القديم المسبب للخطأ 401
+          if (k.includes('AQ.Ab8RN6K')) return false;
+          // التحقق من أن المفتاح يحتوي فقط على محارف ASCII صالحة
+          return /^[\x20-\x7E]+$/.test(k);
+        });
+    },
+
+    /**
+     * استرجاع مفاتيح Gemini الصالحة من الذاكرة أو التخزين المحلي
+     */
+    getGeminiKeys() {
+      const stored = (typeof localStorage !== 'undefined')
+        ? (localStorage.getItem('ksumc_gemini_api_key') || localStorage.getItem('ksumc_gemini_api_keys') || '')
+        : '';
+      const raw = this.geminiApiKey || stored || '';
+      return this.getSanitizedKeys(raw);
+    },
+
+    /**
+     * استرجاع مفاتيح Qwen الصالحة من الذاكرة أو التخزين المحلي
+     */
+    getQwenKeys() {
+      const stored = (typeof localStorage !== 'undefined')
+        ? (localStorage.getItem('ksumc_qwen_api_key') || localStorage.getItem('ksumc_qwen_api_keys') || '')
+        : '';
+      const raw = this.qwenApiKey || stored || '';
+      return this.getSanitizedKeys(raw);
+    },
+
+    /**
+     * حفظ إعدادات وكيل أوراكل ونموذج كوين (Qwen2.5-VL) ومفاتيح Gemini في المتصفح
+     */
+    saveAgentConfig({ oracleAgentUrl, qwenApiKey, qwenVisionModel, qwenApiBaseUrl, geminiApiKey, geminiApiKeys }) {
       if (typeof oracleAgentUrl === 'string') {
         this.oracleAgentUrl = oracleAgentUrl.trim().replace(/\/+$/, '');
-        localStorage.setItem('ksumc_oracle_agent_url', this.oracleAgentUrl);
+        if (typeof localStorage !== 'undefined') localStorage.setItem('ksumc_oracle_agent_url', this.oracleAgentUrl);
       }
       if (typeof qwenApiKey === 'string') {
         this.qwenApiKey = qwenApiKey.trim();
-        localStorage.setItem('ksumc_qwen_api_key', this.qwenApiKey);
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('ksumc_qwen_api_key', this.qwenApiKey);
+          localStorage.setItem('ksumc_qwen_api_keys', this.qwenApiKey);
+        }
       }
       if (typeof qwenVisionModel === 'string' && qwenVisionModel.trim()) {
         this.qwenVisionModel = qwenVisionModel.trim();
-        localStorage.setItem('ksumc_qwen_vision_model', this.qwenVisionModel);
+        if (typeof localStorage !== 'undefined') localStorage.setItem('ksumc_qwen_vision_model', this.qwenVisionModel);
       }
       if (typeof qwenApiBaseUrl === 'string' && qwenApiBaseUrl.trim()) {
         this.qwenApiBaseUrl = qwenApiBaseUrl.trim();
-        localStorage.setItem('ksumc_qwen_base_url', this.qwenApiBaseUrl);
+        if (typeof localStorage !== 'undefined') localStorage.setItem('ksumc_qwen_base_url', this.qwenApiBaseUrl);
       }
-      if (typeof geminiApiKeys === 'string') {
-        this.geminiApiKey = geminiApiKeys.trim();
-        localStorage.setItem('ksumc_gemini_api_keys', this.geminiApiKey);
+      const gKey = (typeof geminiApiKey === 'string') ? geminiApiKey : geminiApiKeys;
+      if (typeof gKey === 'string') {
+        this.geminiApiKey = gKey.trim();
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('ksumc_gemini_api_key', this.geminiApiKey);
+          localStorage.setItem('ksumc_gemini_api_keys', this.geminiApiKey);
+        }
       }
     },
 
@@ -107,33 +153,92 @@
     /**
      * الحصول على الرابط الأساسي لواجهات برمجة التطبيقات
      */
-    getApiUrl(endpoint) {
-      const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    getApiUrl(endpoint = '') {
+      let cleanEndpoint = '';
+      if (!endpoint || endpoint === '') {
+        cleanEndpoint = '/';
+      } else {
+        cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+      }
+
+      const win = typeof window !== 'undefined' ? window : null;
+      const loc = win && win.location ? win.location : null;
+      const hostname = loc && loc.hostname ? loc.hostname : '';
+      const protocol = loc && loc.protocol ? loc.protocol : 'https:';
+      const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0';
+
+      const customStored = (typeof localStorage !== 'undefined' && localStorage.getItem('ksumc_oracle_agent_url'))
+        ? localStorage.getItem('ksumc_oracle_agent_url').trim()
+        : null;
+
+      // عند توفر رابط وكيل أوراكل مخصص أو خارج بيئة التطوير المحلية
       if (this.oracleAgentUrl) {
-        const base = this.oracleAgentUrl.endsWith('/safety/api')
-          ? this.oracleAgentUrl
-          : `${this.oracleAgentUrl}/safety/api`;
+        const isDefaultRemote = this.oracleAgentUrl === 'https://rsdsafety.online' || this.oracleAgentUrl === 'http://rsdsafety.online';
+        if (!isLocal || customStored || !isDefaultRemote) {
+          let agentUrl = this.oracleAgentUrl.trim().replace(/\/+$/, '');
+          // منع مشاكل Mixed Content: ترقية البروتوكول إلى https عند تشغيل الصفحة عبر https
+          if (protocol === 'https:' && agentUrl.startsWith('http://') && !agentUrl.includes('localhost') && !agentUrl.includes('127.0.0.1')) {
+            agentUrl = agentUrl.replace('http://', 'https://');
+          }
+          const base = agentUrl.endsWith('/safety/api')
+            ? agentUrl
+            : `${agentUrl}/safety/api`;
+          return `${base}${cleanEndpoint}`;
+        }
+      }
+
+      // جسر واجهات الزمن الحقيقي
+      if (win && win.KSURealtime && win.KSURealtime.apiBaseUrl) {
+        const rBase = win.KSURealtime.apiBaseUrl.replace(/\/+$/, '');
+        return `${rBase}${cleanEndpoint}`;
+      }
+
+      // توجيه بيئة التطوير المحلية
+      if (isLocal) {
+        const port = loc && loc.port === '8000' ? '' : ':8000';
+        return `http://${hostname}${port}/safety/api${cleanEndpoint}`;
+      }
+
+      // عنوان IP المباشر للخادم السحابي
+      if (loc && loc.host && loc.host.includes('84.13.138.203')) {
+        return `${protocol}//${loc.host}/safety/api${cleanEndpoint}`;
+      }
+
+      // التوجيه النسبي الافتراضي عند تشغيل الموقع على النطاق المعتمد
+      if (hostname === 'rsdsafety.online') {
+        return `/safety/api${cleanEndpoint}`;
+      }
+
+      // في حال وجود رابط وكيل أوراكل افتراضي
+      if (this.oracleAgentUrl) {
+        let agentUrl = this.oracleAgentUrl.trim().replace(/\/+$/, '');
+        if (protocol === 'https:' && agentUrl.startsWith('http://') && !agentUrl.includes('localhost') && !agentUrl.includes('127.0.0.1')) {
+          agentUrl = agentUrl.replace('http://', 'https://');
+        }
+        const base = agentUrl.endsWith('/safety/api')
+          ? agentUrl
+          : `${agentUrl}/safety/api`;
         return `${base}${cleanEndpoint}`;
       }
-      if (window.KSURealtime && window.KSURealtime.apiBaseUrl) {
-        return `${window.KSURealtime.apiBaseUrl}${cleanEndpoint}`;
-      }
-      const hostname = window.location.hostname;
-      if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return `http://${hostname}:8000/safety/api${cleanEndpoint}`;
-      }
-      const host = window.location.host;
-      const proto = window.location.protocol;
-      if (host.includes('84.13.138.203')) {
-        return `${proto}//${host}/safety/api${cleanEndpoint}`;
-      }
+
       return `/safety/api${cleanEndpoint}`;
     },
 
     /**
-     * إرسال طلب موثق مع مهلة زمنية وحماية من التعليق
+     * إرسال طلب موثق مع مهلة زمنية تكيفية وحماية من التعليق
      */
-    async request(endpoint, options = {}, timeoutMs = 45000) {
+    async request(endpoint, options = {}, timeoutMs) {
+      let effectiveTimeout = timeoutMs;
+      if (!effectiveTimeout) {
+        if (typeof endpoint === 'string' && endpoint.includes('analyze-inspection-image')) {
+          effectiveTimeout = 90000; // مهلة تكيفية 90 ثانية لمعالجة الرؤية البصرية عبر Ollama CPU
+        } else if (typeof endpoint === 'string' && endpoint.includes('status')) {
+          effectiveTimeout = 10000;
+        } else {
+          effectiveTimeout = 45000;
+        }
+      }
+
       const url = this.getApiUrl(endpoint);
       const headers = {
         'Content-Type': 'application/json',
@@ -142,7 +247,7 @@
       };
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      const timeoutId = setTimeout(() => controller.abort(), effectiveTimeout);
 
       try {
         const response = await fetch(url, {
@@ -151,21 +256,28 @@
           signal: controller.signal
         });
         clearTimeout(timeoutId);
+
         if (!response.ok) {
           let errText = '';
           try {
             const rawText = await response.text();
             try {
               const errJson = JSON.parse(rawText);
-              errText = errJson.detail || errJson.error || rawText;
+              errText = errJson.detail || errJson.error || errJson.message || rawText;
             } catch (_) {
               errText = rawText;
             }
           } catch (_) {
-            errText = 'خطأ في الاتصال';
+            errText = 'خطأ في الاتصال بالخادم';
           }
           if (response.status === 413) {
             throw new Error('حجم الصورة كبير جداً، يرجى اختيار صورة أخرى أو تقليل دقتها.');
+          }
+          if (response.status === 504) {
+            throw new Error('الخادم يستغرق وقتاً أطول من المعتاد، يرجى إعادة المحاولة.');
+          }
+          if (response.status === 502 || response.status === 503) {
+            throw new Error(`استجابة غير صالحة من خادم الويب (${response.status})`);
           }
           throw new Error(`خطأ (${response.status}): ${errText.slice(0, 150)}`);
         }
@@ -173,7 +285,15 @@
       } catch (err) {
         clearTimeout(timeoutId);
         if (err.name === 'AbortError') {
-          throw new Error('انتهت مهلة استجابة الخادم (Timeout). يرجى التأكد من اتصال الإنترنت وإعادة المحاولة.');
+          const isVision = typeof endpoint === 'string' && endpoint.includes('analyze-inspection-image');
+          const timeoutMessage = isVision
+            ? 'انتهت مهلة الاتصال بخادم الرؤية البصرية. قد يكون الخادم مشغولاً بمعالجة طلبات أخرى، يرجى إعادة المحاولة.'
+            : 'انتهت مهلة استجابة الخادم (Timeout). يرجى التأكد من اتصال الإنترنت وإعادة المحاولة.';
+          const timeoutErr = new Error(timeoutMessage);
+          timeoutErr.name = 'TimeoutError';
+          timeoutErr.error_code = 'ERR_VISION_TIMEOUT';
+          timeoutErr.stage = 'inference';
+          throw timeoutErr;
         }
         console.warn(`[KSUAI] Request to ${endpoint} failed:`, err.message);
         throw err;
@@ -453,7 +573,8 @@
       const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com') || window.location.protocol === 'file:';
 
       // المسار 1 (الأولوية القصوى والسريعة المعتمدة): الاستدعاء المباشر لمحرك Google Gemini 2.5 Flash Vision
-      if (this.geminiApiKey) {
+      const geminiKeys = this.getGeminiKeys();
+      if (geminiKeys.length > 0) {
         try {
           if (typeof onProgress === 'function') onProgress('جاري التحليل البصري الذكي وتحديد نوع واسم المخالفة عبر Gemini Vision...');
           const geminiRes = await this.callGeminiDirectly({
@@ -472,12 +593,13 @@
             return geminiRes;
           }
         } catch (geminiErr) {
-          console.warn('[KSUAI] Direct Gemini API failed, trying alternate providers:', geminiErr.message);
+          console.warn('[KSUAI] Direct Gemini API failed, failing over cleanly to alternate providers:', geminiErr.message);
         }
       }
 
       // المسار 2: الاتصال المباشر بنموذج كوين البصري (Qwen2.5-VL) إذا تم ضبط مفتاح Qwen
-      if (this.qwenApiKey) {
+      const qwenKeys = this.getQwenKeys();
+      if (qwenKeys.length > 0) {
         try {
           if (typeof onProgress === 'function') onProgress('جاري التحليل السحابي عبر نموذج Qwen2.5-VL...');
           const qwenRes = await this.callQwenDirectly({
@@ -499,22 +621,42 @@
         }
       }
 
-      // المسار 3: الاتصال المباشر بوكيل أوراكل (إذا كان متاحاً بدون حظر)
+      // المسار 3: الاتصال المباشر بوكيل أوراكل (مع مهلة تكيفية كافية 90 ثانية لمعالج CPU)
       const hasOracleAgent = Boolean(this.oracleAgentUrl) || !isFirebase;
       if (hasOracleAgent) {
+        let progressTimer = null;
         try {
           if (typeof onProgress === 'function') onProgress('جاري الفحص المباشر عبر وكيل الرؤية البصرية...');
+          if (typeof onProgress === 'function') {
+            let step = 0;
+            const steps = [
+              'المعالج البصري يقوم بتحليل تفاصيل الصورة والمطابقة الهندسية...',
+              'جاري فحص معايير السلامة واستخراج الملاحظات والإجراءات التصحيحية (CAPA)...',
+              'جاري استكمال التقرير المعتمد وتوثيق الحالة ميدانياً...'
+            ];
+            progressTimer = setInterval(() => {
+              if (step < steps.length) {
+                onProgress(steps[step++]);
+              }
+            }, 12000);
+          }
+
           const res = await this.request('/ai/analyze-inspection-image', {
             method: 'POST',
             body: JSON.stringify(payload)
-          }, isFirebase ? 15000 : 35000);
+          }, 90000);
+
+          if (progressTimer) clearInterval(progressTimer);
+
           if (res && res.success && res.data) {
             res.data = this.applyStaticReferenceMapping(res.data, submode || checklistType);
-            res.data.ai_engine_source = res.source || 'Oracle Qwen2.5-VL Agent';
+            res.data.ai_engine_source = res.source || res.provider_used || 'Oracle Qwen2.5-VL Agent';
             return res;
           }
         } catch (serverErr) {
-          console.warn('[KSUAI] Oracle Vision Agent unreachable:', serverErr.message);
+          console.warn('[KSUAI] Oracle Vision Agent unreachable or timed out:', serverErr.message);
+        } finally {
+          if (progressTimer) clearInterval(progressTimer);
         }
       }
 
@@ -522,7 +664,7 @@
       if (isFirebase) {
         try {
           if (typeof onProgress === 'function') onProgress('جاري فحص جسر الفايربيس اللحظي...');
-          const bridgeRes = await this.dispatchViaFirebaseBridge('analyze-inspection-image', payload, 20000);
+          const bridgeRes = await this.dispatchViaFirebaseBridge('analyze-inspection-image', payload, 60000);
           if (bridgeRes && bridgeRes.success && bridgeRes.data) {
             bridgeRes.data = this.applyStaticReferenceMapping(bridgeRes.data, submode || checklistType);
             bridgeRes.data.ai_engine_source = bridgeRes.source || 'Oracle Ollama (via Firebase Bridge)';
@@ -533,18 +675,22 @@
         }
       }
 
-      // المسار 5 (المحرك الخبير الاسترشادي الذكي عند انقطاع الاتصال)
-      if (typeof onProgress === 'function') onProgress('جاري استنباط النتائج عبر محرك السلامة الخبير...');
-      return this.heuristicVisualAnalysis({
-        checklistType,
-        submode,
-        itemLabel,
-        facility,
-        building,
-        floor,
-        notes,
-        fallbackReason: 'استجابة فورية عبر محرك التحليل الخبير'
-      });
+      // المسار 5 (الشفافية الكاملة): الإشعار الصادق الصريح عند انقطاع كافة مزودي الذكاء الاصطناعي
+      const honestFailureMsg = 'تعذر الاتصال بخادم الذكاء الاصطناعي أو استغرق الفحص وقتاً أطول من المتوقع، يرجى إعادة المحاولة أو التحقق من الاتصال';
+      const offlineSaveMsg = 'تعذر الاتصال بخادم الرؤية البصرية، تم حفظ الصورة في المسودات المحلية لمزامنتها لاحقاً';
+      if (typeof onProgress === 'function') onProgress(honestFailureMsg);
+
+      return {
+        success: false,
+        status: 'فشل الاتصال',
+        error: honestFailureMsg,
+        message: honestFailureMsg,
+        user_message: offlineSaveMsg,
+        error_code: 'ERR_ALL_PROVIDERS_UNREACHABLE',
+        stage: 'inference',
+        offline_draft_ready: true,
+        data: null
+      };
     },
 
     /**
@@ -605,15 +751,9 @@
      * الاستدعاء السحابي المباشر لنموذج Google Gemini 2.5 Flash Vision (مع تدوير المفاتيح وتحديد اسم ونوع المخالفة بدقة)
      */
     async callGeminiDirectly({ images, checklistType, submode, itemLabel, facility, building, floor, notes }) {
-      const keyPool = (this.geminiApiKey || '')
-        .split(',')
-        .map(k => k.trim())
-        .filter(Boolean);
-      const defaultKey = 'AQ.Ab8RN6K-cWBO2DLr-uuccKEbUvakPdEhwL9qMV4DMjeYggHF0w';
-      const keys = [];
-      const sourcePool = keyPool.length > 0 ? keyPool : [defaultKey];
-      for (const candidate of sourcePool) {
-        if (candidate && !keys.includes(candidate)) keys.push(candidate);
+      const keys = this.getGeminiKeys();
+      if (!keys.length) {
+        throw new Error('لم يتم ضبط مفاتيح Gemini API صالحة');
       }
 
       const parts = [];
@@ -1038,37 +1178,40 @@
       }
 
       const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com') || window.location.protocol === 'file:';
-      if (!isFirebase) {
+      if (this.oracleAgentUrl || !isFirebase) {
         try {
           return await this.request('/ai/ask-safety-assistant', {
             method: 'POST',
             body: JSON.stringify({ question })
           }, 20000);
         } catch (e) {
-          console.warn('[KSUAI] Backend assistant failed, falling back to direct Gemini:', e.message);
+          console.warn('[KSUAI] Backend assistant failed, falling back to direct cloud:', e.message);
         }
       }
 
-      try {
-        const geminiKey = this.geminiApiKey || 'AQ.Ab8RN6K-cWBO2DLr-uuccKEbUvakPdEhwL9qMV4DMjeYggHF0w';
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-        const prompt = `أنت المستشار والخبير الذكي للسلامة وإدارة المرافق بالمدينة الطبية بجامعة الملك سعود.
+      const geminiKeys = this.getGeminiKeys();
+      if (geminiKeys.length > 0) {
+        try {
+          const geminiKey = geminiKeys[0];
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+          const prompt = `أنت المستشار والخبير الذكي للسلامة وإدارة المرافق بالمدينة الطبية بجامعة الملك سعود.
 أجب عن استفسار السلامة التالي بدقة بالاعتماد على معايير سباهي (CBAHI FMS) وكود الحريق السعودي (SBC 801):
 "${question}"`;
-        const resp = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
-          })
-        });
-        if (resp.ok) {
-          const rJson = await resp.json();
-          const answer = rJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (answer) return { success: true, answer, source: 'Google Gemini 2.5 Flash' };
+          const resp = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }]
+            })
+          });
+          if (resp.ok) {
+            const rJson = await resp.json();
+            const answer = rJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (answer) return { success: true, answer, source: 'Google Gemini 2.5 Flash' };
+          }
+        } catch (err) {
+          console.warn('[KSUAI] Direct assistant call failed:', err.message);
         }
-      } catch (err) {
-        console.warn('[KSUAI] Direct assistant call failed:', err.message);
       }
 
       return {
@@ -1091,7 +1234,7 @@
       }
 
       const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com') || window.location.protocol === 'file:';
-      if (!isFirebase) {
+      if (this.oracleAgentUrl || !isFirebase) {
         try {
           const res = await this.request('/ai/structure-voice-record', {
             method: 'POST',
@@ -1102,13 +1245,15 @@
           }, 25000);
           if (res && res.success && res.data) return res;
         } catch (e) {
-          console.warn('[KSUAI] Backend voice record structuring failed, using direct Gemini / heuristic:', e.message);
+          console.warn('[KSUAI] Backend voice record structuring failed, using direct cloud:', e.message);
         }
       }
 
-      try {
-        const geminiKey = this.geminiApiKey || 'AQ.Ab8RN6K-cWBO2DLr-uuccKEbUvakPdEhwL9qMV4DMjeYggHF0w';
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+      const geminiKeys = this.getGeminiKeys();
+      if (geminiKeys.length > 0) {
+        try {
+          const geminiKey = geminiKeys[0];
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
         const prompt = `أنت مساعد ذكي للأمن والسلامة بالمدينة الطبية بجامعة الملك سعود.
 المطلوب: تفكيك وتحويل النص الصوتي التالي إلى حقول منظمة لبلاغ (${formType}):
 "${transcript}"
@@ -1153,6 +1298,7 @@
       } catch (geminiErr) {
         console.warn('[KSUAI] Direct voice structuring failed, using client heuristic:', geminiErr.message);
       }
+    }
 
       return {
         success: true,
@@ -1504,7 +1650,11 @@
      */
     async callGeminiCBAHIAudit(building = 'كافة مباني المدينة الطبية (KSUMC)', days = 30, stats = null) {
       stats = stats || this._collectBuildingStats(building, days);
-      const geminiKey = this.geminiApiKey || 'AQ.Ab8RN6K-cWBO2DLr-uuccKEbUvakPdEhwL9qMV4DMjeYggHF0w';
+      const geminiKeys = this.getGeminiKeys();
+      if (!geminiKeys.length) {
+        throw new Error('لم يتم ضبط مفاتيح Gemini API صالحة');
+      }
+      const geminiKey = geminiKeys[0];
       const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
       const checklistsStr = (stats.checklists_covered || []).join('، ');
@@ -2968,9 +3118,9 @@
     const notes = document.getElementById('inp-vision-notes')?.value || '';
     const activeSubmode = currentVisionSubmode || 'general';
 
-    // حماية قاطعة: مهلة 50 ثانية لمنع أي تعليق على شاشة الفحص مع إتاحة وقت كافٍ لنموذج الرؤية البصرية
+    // حماية قاطعة: مهلة تكيفية كافية (100 ثانية) لمنع أي تعليق مع إتاحة وقت كافٍ لمعالجة Ollama CPU
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('timeout_safety_fallback')), 50000);
+      setTimeout(() => reject(new Error('انتهت مهلة استجابة خادم الرؤية البصرية (Timeout)')), 100000);
     });
 
     try {
@@ -2991,6 +3141,13 @@
 
       const res = await Promise.race([analysisPromise, timeoutPromise]);
 
+      if (!res || !res.success || !res.data) {
+        const errorMsg = (res && (res.error || res.user_message || res.message)) ||
+          'تعذر الاتصال بخادم الذكاء الاصطناعي أو استغرق الفحص وقتاً أطول من المتوقع، يرجى إعادة المحاولة أو التحقق من الاتصال';
+        renderVisionInspectionError(errorMsg, building, floor, room);
+        return;
+      }
+
       const d = KSUAI.applyStaticReferenceMapping(res.data || {}, activeSubmode);
       d.images_count = visionImagesList.length;
       d.submode = d.pattern || activeSubmode;
@@ -3004,28 +3161,9 @@
 
       renderVisionInspectionResults(d, building, floor, room);
     } catch (err) {
-      console.warn('AI vision error caught, using expert heuristic analysis:', err);
-      const fallbackRes = KSUAI.heuristicVisualAnalysis({
-        checklistType: type,
-        submode: activeSubmode,
-        itemLabel: room ? `${floor} - ${room}` : floor,
-        facility: 'المدينة الطبية (KSUMC)',
-        building: building,
-        floor: floor,
-        notes: notes,
-        fallbackReason: err.message
-      });
-      const d = KSUAI.applyStaticReferenceMapping(fallbackRes.data || {}, activeSubmode);
-      d.images_count = visionImagesList.length;
-      d.submode = d.pattern || activeSubmode;
-      lastVisionAnalysisData = d;
-      lastVisionAnalysisImage = visionImagesList[0];
-      lastVisionAnalysisImages = [...visionImagesList];
-      window.lastVisionAnalysisData = d;
-      window.lastVisionAnalysisImage = lastVisionAnalysisImage;
-      window.lastVisionAnalysisImages = lastVisionAnalysisImages;
-      window.lastVisionLocation = { building, floor, room, type, notes, submode: activeSubmode };
-      renderVisionInspectionResults(d, building, floor, room);
+      console.warn('[KSUAI] AI vision error caught:', err.message);
+      const errorMsg = err.message || 'تعذر الاتصال بخادم الذكاء الاصطناعي أو استغرق الفحص وقتاً أطول من المتوقع، يرجى إعادة المحاولة أو التحقق من الاتصال';
+      renderVisionInspectionError(errorMsg, building, floor, room);
     } finally {
       if (progressTimer) clearInterval(progressTimer);
       if (laser) laser.classList.add('hidden');
@@ -3039,6 +3177,83 @@
   // No-op for legacy calls if any
   window.toggleVisionAgentSettingsPanel = function() {};
   window.testAndSaveVisionAgentConfig = async function() {};
+
+  function renderVisionInspectionError(errorMessage, building, floor, room) {
+    const resultsArea = document.getElementById('vision-results-area');
+    if (!resultsArea) return;
+
+    try {
+      if (typeof window !== 'undefined' && window.visionImagesList && window.visionImagesList.length) {
+        const drafts = JSON.parse(localStorage.getItem('ksu_offline_vision_drafts') || '[]');
+        drafts.push({
+          id: 'draft_' + Date.now(),
+          timestamp: Date.now(),
+          images: window.visionImagesList,
+          building: building || '',
+          floor: floor || '',
+          room: room || '',
+          submode: window.currentVisionSubmode || 'general',
+          error: errorMessage
+        });
+        localStorage.setItem('ksu_offline_vision_drafts', JSON.stringify(drafts.slice(-20)));
+      }
+    } catch (_) {}
+
+    const safeMessage = errorMessage || 'تعذر الاتصال بخادم الذكاء الاصطناعي أو استغرق الفحص وقتاً أطول من المتوقع، يرجى إعادة المحاولة أو التحقق من الاتصال';
+
+    resultsArea.innerHTML = `
+      <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-950/80 via-slate-900 to-slate-900 text-white border border-amber-500/40 shadow-lg space-y-3">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center shrink-0 text-amber-400">
+            <span class="material-symbols-outlined text-2xl">wifi_off</span>
+          </div>
+          <div class="space-y-1 flex-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-black border border-amber-400/30">تنبيه اتصال</span>
+              <span class="text-xs text-slate-300 font-semibold">حالة التحليل الميداني</span>
+            </div>
+            <h4 class="text-base font-black text-amber-300">تعذر استكمال التحليل الآلي للرؤية البصرية</h4>
+            <p class="text-xs text-slate-200 leading-relaxed font-medium">${safeMessage}</p>
+            <p class="text-[11px] text-emerald-300 font-semibold mt-1">
+              ✅ تم حفظ الصورة في المسودات المحلية لمزامنتها لاحقاً عند استقرار الاتصال.
+            </p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-700/60">
+          <button type="button" onclick="runVisionModalAnalysis()" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-black transition flex items-center gap-1.5 shadow">
+            <span class="material-symbols-outlined text-sm">refresh</span>
+            <span>إعادة المحاولة الآن</span>
+          </button>
+          <button type="button" onclick="openManualViolationFromDraft()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-600 transition flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm">edit_note</span>
+            <span>توثيق الملاحظة يدوياً في الجولة</span>
+          </button>
+        </div>
+      </div>
+    `;
+    resultsArea.classList.remove('hidden');
+  }
+
+  window.renderVisionInspectionError = renderVisionInspectionError;
+
+  window.openManualViolationFromDraft = function() {
+    const notes = document.getElementById('inp-vision-notes')?.value || '';
+    const activeSubmode = currentVisionSubmode || 'general';
+
+    if (typeof closeAIVisionInspectionModal === 'function') {
+      closeAIVisionInspectionModal();
+    }
+    if (typeof applyVisionToActiveRound === 'function') {
+      applyVisionToActiveRound({
+        title: notes ? `ملاحظة ميدانية: ${notes.slice(0, 25)}` : 'ملاحظة سلامة ميدانية (توثيق يدوي)',
+        summary: notes || 'تم رصد الملاحظة ميدانياً وتوثيقها يدوياً نظراً لانقطاع الاتصال.',
+        status: 'غير مطابق',
+        risk: 'متوسط',
+        pattern: activeSubmode,
+        observations: [notes || 'ملاحظة مسجلة يدوياً بواسطة المفتش']
+      });
+    }
+  };
 
   function renderVisionInspectionResults(rawD, building, floor, room) {
     const resultsArea = document.getElementById('vision-results-area');
@@ -5353,10 +5568,15 @@
       }
     }
 
-    const geminiKey = KSUAI.geminiApiKey || 'AQ.Ab8RN6K-cWBO2DLr-uuccKEbUvakPdEhwL9qMV4DMjeYggHF0w';
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+    const geminiKeys = (typeof KSUAI.getGeminiKeys === 'function')
+      ? KSUAI.getGeminiKeys()
+      : ((KSUAI.geminiApiKey || '').split(',').map(k => k.trim()).filter(k => k && !k.includes('AQ.Ab8RN6K')));
 
-    const promptText = `أنت خبير واستشاري السلامة والصحة المهنية بالمدينة الطبية بجامعة الملك سعود (KSUMC).
+    if (geminiKeys.length > 0) {
+      const geminiKey = geminiKeys[0];
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
+
+      const promptText = `أنت خبير واستشاري السلامة والصحة المهنية بالمدينة الطبية بجامعة الملك سعود (KSUMC).
 أمامك صورة جدول التشغيل والتفتيش الشهري للورديات المعتمد (جدول التفتيش اليومي لشهر نوفمبر 2026).
 الوردية المستهدفة لهذا الجدول هي: "${sNames[sKey]}".
 المطلوب قراءة محتوى الصورة بدقة شديدة واستخراج مصفوفة الجولات التفتيشية اليومية والأسبوعية للوردية:
@@ -5392,58 +5612,58 @@
   ]
 }`;
 
-    const parts = [
-      {
-        inlineData: {
-          mimeType: mime,
-          data: b64
-        }
-      },
-      { text: promptText }
-    ];
+      const parts = [
+        {
+          inlineData: {
+            mimeType: mime,
+            data: b64
+          }
+        },
+        { text: promptText }
+      ];
 
-    // Attempt call with 1 retry on 429/503
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000);
+      // Attempt call with 1 retry on 429/503
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-        const resp = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts }],
-            generationConfig: {
-              responseMimeType: 'application/json'
-            }
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
+          const resp = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts }],
+              generationConfig: {
+                responseMimeType: 'application/json'
+              }
+            }),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
 
-        if (resp.ok) {
-          const resJson = await resp.json();
-          const rawOutput = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (rawOutput) {
-            const cleanJson = rawOutput.replace(/```json/g, '').replace(/```/g, '').trim();
-            const parsed = JSON.parse(cleanJson);
-            if (Array.isArray(parsed.roundsPlan) && parsed.roundsPlan.length >= 15) {
-              parsed.shiftKey = sKey;
-              parsed.shiftName = sNames[sKey];
-              parsed.supervisor = sSups[sKey];
-              return {
-                success: true,
-                data: parsed,
-                source: 'Google Gemini 2.5 Flash Vision'
-              };
+          if (resp.ok) {
+            const resJson = await resp.json();
+            const rawOutput = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (rawOutput) {
+              const cleanJson = rawOutput.replace(/```json/g, '').replace(/```/g, '').trim();
+              const parsed = JSON.parse(cleanJson);
+              if (Array.isArray(parsed.roundsPlan) && parsed.roundsPlan.length >= 15) {
+                parsed.shiftKey = sKey;
+                parsed.shiftName = sNames[sKey];
+                parsed.supervisor = sSups[sKey];
+                return {
+                  success: true,
+                  data: parsed,
+                  source: 'Google Gemini 2.5 Flash Vision'
+                };
+              }
             }
           }
+        } catch (e) {
+          console.warn(`[KSUAI] Gemini Vision attempt ${attempt + 1} notice:`, e.message);
         }
-      } catch (e) {
-        console.warn(`[KSUAI] Gemini Vision attempt ${attempt + 1} notice:`, e.message);
+        if (attempt === 0) await new Promise(r => setTimeout(r, 1200));
       }
-      // Brief pause before retry
-      if (attempt === 0) await new Promise(r => setTimeout(r, 1200));
     }
 
     // High-Precision Ground Truth Fallback: Guarantees 100% extraction for Shift 1, Shift 2, and Shift 3

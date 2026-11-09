@@ -63,6 +63,40 @@
   </script>
   <link rel="stylesheet" href="assets/css/styles.css?v=6.8.0" />
   <link rel="stylesheet" href="assets/css/core-theme.css?v=3.4" />
+  <style>
+    @keyframes scan {
+      0% {
+        top: 0%;
+        opacity: 0.9;
+      }
+      50% {
+        top: 96%;
+        opacity: 1;
+      }
+      100% {
+        top: 0%;
+        opacity: 0.9;
+      }
+    }
+    .ksu-scan-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #10b981, #06b6d4, transparent);
+      box-shadow: 0 0 16px #10b981, 0 0 8px #06b6d4;
+      animation: scan 2s ease-in-out infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ksu-scan-line,
+      [class*="animate-[scan"] {
+        animation: none !important;
+      }
+    }
+    .reticle-pulse-glow {
+      filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.6));
+    }
+  </style>
   <script src="assets/js/auth-guard.js?v=4.8.2"></script>
   <script src="assets/js/ksumc-data-bridge.js?v=6.3.0"></script>
   <script src="assets/js/ksu-firebase-realtime.js?v=6.9.0"></script>
@@ -3309,27 +3343,34 @@
           </div>
         </div>
 
-        <!-- Location & Facility Details (Compatible with AI Vision Dispatch) -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <!-- Location & Facility Details (Deduplicated Unified Grid) -->
+        <script>
+          function syncViolationLocation() {
+            const b = document.getElementById('inp-violation-building')?.value.trim() || '';
+            const f = document.getElementById('inp-violation-floor')?.value.trim() || '';
+            const l = document.getElementById('inp-violation-location')?.value.trim() || '';
+            const combined = [b, f, l].filter(Boolean).join(' - ') || b || l;
+            const hidden = document.getElementById('inp-sv-location');
+            if (hidden) {
+              hidden.value = combined;
+              // Synchronize location: document.getElementById('inp-sv-location').value = this.value
+            }
+          }
+        </script>
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <div>
             <label class="font-bold text-on-surface block mb-1">المبنى / المنشأة</label>
-            <input id="inp-violation-building" type="text" placeholder="مثال: المبنى الرئيسي" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
+            <input id="inp-violation-building" type="text" placeholder="مثال: المبنى الرئيسي" oninput="syncViolationLocation()" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
           </div>
           <div>
             <label class="font-bold text-on-surface block mb-1">الدور / الجناح</label>
-            <input id="inp-violation-floor" type="text" placeholder="مثال: الدور الأرضي" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
+            <input id="inp-violation-floor" type="text" placeholder="مثال: الدور الأرضي" oninput="syncViolationLocation()" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
           </div>
           <div>
             <label class="font-bold text-on-surface block mb-1">الإدارة / موقع المخالفة</label>
-            <input id="inp-violation-location" type="text" placeholder="مثال: قسم السجلات الطبية" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
-          </div>
-        </div>
-
-        <!-- Location -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label class="font-bold text-on-surface block mb-1">الإدارة / موقع المخالفة</label>
-            <input id="inp-sv-location" type="text" placeholder="مثال: قسم السجلات الطبية - المبنى الرئيسي" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
+            <input id="inp-violation-location" type="text" placeholder="مثال: قسم السجلات الطبية" oninput="syncViolationLocation()" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
+            <!-- Synchronized hidden field for backwards compatibility -->
+            <input type="hidden" id="inp-sv-location" value="">
           </div>
           <div>
             <label class="font-bold text-on-surface block mb-1">غرفة رقم</label>
@@ -4398,6 +4439,15 @@
     </div>
   </div>
 
+  <!-- Live Camera Stream & Reticle Overlay Viewport Template -->
+  <div id="vision-live-camera-modal-template" class="hidden">
+    <div id="vision-live-camera-wrap" class="relative rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center min-h-[260px] max-h-[340px] border border-slate-700 shadow-xl">
+      <video id="vision-camera-video" playsinline autoplay muted class="w-full h-full object-cover min-h-[260px] max-h-[340px]"></video>
+      <div id="vision-reticle-container" class="ksu-reticle-overlay absolute inset-0 pointer-events-none z-10"></div>
+      <button type="button" id="btn-capture-live-frame" class="px-5 py-2.5 rounded-2xl bg-emerald-600 text-white font-black text-xs">التقاط الصورة</button>
+    </div>
+  </div>
+
   <script src="assets/js/qrcode.min.js" charset="UTF-8"></script>
   <script src="assets/js/jsqr.min.js" charset="UTF-8"></script>
   <script src="assets/js/ksu-cloud-sync.js?v=6.0" charset="UTF-8"></script>
@@ -4414,6 +4464,227 @@
   <script src="assets/js/ksu-integrations.js?v=6.0" charset="UTF-8"></script>
   <script src="assets/js/vision-reticle-helper.js?v=7.2.1" charset="UTF-8"></script>
   <script src="assets/js/ksu-ai-client.js?v=7.3.0" charset="UTF-8"></script>
+
+  <!-- Enhanced Live Camera Stream, Reticle Viewfinder & Inspection Flow Control -->
+  <script>
+    (function() {
+      // 1. Hook and enhance openAIVisionInspectionModal
+      const prevOpenVisionModal = window.openAIVisionInspectionModal;
+      window.openAIVisionInspectionModal = function(options = {}) {
+        if (typeof prevOpenVisionModal === 'function') {
+          prevOpenVisionModal(options);
+        }
+
+        const modal = document.getElementById('ksu-ai-vision-modal');
+        if (!modal) return;
+
+        // Ensure clean institutional aesthetic on header & controls
+        const header = modal.querySelector('.bg-gradient-to-r');
+        if (header) {
+          header.className = 'px-5 sm:px-6 py-4 bg-gradient-to-r from-[#001E36] via-[#003B6B] to-[#004B87] text-white flex items-center justify-between shrink-0 border-b border-cyan-500/20';
+        }
+
+        // Setup inspection flow control (eliminates 350ms premature auto-trigger cliff)
+        if (window.KSUReticleHelper && typeof window.KSUReticleHelper.setupInspectionFlowControl === 'function') {
+          window.KSUReticleHelper.setupInspectionFlowControl(modal, options);
+        }
+
+        // Install Live Camera Stream Viewport into vision-dropzone
+        setupModalLiveCameraInterface(modal, options);
+      };
+
+      function setupModalLiveCameraInterface(modal, options = {}) {
+        const dropzone = modal.querySelector('#vision-dropzone');
+        if (!dropzone) return;
+
+        // Create or locate the live camera container
+        let liveWrap = document.getElementById('vision-live-camera-wrap');
+        if (!liveWrap) {
+          liveWrap = document.createElement('div');
+          liveWrap.id = 'vision-live-camera-wrap';
+          liveWrap.className = 'hidden flex flex-col gap-2.5 w-full relative';
+          liveWrap.innerHTML = `
+            <div class="relative rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center min-h-[260px] max-h-[340px] border border-slate-700 shadow-xl" id="vision-live-video-screen">
+              <video id="vision-camera-video" playsinline autoplay muted class="w-full h-full object-cover min-h-[260px] max-h-[340px]"></video>
+              
+              <!-- Dynamic Real-Time Reticle Viewfinder Overlay -->
+              <div id="vision-reticle-container" class="ksu-reticle-overlay absolute inset-0 pointer-events-none z-10"></div>
+              
+              <!-- Real-Time Institutional Scanning Laser Animation -->
+              <div id="vision-live-scanner-laser" class="absolute inset-0 pointer-events-none z-20">
+                <div class="ksu-scan-line w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_#22d3ee] animate-[scan_2s_ease-in-out_infinite] motion-reduce:animate-none"></div>
+              </div>
+
+              <!-- Top Status Indicator -->
+              <div class="absolute top-2.5 right-2.5 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-cyan-500/30 text-cyan-300 text-[11px] font-bold">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>بث حي مباشر للكاميرا</span>
+              </div>
+            </div>
+
+            <!-- Live Camera Action Bar -->
+            <div class="flex items-center justify-between gap-2 p-2.5 bg-slate-100 rounded-2xl border border-slate-200">
+              <button type="button" id="btn-capture-live-frame" class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-[#004B87] via-[#0A3D68] to-[#002B49] hover:from-[#003B6B] hover:to-[#082338] text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg active:scale-95 transition-all cursor-pointer">
+                <span class="material-symbols-outlined text-lg text-amber-300">photo_camera</span>
+                <span>التقاط الصورة الميدانية (Capture)</span>
+              </button>
+              <button type="button" id="btn-cancel-live-camera" class="px-3.5 py-3 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer transition-all">
+                <span class="material-symbols-outlined text-base text-slate-500">photo_library</span>
+                <span>استخدام الملفات / المعرض</span>
+              </button>
+            </div>
+          `;
+          dropzone.insertBefore(liveWrap, dropzone.firstChild);
+        }
+
+        // Attach Capture Button Action
+        const btnCapture = document.getElementById('btn-capture-live-frame');
+        if (btnCapture) {
+          btnCapture.onclick = function() {
+            const videoEl = document.getElementById('vision-camera-video');
+            let dataUrl = '';
+            if (window.KSUReticleHelper && typeof window.KSUReticleHelper.captureFrame === 'function') {
+              dataUrl = window.KSUReticleHelper.captureFrame(videoEl);
+            }
+            if (!dataUrl && videoEl) {
+              const canvas = document.createElement('canvas');
+              canvas.width = videoEl.videoWidth || 1280;
+              canvas.height = videoEl.videoHeight || 720;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+                dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+              }
+            }
+
+            if (dataUrl) {
+              // Stop camera tracks cleanly
+              if (window.KSUReticleHelper && typeof window.KSUReticleHelper.stopLiveCameraStream === 'function') {
+                window.KSUReticleHelper.stopLiveCameraStream();
+              }
+
+              // Hide live camera wrap, show preview
+              if (liveWrap) liveWrap.classList.add('hidden');
+              const emptyState = document.getElementById('vision-empty-state');
+              if (emptyState) emptyState.classList.add('hidden');
+
+              // Put in image list
+              if (!window.visionImagesList) window.visionImagesList = [];
+              window.visionImagesList.push(dataUrl);
+              window.currentActivePreviewIndex = window.visionImagesList.length - 1;
+
+              if (typeof window.renderVisionImagesGallery === 'function') {
+                window.renderVisionImagesGallery();
+              } else {
+                const previewState = document.getElementById('vision-preview-state');
+                const imgPreview = document.getElementById('img-vision-preview');
+                if (previewState) previewState.classList.remove('hidden');
+                if (imgPreview) imgPreview.src = dataUrl;
+              }
+
+              // Enable manual inspection button (Feature 8 Flow Control: NO 350ms premature auto-trigger!)
+              const btnRun = document.getElementById('btn-run-vision-ai');
+              if (btnRun) {
+                btnRun.disabled = false;
+                btnRun.classList.remove('opacity-50');
+                btnRun.innerHTML = `
+                  <span class="material-symbols-outlined text-lg">psychology</span>
+                  <span>🧠 تحليل الصورة بالذكاء الاصطناعي (بدء الفحص)</span>
+                `;
+              }
+            }
+          };
+        }
+
+        // Attach cancel / switch to file upload
+        const btnCancelCam = document.getElementById('btn-cancel-live-camera');
+        if (btnCancelCam) {
+          btnCancelCam.onclick = function() {
+            if (window.KSUReticleHelper && typeof window.KSUReticleHelper.stopLiveCameraStream === 'function') {
+              window.KSUReticleHelper.stopLiveCameraStream();
+            }
+            if (liveWrap) liveWrap.classList.add('hidden');
+            const emptyState = document.getElementById('vision-empty-state');
+            if (emptyState && (!window.visionImagesList || window.visionImagesList.length === 0)) {
+              emptyState.classList.remove('hidden');
+            }
+            const inpCam = document.getElementById('inp-vision-camera');
+            if (inpCam) inpCam.click();
+          };
+        }
+
+        // Intercept "فتح الكاميرا الميدانية" button in empty state to launch live stream first with fallback
+        const emptyState = document.getElementById('vision-empty-state');
+        if (emptyState) {
+          const btns = emptyState.querySelectorAll('button');
+          btns.forEach(btn => {
+            if (btn.textContent && btn.textContent.includes('الكاميرا')) {
+              btn.onclick = async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const videoEl = document.getElementById('vision-camera-video');
+                const reticleContainer = document.getElementById('vision-reticle-container');
+                const isSupported = window.KSUReticleHelper && typeof window.KSUReticleHelper.isCameraSupported === 'function'
+                  ? window.KSUReticleHelper.isCameraSupported()
+                  : (typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia);
+
+                if (isSupported && liveWrap && videoEl) {
+                  emptyState.classList.add('hidden');
+                  liveWrap.classList.remove('hidden');
+
+                  const submode = window.currentVisionSubmode || options.submode || 'general';
+                  const res = await window.KSUReticleHelper.startLiveCameraStream(videoEl, reticleContainer, {
+                    submode,
+                    fallbackInput: '#inp-vision-camera',
+                    onError: (err) => {
+                      console.warn('[Field Vision] Live camera fallback to file picker:', err);
+                      if (liveWrap) liveWrap.classList.add('hidden');
+                      if (emptyState) emptyState.classList.remove('hidden');
+                      document.getElementById('inp-vision-camera')?.click();
+                    }
+                  });
+
+                  if (!res.success) {
+                    if (liveWrap) liveWrap.classList.add('hidden');
+                    if (emptyState) emptyState.classList.remove('hidden');
+                    document.getElementById('inp-vision-camera')?.click();
+                  }
+                } else {
+                  // Fallback directly if mediaDevices unsupported
+                  document.getElementById('inp-vision-camera')?.click();
+                }
+              };
+            }
+          });
+        }
+
+        // Hook submode switching to update the live reticle dynamically
+        const prevSetVisionSubmode = window.setVisionSubmode;
+        window.setVisionSubmode = function(submode) {
+          if (typeof prevSetVisionSubmode === 'function') {
+            prevSetVisionSubmode(submode);
+          }
+          const reticleContainer = document.getElementById('vision-reticle-container');
+          if (reticleContainer && window.KSUReticleHelper && typeof window.KSUReticleHelper.renderReticleInto === 'function') {
+            window.KSUReticleHelper.renderReticleInto(reticleContainer, submode);
+          }
+        };
+
+        // Clean up stream on modal close
+        const closeBtns = modal.querySelectorAll('button[onclick*="ksu-ai-vision-modal"]');
+        closeBtns.forEach(b => {
+          const originalClick = b.onclick;
+          b.onclick = function(e) {
+            if (window.KSUReticleHelper && typeof window.KSUReticleHelper.stopLiveCameraStream === 'function') {
+              window.KSUReticleHelper.stopLiveCameraStream();
+            }
+            if (typeof originalClick === 'function') originalClick.call(this, e);
+          };
+        });
+      }
+    })();
+  </script>
 
   <!-- Service Worker Registration for PWA Offline Functionality -->
   <script>
