@@ -7649,7 +7649,7 @@ function loadState() {
   }
 
   // Assets (Synchronized with official 1,587 real extinguishers, official emergency exits, 61 FM-200 Systems, 61 FHC Cabinets & 10 FACP Panels)
-  const OFFICIAL_ASSETS_VERSION = '2026.11.08_KSU_FACP_REGISTRY_V4';
+  const OFFICIAL_ASSETS_VERSION = '2026.11.09_KSU_FACP_REGISTRY_V6';
   const assetsVersion = localStorage.getItem('ksumc_assets_version');
   const storedAssets = localStorage.getItem(STORAGE_KEY_ASSETS);
   const realExtinguishers = (typeof KSU_REAL_EXTINGUISHERS !== 'undefined' && Array.isArray(KSU_REAL_EXTINGUISHERS)) ? KSU_REAL_EXTINGUISHERS : [];
@@ -7681,6 +7681,12 @@ function loadState() {
         }
       });
     }
+    // Explicitly guarantee FACP panels are never missing from state.assets
+    realFACP.forEach(facp => {
+      if (!state.assets.some(a => a.id === facp.id)) {
+        state.assets.push(facp);
+      }
+    });
     localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(state.assets));
     localStorage.setItem('ksumc_assets_version', OFFICIAL_ASSETS_VERSION);
   }
@@ -8168,6 +8174,8 @@ function getFilteredAssets() {
         matchType = (a.category && (a.category.includes('صناديق') || a.category.includes('خراطيم'))) ||
                     (a.type && (a.type.includes('صندوق') || a.type.includes('خرطوم'))) ||
                     (a.id && (a.id.startsWith('FHC-') || a.id.startsWith('FH-') || a.id.startsWith('PL0') || a.id.startsWith('PL')));
+      } else if (type === 'لوحات إنذار الحريق' || type.includes('إنذار') || type.includes('FACP')) {
+        matchType = (a.category && a.category.includes('إنذار')) || (a.id && a.id.startsWith('FACP-')) || (a.type && a.type.includes('FACP'));
       } else {
         matchType = (a.type && a.type.includes(type)) || (a.name && a.name.includes(type)) || (a.category && a.category.includes(type));
       }
@@ -8255,6 +8263,7 @@ function renderAssetsTableRows(filtered) {
               a.category === 'طفايات الحريق' ? 'local_fire_department' :
               a.category === 'مخارج الطوارئ' ? 'sensor_door' :
               (a.category && a.category.includes('FM')) ? 'air' :
+              (a.category && (a.category.includes('إنذار') || a.category.includes('لوحات'))) ? 'emergency_home' :
               a.category === 'صناديق وخراطيم الإطفاء' ? 'fire_hydrant' : 'qr_code_2'
             }</span>
           </span>
@@ -9908,6 +9917,48 @@ function populateRoundFloorOptions(selectedBuilding, desiredFloor = null) {
     return;
   }
 
+  if (formType === 'fas_insp' || formType === 'fas_test') {
+    const facpAssets = getAllFacpAssets();
+    const bldFacpAssets = facpAssets.filter(a => matchBuilding(a.building || a.buildingTab, selectedBuilding));
+    const baseFloors = [...(BUILDING_FLOOR_MAP[selectedBuilding] || ['القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)'])];
+
+    // Ensure any floor present in bldFacpAssets is included
+    bldFacpAssets.forEach(a => {
+      if (a.floor && !baseFloors.some(f => matchFloor(f, a.floor))) {
+        baseFloors.push(a.floor);
+      }
+    });
+
+    const optionsHtml = baseFloors.map(f => {
+      const cnt = bldFacpAssets.filter(a => matchFloor(a.floor, f)).length;
+      const cntBadge = cnt > 0 ? ` — [${cnt === 1 ? 'لوحة إنذار واحدة' : (cnt === 2 ? 'لوحتان' : `${cnt} لوحات`)}]` : '';
+      return `<option value="${f}">${f}${cntBadge}</option>`;
+    });
+    floorSelect.innerHTML = optionsHtml.join('');
+
+    let defaultTargetFloor = 'الدور الأرضي (G)';
+    const firstWithPanel = baseFloors.find(f => bldFacpAssets.some(a => matchFloor(a.floor, f)));
+    if (matchBuilding(selectedBuilding, 'كلية الطب')) {
+      defaultTargetFloor = 'القبو الأول (B1)';
+    } else if (firstWithPanel) {
+      defaultTargetFloor = firstWithPanel;
+    }
+
+    const currentDraftFloor = (state.currentRoundDraft && state.currentRoundDraft.building === selectedBuilding) ? state.currentRoundDraft.floor : null;
+    const hasPanelsOnCurrentDraftFloor = currentDraftFloor && bldFacpAssets.some(a => matchFloor(a.floor, currentDraftFloor));
+
+    const targetFloor = desiredFloor || (hasPanelsOnCurrentDraftFloor ? currentDraftFloor : defaultTargetFloor);
+    if (baseFloors.includes(targetFloor)) {
+      floorSelect.value = targetFloor;
+    } else {
+      floorSelect.value = defaultTargetFloor;
+    }
+    if (state.currentRoundDraft) {
+      state.currentRoundDraft.floor = floorSelect.value;
+    }
+    return;
+  }
+
   const floors = BUILDING_FLOOR_MAP[selectedBuilding] || ['الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)'];
   floorSelect.innerHTML = floors.map(f => `<option value="${f}">${f}</option>`).join('');
   let defaultTargetFloor = 'الدور الأرضي (G)';
@@ -9961,6 +10012,14 @@ function populateDynamicDropdowns() {
           const displayName = bldAliasLabels[b.name] || b.name;
           return `<option value="${b.name}">[${b.code}] ${displayName}${cnt > 0 ? ` — (${cnt} غرفة صناعية)` : ' — (0)'}</option>`;
         }).join('');
+    } else if (formType === 'fas_insp' || formType === 'fas_test') {
+      const facpAssets = getAllFacpAssets();
+      buildingSelect.innerHTML = bldList.map(b => {
+        const cnt = facpAssets.filter(a => matchBuilding(a.building || a.buildingTab, b.name)).length;
+        const displayName = bldAliasLabels[b.name] || b.name;
+        const cntText = cnt === 1 ? 'لوحة إنذار واحدة' : (cnt === 2 ? 'لوحتان' : `${cnt} لوحات إنذار`);
+        return `<option value="${b.name}">[${b.code}] ${displayName}${cnt > 0 ? ` — (${cntText})` : ' — (0)'}</option>`;
+      }).join('');
     } else {
       buildingSelect.innerHTML = bldList.map(b => {
         const displayName = bldAliasLabels[b.name] || b.name;
@@ -10154,7 +10213,7 @@ function renderFloorAssetsReconciliation() {
     const allFacp = getAllFacpAssets();
     floorAssets = allFacp.filter(a =>
       matchBuilding(a.building || a.buildingTab, currentBuilding) &&
-      matchFloor(a.floor, currentFloor)
+      (currentFloor === 'all' || matchFloor(a.floor, currentFloor))
     );
   } else {
     floorAssets = (state.assets || []).filter(a => matchBuilding(a.building, currentBuilding) && matchFloor(a.floor, currentFloor));

@@ -300,6 +300,22 @@ if (typeof window !== 'undefined') {
       INITIAL_ASSETS.push(...newFacp);
     }
   }
+
+  // Auto-merge into state.assets if state is already initialized
+  const mergeIntoStateAssets = () => {
+    if (window.state && Array.isArray(window.state.assets)) {
+      const currentAssetIds = new Set(window.state.assets.map(a => a.id));
+      const missingFacp = KSU_FACP_ASSETS.filter(a => !currentAssetIds.has(a.id));
+      if (missingFacp.length > 0) {
+        window.state.assets.push(...missingFacp);
+        try {
+          localStorage.setItem('ksumc_assets', JSON.stringify(window.state.assets));
+        } catch (_) {}
+      }
+    }
+  };
+  mergeIntoStateAssets();
+  window.addEventListener('DOMContentLoaded', mergeIntoStateAssets);
 }
 
 // Export for node environments if needed
