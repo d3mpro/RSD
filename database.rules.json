@@ -165,7 +165,16 @@
       "prodCleanVersion": {
         ".write": "newData.exists()",
         ".validate": "newData.isString() && newData.val().length < 100"
+      },
+      "systemMode": {
+        ".write": "newData.exists()",
+        ".validate": "newData.isString() && newData.val().length < 50"
       }
+    },
+
+    "system_config": {
+      ".read": true,
+      ".write": "newData.exists()"
     }
   }
 }

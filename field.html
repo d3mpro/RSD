@@ -63,9 +63,43 @@
   </script>
   <link rel="stylesheet" href="assets/css/styles.css?v=6.8.0" />
   <link rel="stylesheet" href="assets/css/core-theme.css?v=3.4" />
+  <style>
+    @keyframes scan {
+      0% {
+        top: 0%;
+        opacity: 0.9;
+      }
+      50% {
+        top: 96%;
+        opacity: 1;
+      }
+      100% {
+        top: 0%;
+        opacity: 0.9;
+      }
+    }
+    .ksu-scan-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #10b981, #06b6d4, transparent);
+      box-shadow: 0 0 16px #10b981, 0 0 8px #06b6d4;
+      animation: scan 2s ease-in-out infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ksu-scan-line,
+      [class*="animate-[scan"] {
+        animation: none !important;
+      }
+    }
+    .reticle-pulse-glow {
+      filter: drop-shadow(0 0 4px rgba(56, 189, 248, 0.6));
+    }
+  </style>
   <script src="assets/js/auth-guard.js?v=4.8.2"></script>
-  <script src="assets/js/ksumc-data-bridge.js?v=6.2"></script>
-  <script src="assets/js/ksu-firebase-realtime.js?v=6.8.0"></script>
+  <script src="assets/js/ksumc-data-bridge.js?v=6.3.0"></script>
+  <script src="assets/js/ksu-firebase-realtime.js?v=6.9.0"></script>
   <script src="assets/js/ksu-system-mode.js?v=1.2"></script>
   <script src="assets/js/ksu-nav-component.js?v=5.14"></script>
   <script>
@@ -179,9 +213,9 @@
   </header>
 
   <!-- Real-Time Notifications & Executive Directives Modal Sheet -->
-  <div id="field-notifications-sheet" class="fixed inset-0 z-50 bg-black/55 backdrop-blur-xs hidden items-end sm:items-center justify-center p-0 sm:p-4" onclick="toggleFieldNotificationsMenu()">
-    <div class="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-3.5 max-h-[85vh] flex flex-col" onclick="event.stopPropagation()">
-      <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+  <div id="field-notifications-sheet" class="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm hidden items-end sm:items-center justify-center p-0 sm:p-4" onclick="toggleFieldNotificationsMenu()">
+    <div class="bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl p-4 sm:p-5 shadow-2xl space-y-3.5 max-h-[85dvh] sm:max-h-[85vh] flex flex-col pb-[max(1.75rem,env(safe-area-inset-bottom))] sm:pb-5" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between pb-3 border-b border-gray-100 shrink-0">
         <div class="flex items-center gap-2">
           <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center">
             <span class="material-symbols-outlined text-xl">campaign</span>
@@ -202,7 +236,7 @@
       </div>
 
       <!-- Lock-Screen Push Notification Control Bar -->
-      <div id="sheet-lockscreen-notif-bar" class="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2 flex-wrap">
+      <div id="sheet-lockscreen-notif-bar" class="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between gap-2 flex-wrap shrink-0">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined text-lg text-[#004B87]" id="sheet-lockscreen-icon">screen_lock_portrait</span>
           <div>
@@ -221,16 +255,16 @@
         </div>
       </div>
 
-      <div id="field-notifications-sheet-list" class="space-y-2.5 overflow-y-auto flex-1 pr-1">
+      <div id="field-notifications-sheet-list" class="space-y-2.5 overflow-y-auto flex-1 pr-1 overscroll-contain">
         <!-- Populated dynamically via renderInspectorLiveNotifications() -->
       </div>
     </div>
   </div>
 
   <!-- Portal Switcher Modal Sheet -->
-  <div id="field-portal-sheet" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs hidden items-end sm:items-center justify-center p-0 sm:p-4" onclick="toggleFieldPortalMenu()">
-    <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl space-y-4" onclick="event.stopPropagation()">
-      <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+  <div id="field-portal-sheet" class="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm hidden items-end sm:items-center justify-center p-0 sm:p-4" onclick="toggleFieldPortalMenu()">
+    <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-4 sm:p-5 shadow-2xl space-y-4 max-h-[85dvh] sm:max-h-[85vh] flex flex-col pb-[max(1.75rem,env(safe-area-inset-bottom))] sm:pb-5" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between pb-3 border-b border-gray-100 shrink-0">
         <h3 class="text-sm font-black text-[#082B49]">الانتقال السريع للبوابات المستقلة</h3>
         <button onclick="toggleFieldPortalMenu()" class="text-gray-400 hover:text-gray-600"><span class="material-symbols-outlined">close</span></button>
       </div>
@@ -722,7 +756,7 @@
             <div class="p-space-md rounded-xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm flex items-center justify-between">
               <div>
                 <span class="text-xs text-on-surface-variant block">مخالفات حرجة معلقة</span>
-                <span class="text-3xl font-extrabold text-emerald-600">0</span>
+                <span class="text-3xl font-extrabold text-emerald-600" id="kpi-critical-viols">0</span>
               </div>
               <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
                 <span class="material-symbols-outlined text-2xl">check_circle</span>
@@ -746,15 +780,28 @@
 
           <!-- Rounds List Section -->
           <div class="flex flex-col gap-space-sm">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <h3 class="text-base font-bold text-primary flex items-center gap-1">
                 <span class="material-symbols-outlined text-secondary">history</span>
-                سجل الجولات الميدانية لليوم
+                سجل الجولات الميدانية (ورديتك)
               </h3>
-              <button onclick="openNewRoundModal()" class="text-xs text-secondary font-bold hover:underline flex items-center gap-1">
-                <span class="material-symbols-outlined text-sm">add</span>
-                إضافة جولة جديدة
-              </button>
+              <div class="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
+                <div class="flex items-center gap-1.5 bg-surface-container-low p-1 rounded-xl border border-outline-variant/30">
+                  <button type="button" id="btn-rounds-filter-all" onclick="setFieldRoundsFilter('all')" class="rounds-quick-filter-btn px-3 py-1.5 rounded-xl bg-primary text-white font-black text-xs shadow-xs transition-all">
+                    الكل (<span id="rounds-filter-count-all">0</span>)
+                  </button>
+                  <button type="button" id="btn-rounds-filter-today" onclick="setFieldRoundsFilter('today')" class="rounds-quick-filter-btn px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs transition-all">
+                    اليوم (<span id="rounds-filter-count-today">0</span>)
+                  </button>
+                  <button type="button" id="btn-rounds-filter-mine" onclick="setFieldRoundsFilter('mine')" class="rounds-quick-filter-btn px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs transition-all">
+                    جولاتي (<span id="rounds-filter-count-mine">0</span>)
+                  </button>
+                </div>
+                <button onclick="openNewRoundModal()" class="text-xs text-secondary font-bold hover:underline flex items-center gap-1 px-2 py-1">
+                  <span class="material-symbols-outlined text-sm">add</span>
+                  إضافة جولة جديدة
+                </button>
+              </div>
             </div>
 
             <!-- Dynamic Rounds Container -->
@@ -2520,7 +2567,7 @@
   </div>
 
   <!-- MODERN FLOATING BOTTOM NAVIGATION (Native Mobile Shell - Rock-solid iOS PWA Pinning) -->
-  <nav class="ksu-mobile-nav flex items-center justify-around no-print" style="position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; z-index: 50 !important; transform: translateZ(0) !important; -webkit-transform: translateZ(0) !important; will-change: transform !important;">
+  <nav class="ksu-mobile-nav flex items-center justify-around no-print" style="position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; z-index: 40 !important; transform: translateZ(0) !important; -webkit-transform: translateZ(0) !important; will-change: transform !important;">
     <button type="button" onclick="switchMobileTab('home')" id="bnav-home" class="ksu-mobile-nav-item active">
       <span class="material-symbols-outlined nav-icon">home</span>
       <span>الرئيسية</span>
@@ -2552,11 +2599,11 @@
 
 
   <!-- ALL ORIGINAL MODALS FOR ROUNDS, QR, HAZARD, HOTWORK & REPORTS -->
-    <div class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm hidden items-center justify-center p-3 sm:p-6 modal-backdrop" id="newRoundModal">
-    <div class="bg-white rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 overflow-hidden font-cairo text-slate-800 animate-in fade-in zoom-in-95 duration-200 my-auto">
+    <div class="fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm hidden items-stretch sm:items-center justify-center p-0 sm:p-4 md:p-6 modal-backdrop" id="newRoundModal">
+    <div class="bg-white rounded-none sm:rounded-3xl max-w-4xl w-full h-[100dvh] sm:h-auto sm:max-h-[90vh] flex flex-col shadow-2xl border-0 sm:border sm:border-slate-200 overflow-hidden font-cairo text-slate-800 animate-in fade-in zoom-in-95 duration-200 sm:my-auto">
       
       <!-- Modal Header (Royal Blue Gradient with Dynamic Form Title & Icon) -->
-      <div class="px-5 sm:px-6 py-4 bg-gradient-to-r from-[#001E36] via-[#003B6B] to-[#004B87] text-white flex items-center justify-between shrink-0 shadow-sm">
+      <div class="px-4 sm:px-6 py-3.5 sm:py-4 bg-gradient-to-r from-[#001E36] via-[#003B6B] to-[#004B87] text-white flex items-center justify-between shrink-0 shadow-sm pt-[max(0.875rem,env(safe-area-inset-top))] sm:pt-4">
         <div class="flex items-center gap-3">
           <div class="w-11 h-11 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 shadow-xs shrink-0">
             <span class="material-symbols-outlined text-amber-300 text-2xl" id="round-modal-form-icon">assignment</span>
@@ -2573,7 +2620,7 @@
       </div>
 
       <!-- Modal Body (Scrollable) -->
-      <div class="p-4 sm:p-6 overflow-y-auto space-y-4">
+      <div class="p-3.5 sm:p-6 overflow-y-auto flex-1 space-y-4 overscroll-contain">
 
         <!-- Active Form Context & Current Shift Card -->
         <div class="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50/90 via-slate-50 to-emerald-50/60 border border-blue-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3">
@@ -2687,10 +2734,26 @@
         <div class="p-4 rounded-2xl bg-slate-50/80 border border-slate-200 shadow-xs space-y-3">
           <div class="flex items-center gap-2">
             <span class="material-symbols-outlined text-[#004B87] text-lg">badge</span>
-            <h4 class="text-xs font-bold text-[#002B49]">بيانات المفتش والإجراءات التصحيحية المعتمدة</h4>
+            <h4 id="round-inspector-card-title" class="text-xs font-bold text-[#002B49]">بيانات المفتش والإجراءات التصحيحية المعتمدة</h4>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <!-- Auto-Bound Inspector Identity Badge (Active for fas_insp & fas_test) -->
+          <div id="round-inspector-auto-bound-badge" class="hidden p-3 rounded-xl bg-emerald-50 border-2 border-emerald-400 text-emerald-950 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+            <div class="flex items-center gap-2.5">
+              <span class="material-symbols-outlined text-emerald-700 text-2xl">verified_user</span>
+              <div>
+                <span class="text-[10px] font-bold text-emerald-800 block">المفتش المعتمد الموثق (ربط تلقائي موثق بالجلسة الميدانية):</span>
+                <span id="round-inspector-auto-name" class="text-xs font-extrabold text-emerald-950">مفتش السلامة المناوب</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="round-inspector-auto-badge" class="px-2.5 py-1 rounded-lg bg-emerald-200/90 text-[10px] font-extrabold text-emerald-900 border border-emerald-300">الرقم الوظيفي: -</span>
+              <span id="round-inspector-auto-shift" class="px-2.5 py-1 rounded-lg bg-white text-[10px] font-bold text-emerald-800 border border-emerald-300">الوردية الحالية</span>
+            </div>
+          </div>
+
+          <!-- Manual Selection Group (Wrapped for conditional visibility) -->
+          <div id="round-inspector-manual-selection-group" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label class="text-[11px] font-bold text-slate-700 block mb-1">المفتش المعتمد:</label>
               <select id="inp-round-inspector" class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold text-[#004B87] outline-none">
@@ -2705,10 +2768,11 @@
                 <option value="shift3">الوردية الثالثة (ليلي 23:00 - 07:00)</option>
               </select>
             </div>
-            <div>
-              <label class="text-[11px] font-bold text-slate-700 block mb-1">ملاحظات عامة للجولة:</label>
-              <input id="inp-round-notes" type="text" placeholder="أي توجيهات أو ملاحظات إضافية..." class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-semibold text-slate-800 outline-none">
-            </div>
+          </div>
+
+          <div>
+            <label class="text-[11px] font-bold text-slate-700 block mb-1">ملاحظات عامة للجولة:</label>
+            <input id="inp-round-notes" type="text" placeholder="أي توجيهات أو ملاحظات إضافية..." class="w-full px-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-semibold text-slate-800 outline-none">
           </div>
 
           <div>
@@ -2745,9 +2809,9 @@
       </div>
 
       <!-- Modal Footer -->
-      <div class="px-5 sm:px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+      <div class="px-4 sm:px-6 py-3 sm:py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-3.5">
         <button type="button" onclick="closeNewRoundModal()" class="px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-200 text-slate-700 text-xs font-bold cursor-pointer transition-all">إلغاء</button>
-        <button type="button" onclick="saveNewInspectionRound()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer active:scale-95 transition-all">
+        <button type="button" onclick="saveNewInspectionRound()" class="px-5 sm:px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white text-xs font-black shadow-md flex items-center gap-2 cursor-pointer active:scale-95 transition-all">
           <span class="material-symbols-outlined text-base">verified</span>
           <span>حفظ التفتيش واعتماد المحضر الرسمي 🛡️</span>
         </button>
@@ -2757,9 +2821,9 @@
   </div>
 
   <!-- 3. View Round Details Modal (Upgraded to Official Inspection Card) -->
-  <div class="fixed inset-0 z-50 bg-slate-900/85 backdrop-blur-md hidden items-center justify-center p-3 sm:p-6 modal-backdrop" id="viewRoundModal">
-    <div class="bg-white rounded-3xl max-w-4xl w-full p-4 sm:p-6 shadow-2xl flex flex-col gap-4 text-slate-800 max-h-[94vh] overflow-y-auto font-cairo my-auto">
-      <div class="flex items-center justify-between pb-3 border-b border-slate-200 no-print">
+  <div class="fixed inset-0 z-[100] bg-slate-900/85 backdrop-blur-md hidden items-stretch sm:items-center justify-center p-0 sm:p-4 md:p-6 modal-backdrop" id="viewRoundModal">
+    <div class="bg-white rounded-none sm:rounded-3xl max-w-4xl w-full h-[100dvh] sm:h-auto sm:max-h-[92vh] shadow-2xl flex flex-col font-cairo text-slate-800 overflow-hidden sm:my-auto">
+      <div class="flex items-center justify-between p-4 sm:p-6 pb-3 border-b border-slate-200 shrink-0 no-print pt-[max(0.875rem,env(safe-area-inset-top))] sm:pt-6">
         <div class="flex items-center gap-3">
           <img src="assets/images/ksu_official_logo.png" alt="جامعة الملك سعود" class="h-10 w-auto max-w-[140px] object-contain rounded-lg shadow-xs border border-slate-200" />
           <div>
@@ -2776,11 +2840,11 @@
         </div>
       </div>
 
-      <div id="viewRoundModalBody" class="w-full">
+      <div id="viewRoundModalBody" class="w-full flex-1 overflow-y-auto p-4 sm:p-6 overscroll-contain">
         <!-- Populated by JS using window.generateOfficialInspectionCardHtml() -->
       </div>
 
-      <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-200 no-print">
+      <div class="flex items-center justify-end gap-2 p-3 sm:p-4 border-t border-slate-200 shrink-0 no-print pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:pb-4">
         <button type="button" onclick="closeRoundDetailsModal()" class="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-bold transition-all cursor-pointer">إغلاق</button>
       </div>
     </div>
@@ -3279,27 +3343,34 @@
           </div>
         </div>
 
-        <!-- Location & Facility Details (Compatible with AI Vision Dispatch) -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <!-- Location & Facility Details (Deduplicated Unified Grid) -->
+        <script>
+          function syncViolationLocation() {
+            const b = document.getElementById('inp-violation-building')?.value.trim() || '';
+            const f = document.getElementById('inp-violation-floor')?.value.trim() || '';
+            const l = document.getElementById('inp-violation-location')?.value.trim() || '';
+            const combined = [b, f, l].filter(Boolean).join(' - ') || b || l;
+            const hidden = document.getElementById('inp-sv-location');
+            if (hidden) {
+              hidden.value = combined;
+              // Synchronize location: document.getElementById('inp-sv-location').value = this.value
+            }
+          }
+        </script>
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <div>
             <label class="font-bold text-on-surface block mb-1">المبنى / المنشأة</label>
-            <input id="inp-violation-building" type="text" placeholder="مثال: المبنى الرئيسي" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
+            <input id="inp-violation-building" type="text" placeholder="مثال: المبنى الرئيسي" oninput="syncViolationLocation()" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
           </div>
           <div>
             <label class="font-bold text-on-surface block mb-1">الدور / الجناح</label>
-            <input id="inp-violation-floor" type="text" placeholder="مثال: الدور الأرضي" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
+            <input id="inp-violation-floor" type="text" placeholder="مثال: الدور الأرضي" oninput="syncViolationLocation()" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
           </div>
           <div>
             <label class="font-bold text-on-surface block mb-1">الإدارة / موقع المخالفة</label>
-            <input id="inp-violation-location" type="text" placeholder="مثال: قسم السجلات الطبية" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
-          </div>
-        </div>
-
-        <!-- Location -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label class="font-bold text-on-surface block mb-1">الإدارة / موقع المخالفة</label>
-            <input id="inp-sv-location" type="text" placeholder="مثال: قسم السجلات الطبية - المبنى الرئيسي" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
+            <input id="inp-violation-location" type="text" placeholder="مثال: قسم السجلات الطبية" oninput="syncViolationLocation()" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
+            <!-- Synchronized hidden field for backwards compatibility -->
+            <input type="hidden" id="inp-sv-location" value="">
           </div>
           <div>
             <label class="font-bold text-on-surface block mb-1">غرفة رقم</label>
@@ -4368,6 +4439,8 @@
     </div>
   </div>
 
+  <!-- Live camera and reticle elements are dynamically mounted inside modal dropzone -->
+
   <script src="assets/js/qrcode.min.js" charset="UTF-8"></script>
   <script src="assets/js/jsqr.min.js" charset="UTF-8"></script>
   <script src="assets/js/ksu-cloud-sync.js?v=6.0" charset="UTF-8"></script>
@@ -4377,12 +4450,247 @@
   <script src="assets/js/ksu-fhc-assets.js?v=1.0" charset="UTF-8"></script>
   <script src="assets/js/ksu-plant-rooms-assets.js?v=1.0" charset="UTF-8"></script>
   <script src="assets/js/ksu-wet-chemical-assets.js?v=1.0" charset="UTF-8"></script>
+  <script src="assets/js/ksu-facp-assets.js?v=2.0" charset="UTF-8"></script>
   <script src="assets/js/qr-scanner.js?v=5.5" charset="UTF-8"></script>
-  <script src="assets/js/ksu-official-card.js?v=6.6.3" charset="UTF-8"></script>
-  <script src="assets/js/app.js?v=8.0.0" charset="UTF-8"></script>
+  <script src="assets/js/ksu-official-card.js?v=6.6.4" charset="UTF-8"></script>
+  <script src="assets/js/app.js?v=8.2.0" charset="UTF-8"></script>
   <script src="assets/js/ksu-integrations.js?v=6.0" charset="UTF-8"></script>
-  <script src="assets/js/vision-reticle-helper.js?v=7.2.1" charset="UTF-8"></script>
-  <script src="assets/js/ksu-ai-client.js?v=7.2.1" charset="UTF-8"></script>
+  <script src="assets/js/vision-reticle-helper.js?v=7.2.2" charset="UTF-8"></script>
+  <script src="assets/js/ksu-ai-client.js?v=7.3.1" charset="UTF-8"></script>
+
+  <!-- Enhanced Live Camera Stream, Reticle Viewfinder & Inspection Flow Control -->
+  <script>
+    (function() {
+      // 1. Hook and enhance openAIVisionInspectionModal
+      const prevOpenVisionModal = window.openAIVisionInspectionModal;
+      window.openAIVisionInspectionModal = function(options = {}) {
+        if (typeof prevOpenVisionModal === 'function') {
+          prevOpenVisionModal(options);
+        }
+
+        const modal = document.getElementById('ksu-ai-vision-modal');
+        if (!modal) return;
+
+        // Ensure clean institutional aesthetic on header & controls
+        const header = modal.querySelector('.bg-gradient-to-r');
+        if (header) {
+          header.className = 'px-5 sm:px-6 py-4 bg-gradient-to-r from-[#001E36] via-[#003B6B] to-[#004B87] text-white flex items-center justify-between shrink-0 border-b border-cyan-500/20';
+        }
+
+        // Setup inspection flow control (eliminates 350ms premature auto-trigger cliff)
+        if (window.KSUReticleHelper && typeof window.KSUReticleHelper.setupInspectionFlowControl === 'function') {
+          window.KSUReticleHelper.setupInspectionFlowControl(modal, options);
+        }
+
+        // Install Live Camera Stream Viewport into vision-dropzone
+        setupModalLiveCameraInterface(modal, options);
+      };
+
+      function setupModalLiveCameraInterface(modal, options = {}) {
+        const dropzone = modal.querySelector('#vision-dropzone');
+        if (!dropzone) return;
+
+        // Create or locate the live camera container inside dropzone
+        let liveWrap = dropzone.querySelector('#vision-live-camera-wrap');
+        if (!liveWrap) {
+          liveWrap = document.createElement('div');
+          liveWrap.id = 'vision-live-camera-wrap';
+          liveWrap.className = 'hidden flex flex-col gap-2.5 w-full relative';
+          liveWrap.innerHTML = `
+            <!-- id="vision-live-camera-wrap" -->
+            <div class="relative rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center min-h-[260px] max-h-[340px] border border-slate-700 shadow-xl" id="vision-live-video-screen">
+              <video id="vision-camera-video" playsinline autoplay muted class="w-full h-full object-cover min-h-[260px] max-h-[340px]"></video>
+              
+              <!-- Dynamic Real-Time Reticle Viewfinder Overlay -->
+              <div id="vision-reticle-container" class="ksu-reticle-overlay absolute inset-0 pointer-events-none z-10"></div>
+              
+              <!-- Real-Time Institutional Scanning Laser Animation -->
+              <div id="vision-live-scanner-laser" class="absolute inset-0 pointer-events-none z-20">
+                <div class="ksu-scan-line w-full h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_#22d3ee] animate-[scan_2s_ease-in-out_infinite] motion-reduce:animate-none"></div>
+              </div>
+
+              <!-- Top Status Indicator -->
+              <div class="absolute top-2.5 right-2.5 z-20 flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-cyan-500/30 text-cyan-300 text-[11px] font-bold">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>بث حي مباشر للكاميرا</span>
+              </div>
+            </div>
+
+            <!-- Live Camera Action Bar -->
+            <div class="flex items-center justify-between gap-2 p-2.5 bg-slate-100 rounded-2xl border border-slate-200">
+              <button type="button" id="btn-capture-live-frame" class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-[#004B87] via-[#0A3D68] to-[#002B49] hover:from-[#003B6B] hover:to-[#082338] text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg active:scale-95 transition-all cursor-pointer">
+                <span class="material-symbols-outlined text-lg text-amber-300">photo_camera</span>
+                <span>التقاط الصورة الميدانية (Capture)</span>
+              </button>
+              <button type="button" id="btn-cancel-live-camera" class="px-3.5 py-3 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer transition-all">
+                <span class="material-symbols-outlined text-base text-slate-500">photo_library</span>
+                <span>استخدام الملفات / المعرض</span>
+              </button>
+            </div>
+          `;
+          dropzone.insertBefore(liveWrap, dropzone.firstChild);
+        }
+
+        // Attach Capture Button Action
+        const btnCapture = liveWrap.querySelector('#btn-capture-live-frame') || document.getElementById('btn-capture-live-frame');
+        if (btnCapture) {
+          btnCapture.onclick = function() {
+            const videoEl = liveWrap.querySelector('#vision-camera-video') || document.getElementById('vision-camera-video');
+            let dataUrl = '';
+            if (window.KSUReticleHelper && typeof window.KSUReticleHelper.captureFrame === 'function') {
+              dataUrl = window.KSUReticleHelper.captureFrame(videoEl);
+            }
+            if (!dataUrl && videoEl) {
+              const canvas = document.createElement('canvas');
+              canvas.width = videoEl.videoWidth || 1280;
+              canvas.height = videoEl.videoHeight || 720;
+              const ctx = canvas.getContext('2d');
+              if (ctx) {
+                try {
+                  ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+                  dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                } catch (e) {
+                  console.warn('Canvas capture error:', e);
+                }
+              }
+            }
+
+            if (dataUrl) {
+              // Stop camera tracks cleanly
+              if (window.KSUReticleHelper && typeof window.KSUReticleHelper.stopLiveCameraStream === 'function') {
+                window.KSUReticleHelper.stopLiveCameraStream();
+              }
+
+              // Hide live camera wrap, show preview
+              if (liveWrap) liveWrap.classList.add('hidden');
+              const emptyState = modal.querySelector('#vision-empty-state') || document.getElementById('vision-empty-state');
+              if (emptyState) emptyState.classList.add('hidden');
+
+              // Put in image list
+              if (typeof window.addVisionImage === 'function') {
+                window.addVisionImage(dataUrl);
+              } else {
+                if (!Array.isArray(window.visionImagesList)) window.visionImagesList = [];
+                window.visionImagesList.push(dataUrl);
+                window.currentActivePreviewIndex = window.visionImagesList.length - 1;
+              }
+
+              if (typeof window.renderVisionImagesGallery === 'function') {
+                window.renderVisionImagesGallery();
+              } else {
+                const previewState = modal.querySelector('#vision-preview-state') || document.getElementById('vision-preview-state');
+                const imgPreview = modal.querySelector('#img-vision-preview') || document.getElementById('img-vision-preview');
+                if (previewState) previewState.classList.remove('hidden');
+                if (imgPreview) imgPreview.src = dataUrl;
+              }
+
+              // Enable manual inspection button (Feature 8 Flow Control: NO 350ms premature auto-trigger!)
+              const btnRun = modal.querySelector('#btn-run-vision-ai') || document.getElementById('btn-run-vision-ai');
+              if (btnRun) {
+                btnRun.disabled = false;
+                btnRun.classList.remove('opacity-50');
+                btnRun.innerHTML = `
+                  <span class="material-symbols-outlined text-lg">psychology</span>
+                  <span>🧠 تحليل الصورة بالذكاء الاصطناعي (بدء الفحص)</span>
+                `;
+              }
+            }
+          };
+        }
+
+        // Attach cancel / switch to file upload
+        const btnCancelCam = liveWrap.querySelector('#btn-cancel-live-camera') || document.getElementById('btn-cancel-live-camera');
+        if (btnCancelCam) {
+          btnCancelCam.onclick = function() {
+            if (window.KSUReticleHelper && typeof window.KSUReticleHelper.stopLiveCameraStream === 'function') {
+              window.KSUReticleHelper.stopLiveCameraStream();
+            }
+            if (liveWrap) liveWrap.classList.add('hidden');
+            const emptyState = modal.querySelector('#vision-empty-state') || document.getElementById('vision-empty-state');
+            const imagesList = window.getVisionImagesList ? window.getVisionImagesList() : window.visionImagesList;
+            if (emptyState && (!imagesList || imagesList.length === 0)) {
+              emptyState.classList.remove('hidden');
+            }
+            const inpCam = modal.querySelector('#inp-vision-camera') || document.getElementById('inp-vision-camera');
+            if (inpCam) inpCam.click();
+          };
+        }
+
+        // Intercept "فتح الكاميرا الميدانية" button in empty state to launch live stream first with fallback
+        const emptyState = modal.querySelector('#vision-empty-state') || document.getElementById('vision-empty-state');
+        if (emptyState) {
+          const btns = emptyState.querySelectorAll('button');
+          btns.forEach(btn => {
+            if (btn.textContent && btn.textContent.includes('الكاميرا')) {
+              btn.onclick = async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const videoEl = liveWrap.querySelector('#vision-camera-video') || document.getElementById('vision-camera-video');
+                const reticleContainer = liveWrap.querySelector('#vision-reticle-container') || document.getElementById('vision-reticle-container');
+                const isSupported = window.KSUReticleHelper && typeof window.KSUReticleHelper.isCameraSupported === 'function'
+                  ? window.KSUReticleHelper.isCameraSupported()
+                  : (typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia);
+
+                if (isSupported && liveWrap && videoEl) {
+                  emptyState.classList.add('hidden');
+                  liveWrap.classList.remove('hidden');
+
+                  const submode = window.currentVisionSubmode || options.submode || 'general';
+                  const res = await window.KSUReticleHelper.startLiveCameraStream(videoEl, reticleContainer, {
+                    submode,
+                    fallbackInput: '#inp-vision-camera',
+                    onError: (err) => {
+                      console.warn('[Field Vision] Live camera fallback to file picker:', err);
+                      if (liveWrap) liveWrap.classList.add('hidden');
+                      if (emptyState) emptyState.classList.remove('hidden');
+                      const inpCam = modal.querySelector('#inp-vision-camera') || document.getElementById('inp-vision-camera');
+                      inpCam?.click();
+                    }
+                  });
+
+                  if (!res.success) {
+                    if (liveWrap) liveWrap.classList.add('hidden');
+                    if (emptyState) emptyState.classList.remove('hidden');
+                    const inpCam = modal.querySelector('#inp-vision-camera') || document.getElementById('inp-vision-camera');
+                    inpCam?.click();
+                  }
+                } else {
+                  // Fallback directly if mediaDevices unsupported
+                  const inpCam = modal.querySelector('#inp-vision-camera') || document.getElementById('inp-vision-camera');
+                  inpCam?.click();
+                }
+              };
+            }
+          });
+        }
+
+        // Hook submode switching to update the live reticle dynamically
+        const prevSetVisionSubmode = window.setVisionSubmode;
+        window.setVisionSubmode = function(submode) {
+          if (typeof prevSetVisionSubmode === 'function') {
+            prevSetVisionSubmode(submode);
+          }
+          const reticleContainer = document.getElementById('vision-reticle-container');
+          if (reticleContainer && window.KSUReticleHelper && typeof window.KSUReticleHelper.renderReticleInto === 'function') {
+            window.KSUReticleHelper.renderReticleInto(reticleContainer, submode);
+          }
+        };
+
+        // Clean up stream on modal close
+        const closeBtns = modal.querySelectorAll('button[onclick*="ksu-ai-vision-modal"]');
+        closeBtns.forEach(b => {
+          const originalClick = b.onclick;
+          b.onclick = function(e) {
+            if (window.KSUReticleHelper && typeof window.KSUReticleHelper.stopLiveCameraStream === 'function') {
+              window.KSUReticleHelper.stopLiveCameraStream();
+            }
+            if (typeof originalClick === 'function') originalClick.call(this, e);
+          };
+        });
+      }
+    })();
+  </script>
 
   <!-- Service Worker Registration for PWA Offline Functionality -->
   <script>
@@ -5117,16 +5425,26 @@
     }
 
     function updateFieldLiveCounters() {
-      const roundsCount = (window.state && Array.isArray(window.state.rounds)) ? window.state.rounds.length : 0;
+      const rawRounds = (window.state && Array.isArray(window.state.rounds)) ? window.state.rounds : [];
+      const scopedRounds = (typeof window.getScopedRoundsForCurrentUser === 'function')
+        ? window.getScopedRoundsForCurrentUser(rawRounds, 'none')
+        : rawRounds;
+      const todayScopedRounds = (typeof window.getScopedRoundsForCurrentUser === 'function')
+        ? window.getScopedRoundsForCurrentUser(rawRounds, 'today')
+        : rawRounds.filter(r => r && r.date === new Date().toISOString().split('T')[0]);
+
       if (window.KSUDataBridge) {
-        const kpis = window.KSUDataBridge.getLiveKPIs();
         const alarmsCount = window.KSUDataBridge.getActiveAlarms().length;
         const viols = window.KSUDataBridge.getViolations();
 
-        const todayRnds = Math.max(roundsCount, kpis.todayRoundsCount || 0);
-        document.getElementById('kpi-today-rounds').textContent = todayRnds;
+        const todayEl = document.getElementById('kpi-today-rounds');
+        if (todayEl) todayEl.textContent = todayScopedRounds.length;
         const totRndsEl = document.getElementById('kpi-total-rounds');
-        if (totRndsEl) totRndsEl.textContent = todayRnds;
+        if (totRndsEl) totRndsEl.textContent = scopedRounds.length;
+        const pendObsEl = document.getElementById('kpi-pending-obs');
+        if (pendObsEl) pendObsEl.textContent = scopedRounds.reduce((sum, r) => sum + (r.observationCount || 0), 0);
+        const critViolEl = document.getElementById('kpi-critical-viols');
+        if (critViolEl) critViolEl.textContent = scopedRounds.reduce((sum, r) => sum + (r.violationCount || 0), 0);
         document.getElementById('kpi-today-violations').textContent = viols.total || 0;
         document.getElementById('kpi-today-alarms').textContent = alarmsCount || 0;
         

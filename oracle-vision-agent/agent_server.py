@@ -17,6 +17,7 @@ KSUMC Smart Safety Vision Agent - Oracle Cloud Server (Qwen2.5-VL + Ollama + Gem
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import io
@@ -24,8 +25,11 @@ import json
 import logging
 import os
 import re
+import smtplib
 import time
 from datetime import datetime, timezone, timedelta
+from email.message import EmailMessage
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 RIYADH_TZ = timezone(timedelta(hours=3))
@@ -38,7 +42,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
 try:
-    from PIL import Image
+    from PIL import Image, ImageOps
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
@@ -73,9 +77,14 @@ CONFIG = {
     "security_token": os.getenv("KSUMC_SECURITY_TOKEN", "ksu_sec_token_95972_riyadh"),
     "priority": [
         p.strip()
-        for p in os.getenv("AI_PROVIDER_PRIORITY", "qwen_api,ollama_local,gemini_api").split(",")
+        for p in os.getenv("AI_PROVIDER_PRIORITY", "github_models,qwen_api,ollama_local,gemini_api").split(",")
         if p.strip()
     ],
+    "github_base_url": os.getenv("GITHUB_MODELS_BASE_URL", "https://models.github.ai/inference/chat/completions"),
+    "github_keys": [k.strip() for k in os.getenv("GITHUB_MODELS_KEYS", "").split(",") if k.strip()],
+    "github_vision_model": os.getenv("GITHUB_VISION_MODEL", "openai/gpt-4o"),
+    "github_fallback_vision_model": os.getenv("GITHUB_FALLBACK_VISION_MODEL", "openai/gpt-4o-mini"),
+    "github_text_model": os.getenv("GITHUB_TEXT_MODEL", "openai/gpt-4o-mini"),
     "qwen_base_url": os.getenv("QWEN_API_BASE_URL", "https://openrouter.ai/api/v1/chat/completions"),
     "qwen_keys": [k.strip() for k in os.getenv("QWEN_API_KEYS", "").split(",") if k.strip()],
     "qwen_vision_model": os.getenv("QWEN_VISION_MODEL", "qwen/qwen2.5-vl-72b-instruct:free"),
@@ -87,6 +96,12 @@ CONFIG = {
     "ollama_timeout": int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "90")),
     "gemini_keys": [k.strip() for k in os.getenv("GEMINI_API_KEYS", "").split(",") if k.strip()],
     "gemini_model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+    "archive_vault_dir": os.getenv("ARCHIVE_VAULT_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "archive_vault")),
+    "archive_smtp_host": os.getenv("ARCHIVE_SMTP_HOST", "").strip(),
+    "archive_smtp_port": int(os.getenv("ARCHIVE_SMTP_PORT", "587")),
+    "archive_smtp_user": os.getenv("ARCHIVE_SMTP_USER", "").strip(),
+    "archive_smtp_pass": os.getenv("ARCHIVE_SMTP_PASS", "").strip(),
+    "archive_target_email": os.getenv("ARCHIVE_TARGET_EMAIL", "aalsaqri@ksu.edu.sa").strip(),
     "max_image_dim": int(os.getenv("MAX_IMAGE_DIMENSION", "800")),
     "jpeg_quality": int(os.getenv("JPEG_QUALITY", "70")),
     "cache_ttl": int(os.getenv("CACHE_TTL_SECONDS", "1800")),
@@ -94,11 +109,13 @@ CONFIG = {
 }
 
 STATE = {
+    "github_key_idx": 0,
     "qwen_key_idx": 0,
     "gemini_key_idx": 0,
     "total_requests": 0,
     "cache_hits": 0,
-    "provider_success": {"qwen_api": 0, "ollama_local": 0, "gemini_api": 0, "heuristic": 0},
+    "archived_count": 0,
+    "provider_success": {"github_models": 0, "qwen_api": 0, "ollama_local": 0, "gemini_api": 0, "heuristic": 0},
     "last_provider_used": "none",
     "last_error": None,
 }
@@ -143,6 +160,7 @@ class CBAHIAuditRequest(BaseModel):
 
 
 class RuntimeConfigUpdate(BaseModel):
+    github_keys: Optional[List[str]] = None
     qwen_base_url: Optional[str] = None
     qwen_keys: Optional[List[str]] = None
     qwen_vision_model: Optional[str] = None
@@ -150,6 +168,22 @@ class RuntimeConfigUpdate(BaseModel):
     ollama_vision_model: Optional[str] = None
     gemini_keys: Optional[List[str]] = None
     priority: Optional[List[str]] = None
+
+
+class ArchiveDispatchRequest(BaseModel):
+    cardId: str
+    date: Optional[str] = None
+    facility: Optional[str] = ""
+    location: Optional[str] = ""
+    severity: Optional[str] = "high"
+    summary: Optional[str] = ""
+    htmlReport: Optional[str] = ""
+    images: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class ArchiveMediaQuery(BaseModel):
+    cardId: str
 
 
 # ==============================================================================
@@ -189,6 +223,10 @@ def optimize_base64_image(img_str: str) -> tuple[str, str]:
     try:
         raw_bytes = base64.b64decode(b64_data)
         with Image.open(io.BytesIO(raw_bytes)) as img:
+            try:
+                img = ImageOps.exif_transpose(img)
+            except Exception as exif_err:
+                logger.debug(f"EXIF transpose skipped: {exif_err}")
             if img.mode in ("RGBA", "P"):
                 img = img.convert("RGB")
             max_dim = CONFIG["max_image_dim"]
@@ -650,8 +688,216 @@ def build_vision_prompt(
 
 
 # ==============================================================================
-# المحركات الثلاثة: 1) Qwen2.5-VL API  2) Local Ollama Qwen2.5-VL  3) Gemini Pool
+# المحركات الأربعة: 0) GitHub Models (GPT-4o)  1) Qwen2.5-VL API  2) Ollama  3) Gemini
 # ==============================================================================
+def sanitize_archive_card_id(raw_card_id: str) -> str:
+    val = (raw_card_id or "").strip()
+    if not val or not re.match(r"^[A-Za-z0-9_-]{1,80}$", val):
+        raise ValueError("Invalid cardId format")
+    return val
+
+
+def ensure_inside_vault(vault_root: Path, candidate: Path) -> Path:
+    resolved_root = vault_root.resolve()
+    resolved_candidate = candidate.resolve()
+    try:
+        resolved_candidate.relative_to(resolved_root)
+    except ValueError as exc:
+        raise ValueError("Invalid archive path outside vault") from exc
+    return resolved_candidate
+
+
+def send_archive_email_if_configured(
+    safe_id: str,
+    facility: str,
+    summary: str,
+    html_report: str,
+    jpg_attachments: List[Tuple[str, bytes]],
+) -> bool:
+    host = CONFIG["archive_smtp_host"]
+    user = CONFIG["archive_smtp_user"]
+    pw = CONFIG["archive_smtp_pass"]
+    target = CONFIG["archive_target_email"]
+    if not (host and user and pw and target):
+        return False
+
+    try:
+        msg = EmailMessage()
+        msg["Subject"] = f"[RSD-ARCHIVE] {safe_id} | {facility or 'KSUMC'}"
+        msg["From"] = user
+        msg["To"] = target
+        msg.set_content(f"محضر رصد سلامة مؤرشف تلقائياً: {safe_id}\nالمنشأة: {facility}\nالملخص: {summary}")
+        if html_report:
+            msg.add_attachment(
+                html_report.encode("utf-8"),
+                maintype="text",
+                subtype="html",
+                filename=f"{safe_id}.html",
+            )
+        for fname, raw_bytes in jpg_attachments:
+            msg.add_attachment(raw_bytes, maintype="image", subtype="jpeg", filename=fname)
+
+        if CONFIG["archive_smtp_port"] == 465:
+            with smtplib.SMTP_SSL(host, CONFIG["archive_smtp_port"], timeout=15) as server:
+                server.login(user, pw)
+                server.send_message(msg)
+        else:
+            with smtplib.SMTP(host, CONFIG["archive_smtp_port"], timeout=15) as server:
+                server.starttls()
+                server.login(user, pw)
+                server.send_message(msg)
+        return True
+    except Exception as exc:
+        logger.warning(f"Archive SMTP dispatch skipped/failed: {exc}")
+        return False
+
+
+def save_archive_bundle(body: ArchiveDispatchRequest) -> Dict[str, Any]:
+    safe_id = sanitize_archive_card_id(body.cardId)
+    raw_date = (body.date or get_riyadh_context()["currentDate"]).strip()
+    m_month = re.match(r"^(\d{4}-\d{2})", raw_date)
+    month_key = m_month.group(1) if m_month else get_riyadh_context()["currentDate"][:7]
+
+    vault_root = Path(CONFIG["archive_vault_dir"]).resolve()
+    month_dir = ensure_inside_vault(vault_root, vault_root / month_key)
+    month_dir.mkdir(parents=True, exist_ok=True)
+
+    images = [img for img in (body.images or []) if isinstance(img, str) and img][:10]
+    jpg_attachments: List[Tuple[str, bytes]] = []
+
+    for idx, img_str in enumerate(images):
+        m_data = re.match(r"^data:image/([a-zA-Z0-9+.-]+);base64,(.+)$", img_str, flags=re.DOTALL)
+        b64_payload = m_data.group(2) if m_data else img_str
+        try:
+            raw_bytes = base64.b64decode(b64_payload)
+            fname = f"{safe_id}_{idx}.jpg"
+            img_path = ensure_inside_vault(vault_root, month_dir / fname)
+            img_path.write_bytes(raw_bytes)
+            jpg_attachments.append((fname, raw_bytes))
+        except Exception as exc:
+            logger.warning(f"Failed writing archive image {safe_id}_{idx}: {exc}")
+
+    if body.htmlReport and body.htmlReport.strip():
+        html_path = ensure_inside_vault(vault_root, month_dir / f"{safe_id}.html")
+        html_path.write_text(body.htmlReport, encoding="utf-8")
+
+    record_payload = {
+        "cardId": safe_id,
+        "savedAt": datetime.now(RIYADH_TZ).isoformat(),
+        "monthKey": month_key,
+        "date": raw_date,
+        "facility": body.facility or "",
+        "location": body.location or "",
+        "severity": body.severity or "high",
+        "summary": body.summary or "",
+        "metadata": body.metadata or {},
+        "images": images,
+    }
+    json_path = ensure_inside_vault(vault_root, month_dir / f"{safe_id}.json")
+    json_path.write_text(json.dumps(record_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    STATE["archived_count"] = STATE.get("archived_count", 0) + 1
+
+    email_sent = send_archive_email_if_configured(
+        safe_id=safe_id,
+        facility=body.facility or "",
+        summary=body.summary or "",
+        html_report=body.htmlReport or "",
+        jpg_attachments=jpg_attachments,
+    )
+
+    return {
+        "cardId": safe_id,
+        "monthKey": month_key,
+        "storedImages": len(images),
+        "emailDispatched": email_sent,
+    }
+
+
+def load_archive_media(raw_card_id: str) -> Optional[Dict[str, Any]]:
+    safe_id = sanitize_archive_card_id(raw_card_id)
+    vault_root = Path(CONFIG["archive_vault_dir"]).resolve()
+    if not vault_root.exists():
+        return None
+
+    month_dirs = sorted(
+        [d.name for d in vault_root.iterdir() if d.is_dir() and re.match(r"^\d{4}-\d{2}$", d.name)],
+        reverse=True,
+    )
+    for month_name in month_dirs:
+        candidate_json = ensure_inside_vault(vault_root, vault_root / month_name / f"{safe_id}.json")
+        if candidate_json.exists():
+            parsed = json.loads(candidate_json.read_text(encoding="utf-8"))
+            return {
+                "cardId": safe_id,
+                "images": parsed.get("images") if isinstance(parsed.get("images"), list) else [],
+                "metadata": {
+                    "date": parsed.get("date", ""),
+                    "facility": parsed.get("facility", ""),
+                    "location": parsed.get("location", ""),
+                    "severity": parsed.get("severity", ""),
+                    "summary": parsed.get("summary", ""),
+                    "savedAt": parsed.get("savedAt", ""),
+                },
+            }
+    return None
+
+
+async def call_github_models_vision(images_b64: List[tuple[str, str]], prompt: str) -> tuple[Dict[str, Any], str]:
+    """استدعاء محرك GitHub Models (GPT-4o مع نزول تلقائي إلى GPT-4o-mini عند 429)"""
+    keys = CONFIG["github_keys"]
+    if not keys:
+        raise RuntimeError("لم يتم إدخال مفاتيح GITHUB_MODELS_KEYS بعد")
+
+    models_to_try: List[str] = []
+    for m in (CONFIG["github_vision_model"], CONFIG["github_fallback_vision_model"]):
+        if m and m not in models_to_try:
+            models_to_try.append(m)
+
+    last_err: Optional[Exception] = None
+    for _ in range(len(keys)):
+        idx = STATE["github_key_idx"] % len(keys)
+        STATE["github_key_idx"] = (STATE["github_key_idx"] + 1) % len(keys)
+        api_key = keys[idx]
+
+        content_list: List[Dict[str, Any]] = [
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}}
+            for mime, b64 in images_b64
+        ]
+        content_list.append({"type": "text", "text": prompt})
+
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        for model_name in models_to_try:
+            payload = {
+                "model": model_name,
+                "messages": [{"role": "user", "content": content_list}],
+                "temperature": 0.2,
+                "max_tokens": 1400,
+            }
+            try:
+                async with httpx.AsyncClient(timeout=45.0) as client:
+                    resp = await client.post(CONFIG["github_base_url"], headers=headers, json=payload)
+                    if resp.status_code == 429 and model_name != models_to_try[-1]:
+                        last_err = RuntimeError(f"GitHub Models ({model_name}) HTTP 429")
+                        continue
+                    if resp.status_code in (401, 403):
+                        last_err = RuntimeError(f"GitHub Models ({model_name}) HTTP {resp.status_code}: {resp.text[:180]}")
+                        break
+                    if resp.status_code != 200:
+                        raise RuntimeError(f"GitHub Models ({model_name}) HTTP {resp.status_code}: {resp.text[:180]}")
+                    data = resp.json()
+                    raw_text = data["choices"][0]["message"]["content"]
+                    return extract_json_object(raw_text), f"GitHub Models ({model_name})"
+            except Exception as exc:
+                last_err = exc
+                logger.warning(f"[GitHub Models Key #{idx + 1} / {model_name}] failed: {exc}")
+
+    raise RuntimeError(f"تعذر الاتصال بـ GitHub Models: {last_err}")
+
+
 async def call_qwen_api_vision(images_b64: List[tuple[str, str]], prompt: str) -> Dict[str, Any]:
     """استدعاء نموذج Qwen2.5-VL عبر واجهة متوافقة مع OpenAI (OpenRouter / DashScope / Together)"""
     keys = CONFIG["qwen_keys"]
@@ -769,10 +1015,28 @@ async def call_gemini_pool_vision(images_b64: List[tuple[str, str]], prompt: str
 
 
 async def call_text_llm(prompt: str, expect_json: bool = False) -> tuple[Any, str]:
-    """توجيه الطلبات النصية (المساعد الاستشاري، التوثيق الصوتي، التقرير التنفيذي) عبر Qwen أو Ollama أو Gemini"""
+    """توجيه الطلبات النصية (المساعد الاستشاري، التوثيق الصوتي، التقرير التنفيذي) عبر GitHub Models أو Qwen أو Ollama أو Gemini"""
     for provider in CONFIG["priority"]:
         try:
-            if provider == "qwen_api" and CONFIG["qwen_keys"]:
+            if provider == "github_models" and CONFIG["github_keys"]:
+                idx = STATE["github_key_idx"] % len(CONFIG["github_keys"])
+                STATE["github_key_idx"] = (STATE["github_key_idx"] + 1) % len(CONFIG["github_keys"])
+                headers = {
+                    "Authorization": f"Bearer {CONFIG['github_keys'][idx]}",
+                    "Content-Type": "application/json",
+                }
+                payload = {
+                    "model": CONFIG["github_text_model"],
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.2,
+                }
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(CONFIG["github_base_url"], headers=headers, json=payload)
+                    if resp.status_code == 200:
+                        txt = resp.json()["choices"][0]["message"]["content"]
+                        return (extract_json_object(txt) if expect_json else txt), f"GitHub Models ({CONFIG['github_text_model']})"
+
+            elif provider == "qwen_api" and CONFIG["qwen_keys"]:
                 idx = STATE["qwen_key_idx"] % len(CONFIG["qwen_keys"])
                 STATE["qwen_key_idx"] = (STATE["qwen_key_idx"] + 1) % len(CONFIG["qwen_keys"])
                 headers = {
@@ -791,18 +1055,56 @@ async def call_text_llm(prompt: str, expect_json: bool = False) -> tuple[Any, st
                         return (extract_json_object(txt) if expect_json else txt), f"Qwen ({CONFIG['qwen_text_model']})"
 
             elif provider == "ollama_local" and CONFIG["ollama_enabled"]:
-                payload = {
-                    "model": CONFIG["ollama_text_model"],
-                    "messages": [{"role": "user", "content": prompt}],
-                    "stream": False,
-                }
-                if expect_json:
-                    payload["format"] = "json"
-                async with httpx.AsyncClient(timeout=45.0) as client:
-                    resp = await client.post(f"{CONFIG['ollama_base_url']}/api/chat", json=payload)
-                    if resp.status_code == 200:
-                        txt = resp.json().get("message", {}).get("content", "")
-                        return (extract_json_object(txt) if expect_json else txt), f"Oracle Local Ollama ({CONFIG['ollama_text_model']})"
+                # استعلام النماذج المثبتة في Ollama ديناميكياً لتجنب خطأ 404
+                installed_models: List[str] = []
+                try:
+                    async with httpx.AsyncClient(timeout=2.5) as tag_client:
+                        tag_resp = await tag_client.get(f"{CONFIG['ollama_base_url']}/api/tags")
+                        if tag_resp.status_code == 200:
+                            installed_models = [m.get("name", "") for m in tag_resp.json().get("models", [])]
+                except Exception as tag_err:
+                    logger.debug(f"Could not fetch Ollama tags: {tag_err}")
+
+                candidate_models: List[str] = []
+                if CONFIG.get("ollama_text_model"):
+                    candidate_models.append(CONFIG["ollama_text_model"])
+                if CONFIG.get("ollama_vision_model") and CONFIG["ollama_vision_model"] not in candidate_models:
+                    candidate_models.append(CONFIG["ollama_vision_model"])
+                for im in installed_models:
+                    if im and im not in candidate_models:
+                        candidate_models.append(im)
+
+                # إعطاء الأولوية للنماذج المثبتة فعلياً
+                if installed_models:
+                    actual_candidates = [
+                        m for m in candidate_models
+                        if m in installed_models or any(m.split(":")[0] == im.split(":")[0] for im in installed_models)
+                    ]
+                    if actual_candidates:
+                        candidate_models = actual_candidates
+
+                for model_candidate in candidate_models:
+                    try:
+                        payload = {
+                            "model": model_candidate,
+                            "messages": [{"role": "user", "content": prompt}],
+                            "stream": False,
+                        }
+                        if expect_json:
+                            payload["format"] = "json"
+                        async with httpx.AsyncClient(timeout=45.0) as client:
+                            resp = await client.post(f"{CONFIG['ollama_base_url']}/api/chat", json=payload)
+                            if resp.status_code == 200:
+                                txt = resp.json().get("message", {}).get("content", "")
+                                return (extract_json_object(txt) if expect_json else txt), f"Oracle Local Ollama ({model_candidate})"
+                            elif resp.status_code == 404:
+                                logger.info(f"Ollama model '{model_candidate}' not found (404), falling back to next candidate...")
+                                continue
+                            else:
+                                logger.warning(f"Ollama model '{model_candidate}' returned HTTP {resp.status_code}")
+                    except Exception as model_err:
+                        logger.warning(f"Ollama candidate {model_candidate} error: {model_err}")
+                        continue
 
             elif provider == "gemini_api" and CONFIG["gemini_keys"]:
                 idx = STATE["gemini_key_idx"] % len(CONFIG["gemini_keys"])
@@ -820,6 +1122,153 @@ async def call_text_llm(prompt: str, expect_json: bool = False) -> tuple[Any, st
             logger.warning(f"Text LLM provider {provider} error: {e}")
 
     raise RuntimeError("لم ينجح أي مزود ذكاء اصطناعي في معالجة الطلب النصي")
+
+
+def get_safety_assistant_rulebase(question: str) -> str:
+    """قاعدة معرفية استشارية متقدمة لمعايير السلامة سباهي (CBAHI FMS) و NFPA والكود السعودي (SBC 801)"""
+    q = (question or "").lower()
+
+    if any(k in q for k in ["طفاية", "طفايات", "حريق", "ضغط", "خرطوم", "extinguisher"]):
+        return (
+            "وفقاً لمعايير سباهي (CBAHI FMS.14) وكود الحريق السعودي (SBC 801) ومعيار NFPA 10:\n"
+            "1. يجب فحص طفايات الحريق شهرياً والتأكد من وجود بطاقة التفتيش سارية المفعول.\n"
+            "2. يجب أن يكون مؤشر مقياس الضغط في المنطقة الخضراء (100-175 psi).\n"
+            "3. يجب توفر مسمار الأمان وسلك الختم البلاستيكي سليمين دون تلاعب.\n"
+            "4. يجب تركيب الطفاية على حامل جداري بارتفاع لا يتجاوز 1.5م للطفايات التي يقل وزنها عن 18 كجم، وبقاء محيطها خالياً من أي عوائق بمسافة لا تقل عن 1 متر."
+        )
+    elif any(k in q for k in ["مخرج", "مخارج", "طوارئ", "هروب", "مسار", "exit", "evacuation"]):
+        return (
+            "وفقاً لمعايير سباهي (CBAHI FMS.12) وكود الحريق السعودي (SBC 801) ومعيار NFPA 101:\n"
+            "1. يجب أن تظل جميع مخارج ومسارات الطوارئ خالية تماماً من أي عوائق أو مواد مخزنة على مدار الساعة.\n"
+            "2. يجب أن تعمل لوحات مخارج الطوارئ المضيئة (Exit Signs) وإضاءة الطوارئ بكفاءة وتدعم بطارية احتياطية لمدة لا تقل عن 90 دقيقة.\n"
+            "3. أبواب الطوارئ يجب أن تفتح للخارج باتجاه مسار الهروب ومزودة بمقابض هلوع (Panic Hardware) ولا يجوز قفلها أثناء تواجد الأشخاص بالمبنى."
+        )
+    elif any(k in q for k in ["كهرباء", "توصيلة", "توصيلات", "قاطع", "أسلاك", "electrical"]):
+        return (
+            "وفقاً لمتطلبات CBAHI FMS ومعايير NFPA 70 والكود السعودي (SBC 401):\n"
+            "1. يمنع منعاً باتاً استخدام التوصيلات الكهربائية المتعددة أو الأسلاك المكشوفة في المناطق الطبية والمستودعات.\n"
+            "2. يجب الحفاظ على مسافة خلوص لا تقل عن 90 سم (36 بوصة) أمام جميع لوحات وقواطع الكهرباء.\n"
+            "3. الأجهزة الطبية يجب أن توصل بمآخذ مطابقة لمعيار المستشفيات (Hospital Grade) مع تأريض وقائي معتمد."
+        )
+    elif any(k in q for k in ["كيميائ", "مواد خطرة", "تخزين", "msds", "chemical", "hazmat"]):
+        return (
+            "وفقاً لمعايير سباهي (CBAHI FMS.8) ومتطلبات OSHA و NFPA 400:\n"
+            "1. يجب توفير صحائف بيانات سلامة المواد (MSDS/SDS) باللغتين العربية والإنجليزية بالقرب من أماكن التخزين والاستخدام.\n"
+            "2. تخزين المواد الكيميائية في خزائن مخصصة مقاومة للحريق ومزودة بتهوية مناسبة وحوض احتواء ثانوي (Secondary Containment).\n"
+            "3. توفير محطات غسيل العيون ودش الطوارئ على مسافة لا تزيد عن 10 ثوانٍ من موقع الخطر، وفحصها أسبوعياً."
+        )
+    elif any(k in q for k in ["تدخين", "دخان", "سيجارة", "smoke", "smoking"]):
+        return (
+            "وفقاً لسياسة المدينة الطبية ونظام مكافحة التدخين بالمرسوم الملكي م/56 ومعايير CBAHI:\n"
+            "1. يمنع التدخين منعاً باتاً بجميع أشكاله (التقليدي والإلكتروني) داخل كافة منشآت ومرافق وحرم المدينة الطبية.\n"
+            "2. تحرير محضر ضبط مخالفة وإحالة المخالف للجنة المختصة وتطبيق الغرامة المقررة نظاماً (200 ريال للمرة الأولى).\n"
+            "3. التأكد من سلامة كواشف الدخان في الغرف والممرات وعدم تغطيتها أو تعطيلها."
+        )
+    else:
+        return (
+            "معايير السلامة وإدارة المرافق المعتمدة بالمدينة الطبية بجامعة الملك سعود تشترط الامتثال الكامل لمتطلبات المركز السعودي لاعتماد المنشآت الصحية (CBAHI FMS)، "
+            "وكود الحريق السعودي (SBC 801)، ومعايير الجمعية الوطنية للحماية من الحرائق (NFPA). "
+            "يجب الالتزام ببيئة عمل خالية من المخاطر، والتدقيق الدوري على أنظمة الإنذار والإطفاء، وتأمين مسارات الإخلاء، والتبليغ الفوري عن أي ملاحظة عبر منصة رصد."
+        )
+
+
+def structure_voice_rulebase(transcript: str, form_type: str = "general") -> Dict[str, Any]:
+    """تفكيك وتحويل النص الصوتي الميداني إلى حقول منظمة لبلاغات السلامة بدقة دون أخطاء 503"""
+    t = transcript or ""
+    t_lower = t.lower()
+
+    # 1. كشف الأجهزة
+    detected_devices: List[str] = []
+    device_keywords = {
+        "غلاية": "غلاية ماء كهربائية",
+        "سخان": "سخان كهربائي",
+        "توصيلة": "توصيلة كهربائية متعددة",
+        "دفاية": "دفاية كهربائية",
+        "ميكروويف": "جهاز ميكروويف",
+        "شاحن": "شاحن غير معتمد",
+        "ثلاجة": "ثلاجة صغيرة",
+        "مكواة": "مكواة كهربائية",
+        "أسطوانة": "أسطوانة غاز/أكسجين",
+        "طفاية": "طفاية حريق",
+    }
+    for kw, label in device_keywords.items():
+        if kw in t_lower:
+            detected_devices.append(label)
+
+    # 2. كشف الموقع والدور
+    location_parts: List[str] = []
+    m_bldg = re.search(r"(مبنى\s+[^\s,،]+|مستشفى\s+[^\s,،]+|كلية\s+[^\s,،]+|البرج\s+[^\s,،]+)", t)
+    if m_bldg:
+        location_parts.append(m_bldg.group(1))
+    m_floor = re.search(r"(الدور\s+[^\s,،]+|الطابق\s+[^\s,،]+|القبو|الأرضي|الميزانين)", t)
+    if m_floor:
+        location_parts.append(m_floor.group(1))
+    m_dept = re.search(r"(قسم\s+[^\s,،]+|جناح\s+[^\s,،]+|مستودع\s+[^\s,،]+|ممر\s+[^\s,،]+|طوارئ|عيادات)", t)
+    if m_dept:
+        location_parts.append(m_dept.group(1))
+    location_str = " - ".join(location_parts) if location_parts else "الموقع محدد في نص البلاغ"
+
+    # 3. كشف رقم الغرفة
+    room_str = ""
+    m_room = re.search(r"(?:غرفة|مكتب|room)\s*([A-Za-z0-9\-]+)", t, re.IGNORECASE)
+    if m_room:
+        room_str = m_room.group(1)
+    else:
+        m_num = re.search(r"\b([A-Z]?\d{3,4}[A-Z]?)\b", t)
+        if m_num:
+            room_str = m_num.group(1)
+
+    # 4. تقييم مستوى الخطورة
+    risk_level = "متوسط"
+    if any(k in t_lower for k in ["حريق", "دخان", "حرج", "التماس", "أسلاك مكشوفة", "خطر داهم", "انفجار"]):
+        risk_level = "عالي"
+    elif any(k in t_lower for k in ["إعاقة", "مخرج", "غاز", "كيماوي"]):
+        risk_level = "عالي"
+    elif any(k in t_lower for k in ["نظافة", "ورق", "ملاحظة بسيطة"]):
+        risk_level = "منخفض"
+
+    # 5. كشف بيانات المخالف
+    violator_name = ""
+    violator_role = ""
+    violator_dept = ""
+    m_name = re.search(r"(?:المخالف|المدعو|الموظف|الطالب)\s+([^\s,،]+(?:\s+[^\s,،]+){1,3})", t)
+    if m_name:
+        violator_name = m_name.group(1)
+    if "موظف" in t_lower:
+        violator_role = "موظف"
+    elif "طالب" in t_lower:
+        violator_role = "طالب"
+    elif "مراجع" in t_lower or "زائر" in t_lower:
+        violator_role = "مراجع"
+    elif "شركة" in t_lower or "مقاول" in t_lower:
+        violator_role = "عامل مقاول"
+
+    # 6. صياغة الإجراء والوصف
+    is_smoking = "تدخين" in t_lower or form_type == "smoking"
+    if is_smoking:
+        formal_desc = f"رصد مخالفة تدخين داخل منشآت المدينة الطبية بما يخالف نظام مكافحة التدخين ومعايير سباهي: {t}"
+        action_taken = "تم ضبط الواقعة وإشعار المخالف بالتعليمات وتوثيق بيانات البلاغ"
+        suggested_action = "تحرير غرامة تدخين وإحالة المحضر للإدارة المعنية لتطبيق اللائحة"
+        risk_level = "متوسط"
+    else:
+        dev_text = (" وجود " + " و ".join(detected_devices)) if detected_devices else ""
+        formal_desc = f"رصد ملاحظة سلامة ميدانية تشمل{dev_text}، استناداً إلى البلاغ الصوتي: {t}"
+        action_taken = "تمت المعاينة الميدانية الأولية وإشعار مسؤولي الموقع للبدء في المعالجة"
+        suggested_action = "إزالة مسببات الخطر ومطابقة تجهيزات الموقع مع كود الحريق السعودي ومعايير CBAHI FMS"
+
+    return {
+        "detected_devices": detected_devices if detected_devices else ["أجهزة أو ملاحظات واردة بالنص الصوتي"],
+        "other_device_desc": t if not detected_devices else "",
+        "location": location_str,
+        "room": room_str,
+        "action_taken": action_taken,
+        "formal_description": formal_desc,
+        "suggested_corrective_action": suggested_action,
+        "risk_level": risk_level,
+        "violator_name": violator_name,
+        "violator_role": violator_role,
+        "violator_dept": violator_dept,
+    }
 
 
 # ==============================================================================
@@ -910,18 +1359,113 @@ async def get_ai_status():
         except Exception:
             ollama_online = False
 
+    text_model_installed = any(
+        CONFIG["ollama_text_model"] == m or CONFIG["ollama_text_model"].split(":")[0] == m.split(":")[0]
+        for m in ollama_models
+    )
+    vision_model_installed = any(
+        CONFIG["ollama_vision_model"] == m or CONFIG["ollama_vision_model"].split(":")[0] == m.split(":")[0]
+        for m in ollama_models
+    )
+
+    if len(CONFIG["github_keys"]) > 0:
+        active_text_model = f"github_models ({CONFIG['github_text_model']})"
+    elif len(CONFIG["qwen_keys"]) > 0:
+        active_text_model = f"qwen_api ({CONFIG['qwen_text_model']})"
+    elif text_model_installed:
+        active_text_model = f"ollama_local ({CONFIG['ollama_text_model']})"
+    elif vision_model_installed:
+        active_text_model = f"ollama_local ({CONFIG['ollama_vision_model']}) [vision-fallback]"
+    elif ollama_models:
+        active_text_model = f"ollama_local ({ollama_models[0]}) [installed-fallback]"
+    elif len(CONFIG["gemini_keys"]) > 0:
+        active_text_model = f"gemini_api ({CONFIG['gemini_model']})"
+    else:
+        active_text_model = "rulebase (KSUMC Safety Knowledge Engine)"
+
     return {
         "status": "online",
-        "agent": "KSUMC Oracle Vision Agent v2.0",
+        "agent": "KSUMC Oracle Vision Agent v2.1",
         "priority": CONFIG["priority"],
+        "github_models_configured": len(CONFIG["github_keys"]) > 0,
+        "github_vision_model": CONFIG["github_vision_model"],
+        "github_text_model": CONFIG["github_text_model"],
         "qwen_api_configured": len(CONFIG["qwen_keys"]) > 0,
         "qwen_vision_model": CONFIG["qwen_vision_model"],
+        "qwen_text_model": CONFIG["qwen_text_model"],
         "ollama_online": ollama_online,
         "ollama_vision_model": CONFIG["ollama_vision_model"],
+        "ollama_text_model": CONFIG["ollama_text_model"],
         "ollama_installed_models": ollama_models,
         "gemini_keys_count": len(CONFIG["gemini_keys"]),
+        "diagnostics": {
+            "exif_transpose_supported": PIL_AVAILABLE,
+            "ollama_text_model_installed": text_model_installed,
+            "ollama_vision_model_installed": vision_model_installed,
+            "text_fallback_active": not text_model_installed,
+            "active_text_model": active_text_model,
+            "archive_vault_dir": str(CONFIG["archive_vault_dir"]),
+            "timestamp": datetime.now(RIYADH_TZ).isoformat(),
+        },
         "stats": STATE,
     }
+
+
+def _verify_agent_token(x_ksumc_key: Optional[str], x_ksumc_token: Optional[str]) -> None:
+    token = x_ksumc_key or x_ksumc_token
+    if not token or token != CONFIG["security_token"]:
+        raise HTTPException(status_code=403, detail="غير مصرح بالوصول إلى الوكيل")
+
+
+@app.post("/archive/dispatch")
+@app.post("/safety/api/archive/dispatch")
+@app.post("/ai/archive-dispatch")
+@app.post("/safety/api/ai/archive-dispatch")
+async def dispatch_archive_bundle(
+    body: ArchiveDispatchRequest,
+    x_ksumc_key: Optional[str] = Header(default=None),
+    x_ksumc_token: Optional[str] = Header(default=None),
+):
+    _verify_agent_token(x_ksumc_key, x_ksumc_token)
+    try:
+        saved = await asyncio.to_thread(save_archive_bundle, body)
+        return {"success": True, **saved}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/archive/media/{card_id:path}")
+@app.get("/safety/api/archive/media/{card_id:path}")
+async def get_archive_media(
+    card_id: str,
+    x_ksumc_key: Optional[str] = Header(default=None),
+    x_ksumc_token: Optional[str] = Header(default=None),
+):
+    _verify_agent_token(x_ksumc_key, x_ksumc_token)
+    try:
+        media = load_archive_media(card_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not media:
+        raise HTTPException(status_code=404, detail="لم يتم العثور على صور مؤرشفة لهذا المحضر")
+    return {"success": True, **media}
+
+
+@app.post("/ai/archive-media")
+@app.post("/safety/api/ai/archive-media")
+async def post_archive_media(
+    body: ArchiveMediaQuery,
+    x_ksumc_key: Optional[str] = Header(default=None),
+    x_ksumc_token: Optional[str] = Header(default=None),
+):
+    _verify_agent_token(x_ksumc_key, x_ksumc_token)
+    try:
+        media = load_archive_media(body.cardId)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not media:
+        raise HTTPException(status_code=404, detail="لم يتم العثور على صور مؤرشفة لهذا المحضر")
+    return {"success": True, **media}
 
 
 @app.post("/ai/config")
@@ -929,11 +1473,13 @@ async def get_ai_status():
 async def update_runtime_config(
     body: RuntimeConfigUpdate,
     x_ksumc_key: Optional[str] = Header(default=None),
+    x_ksumc_token: Optional[str] = Header(default=None),
 ):
     """تحديث مفاتيح وإعدادات الوكيل فوراً بدون إعادة تشغيل الخادم"""
-    if x_ksumc_key != CONFIG["security_token"]:
-        raise HTTPException(status_code=403, detail="غير مصرح بتعديل إعدادات الوكيل")
+    _verify_agent_token(x_ksumc_key, x_ksumc_token)
 
+    if body.github_keys is not None:
+        CONFIG["github_keys"] = [k.strip() for k in body.github_keys if k.strip()]
     if body.qwen_base_url:
         CONFIG["qwen_base_url"] = body.qwen_base_url.strip()
     if body.qwen_keys is not None:
@@ -951,6 +1497,7 @@ async def update_runtime_config(
 
     return {"success": True, "message": "تم تحديث إعدادات وكيل الرؤية البصرية بنجاح", "config": {
         "priority": CONFIG["priority"],
+        "github_keys_count": len(CONFIG["github_keys"]),
         "qwen_vision_model": CONFIG["qwen_vision_model"],
         "qwen_keys_count": len(CONFIG["qwen_keys"]),
         "ollama_enabled": CONFIG["ollama_enabled"],
@@ -1007,10 +1554,13 @@ async def analyze_inspection_image(req: VisionAnalysisRequest):
 
     errors: List[str] = []
 
-    # 3. المرور على المحركات حسب الأولوية المحددة (Qwen API -> Ollama Local -> Gemini Pool)
+    # 3. المرور على المحركات حسب الأولوية المحددة (GitHub Models GPT-4o -> Qwen API -> Ollama Local -> Gemini Pool)
     for provider in CONFIG["priority"]:
         try:
-            if provider == "qwen_api":
+            if provider == "github_models":
+                parsed, source_label = await call_github_models_vision(optimized_images, prompt)
+                clean_data = sanitize_vision_output(parsed, riyadh_ctx, submode=submode)
+            elif provider == "qwen_api":
                 parsed = await call_qwen_api_vision(optimized_images, prompt)
                 clean_data = sanitize_vision_output(parsed, riyadh_ctx, submode=submode)
                 source_label = f"Oracle Qwen2.5-VL ({CONFIG['qwen_vision_model']})"
@@ -1057,9 +1607,10 @@ async def ask_safety_assistant(req: AssistantQuestionRequest):
         answer, source = await call_text_llm(prompt, expect_json=False)
         return {"success": True, "answer": answer, "source": source}
     except Exception as e:
+        logger.warning(f"AI text LLM unavailable for safety assistant ({e}), using rulebase fallback")
         return {
             "success": True,
-            "answer": "معايير السلامة المعتمدة بالمدينة الطبية تشترط الالتزام بمتطلبات سباهي (CBAHI FMS) وكود البناء السعودي (SBC 801) لضمان سلامة المرضى والكوادر الطبية والمرافق.",
+            "answer": get_safety_assistant_rulebase(req.question),
             "source": "KSUMC Safety Rulebase",
             "notice": str(e),
         }
@@ -1090,7 +1641,14 @@ async def structure_voice_record(req: VoiceRecordRequest):
         parsed, source = await call_text_llm(prompt, expect_json=True)
         return {"success": True, "data": parsed, "source": source}
     except Exception as e:
-        raise HTTPException(status_code=503, detail=str(e))
+        logger.warning(f"AI text LLM unavailable for voice record structuring ({e}), using rulebase fallback")
+        fallback_data = structure_voice_rulebase(req.transcript, req.form_type)
+        return {
+            "success": True,
+            "data": fallback_data,
+            "source": "KSUMC Safety Voice Rulebase (Fallback)",
+            "notice": str(e),
+        }
 
 
 if __name__ == "__main__":

@@ -257,19 +257,27 @@
     saveRound: function(round) {
       const rounds = this.getRounds();
       const userObj = window.KSUAuth ? window.KSUAuth.getUser() : null;
+      const nowIso = new Date().toISOString();
       const newRound = {
         id: round.id || 'RND-' + Date.now(),
-        date: round.date || new Date().toISOString().split('T')[0],
+        date: round.date || nowIso.split('T')[0],
         time: round.time || new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
-        timestamp: round.timestamp || new Date().toISOString(),
+        timestamp: round.timestamp || nowIso,
         facility: round.facility || round.hospital || 'مستشفى الملك خالد الجامعي (KKUH)',
         shift: round.shift || (userObj && userObj.shift) || 'الوردية 1 (صباحي)',
         routedTo: 'Q1',
+        workflowStatus: round.workflowStatus || 'pending_quality',
         status: round.status || 'مكتملة',
+        _isOfflinePending: true,
         ...round
       };
+      if (!newRound.timestamp) newRound.timestamp = nowIso;
       rounds.unshift(newRound);
       setToStorage(KEYS.ROUNDS, rounds);
+      try {
+        localStorage.setItem('ksumc_field_rounds', JSON.stringify(rounds));
+        localStorage.setItem('ksumc_rounds_registry', JSON.stringify(rounds));
+      } catch (_) {}
       if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncRound === 'function') {
         window.ksuFirebaseSync.syncRound(newRound);
       }
@@ -290,6 +298,7 @@
     saveAlarm: function(alarm) {
       const alarms = this.getAlarms();
       const userObj = window.KSUAuth ? window.KSUAuth.getUser() : null;
+      const nowIso = new Date().toISOString();
       const newAlarm = {
         id: alarm.id || 'ALM-' + (alarms.length + 101) + '-' + Date.now().toString().slice(-3),
         title: alarm.title || 'إنذار طارئ',
@@ -298,16 +307,19 @@
         severity: alarm.severity || 'critical',
         status: alarm.status || 'نشط - قيد الاستجابة',
         time: alarm.time || new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
-        date: alarm.date || new Date().toISOString().split('T')[0],
+        date: alarm.date || nowIso.split('T')[0],
         reportedBy: alarm.reportedBy || (userObj ? userObj.name : 'مفتش السلامة'),
         shift: alarm.shift || (userObj && userObj.shift) || 'الوردية 1 (صباحي)',
         routedTo: 'H1',
         routedToTitle: 'المشرف العام الملك خالد (H1)',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        timestamp: alarm.timestamp || nowIso,
+        createdAt: nowIso,
+        updatedAt: nowIso,
         updatedAtMs: Date.now(),
+        _isOfflinePending: true,
         ...alarm
       };
+      if (!newAlarm.timestamp) newAlarm.timestamp = nowIso;
       alarms.unshift(newAlarm);
       setToStorage(KEYS.ALARMS, alarms);
       if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncAlarm === 'function') {
@@ -324,7 +336,9 @@
         found.resolvedAt = new Date().toISOString();
         found.updatedAt = new Date().toISOString();
         found.updatedAtMs = Date.now();
+        found.timestamp = found.timestamp || found.updatedAt;
         found.resolutionNotes = resolutionNotes;
+        found._isOfflinePending = true;
         setToStorage(KEYS.ALARMS, alarms);
         if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncAlarm === 'function') {
           window.ksuFirebaseSync.syncAlarm(found);
@@ -346,18 +360,24 @@
     saveSafetyViolation: function(violation) {
       const list = getFromStorage(KEYS.SAFETY_VIOLATIONS, []);
       const userObj = window.KSUAuth ? window.KSUAuth.getUser() : null;
+      const nowIso = new Date().toISOString();
       const item = {
         id: violation.id || 'VIO-' + Date.now(),
-        date: violation.date || new Date().toISOString().split('T')[0],
+        date: violation.date || nowIso.split('T')[0],
         status: violation.status || 'قيد المتابعة',
+        severity: violation.severity || 'high',
         facility: violation.facility || 'مستشفى الملك خالد الجامعي (KKUH)',
         shift: violation.shift || (userObj && userObj.shift) || 'الوردية 1 (صباحي)',
         routedTo: 'H1',
         routedToTitle: 'المشرف العام الملك خالد (H1)',
-        updatedAt: new Date().toISOString(),
+        timestamp: violation.timestamp || nowIso,
+        createdAt: violation.createdAt || nowIso,
+        updatedAt: nowIso,
         updatedAtMs: Date.now(),
+        _isOfflinePending: true,
         ...violation
       };
+      if (!item.timestamp) item.timestamp = nowIso;
       list.unshift(item);
       setToStorage(KEYS.SAFETY_VIOLATIONS, list);
       if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncSafetyViolation === 'function') {
@@ -369,18 +389,23 @@
     saveSmokingViolation: function(violation) {
       const list = getFromStorage(KEYS.SMOKING_VIOLATIONS, []);
       const userObj = window.KSUAuth ? window.KSUAuth.getUser() : null;
+      const nowIso = new Date().toISOString();
       const item = {
         id: violation.id || 'SMK-' + Date.now(),
-        date: violation.date || new Date().toISOString().split('T')[0],
+        date: violation.date || nowIso.split('T')[0],
         status: violation.status || 'تم الضبط',
         facility: violation.facility || 'مستشفى الملك خالد الجامعي (KKUH)',
         shift: violation.shift || (userObj && userObj.shift) || 'الوردية 1 (صباحي)',
         routedTo: 'H1',
         routedToTitle: 'المشرف العام الملك خالد (H1)',
-        updatedAt: new Date().toISOString(),
+        timestamp: violation.timestamp || nowIso,
+        createdAt: violation.createdAt || nowIso,
+        updatedAt: nowIso,
         updatedAtMs: Date.now(),
+        _isOfflinePending: true,
         ...violation
       };
+      if (!item.timestamp) item.timestamp = nowIso;
       list.unshift(item);
       setToStorage(KEYS.SMOKING_VIOLATIONS, list);
       if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncSmokingViolation === 'function') {
@@ -399,18 +424,23 @@
     savePermit: function(permit) {
       const list = this.getPermits();
       const userObj = window.KSUAuth ? window.KSUAuth.getUser() : null;
+      const nowIso = new Date().toISOString();
       const item = {
         id: permit.id || 'HWP-' + (list.length + 101),
-        date: permit.date || new Date().toISOString().split('T')[0],
+        date: permit.date || nowIso.split('T')[0],
         status: permit.status || 'ساري ومعتمد',
         shift: permit.shift || (userObj && userObj.shift) || 'الوردية 1 (صباحي)',
         qualityStatus: 'archived_approved',
         routedTo: 'ARCHIVE',
         routedToTitle: 'أرشيف التصاريح المعتمدة',
-        updatedAt: new Date().toISOString(),
+        timestamp: permit.timestamp || nowIso,
+        createdAt: permit.createdAt || nowIso,
+        updatedAt: nowIso,
         updatedAtMs: Date.now(),
+        _isOfflinePending: true,
         ...permit
       };
+      if (!item.timestamp) item.timestamp = nowIso;
       list.unshift(item);
       setToStorage(KEYS.PERMITS, list);
       if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncPermit === 'function') {
@@ -862,13 +892,16 @@
         timestamp: notif.timestamp || notif.createdAt || nowIso,
         date: notif.date || nowIso.split('T')[0],
         time: notif.time || new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: notif.timestamp || nowIso,
         createdAt: notif.createdAt || nowIso,
         updatedAt: nowIso,
         createdAtMs: notif.createdAtMs || nowMs,
         updatedAtMs: nowMs,
+        _isOfflinePending: true,
         ...notif,
         timestamp: notif.timestamp || notif.createdAt || nowIso
       };
+      if (!newNotif.timestamp) newNotif.timestamp = nowIso;
 
       const existingIdx = list.findIndex(item => String(item.id) === String(newNotif.id));
       if (existingIdx !== -1) {

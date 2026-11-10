@@ -7256,6 +7256,12 @@ if (typeof KSU_WET_CHEM_ASSETS !== 'undefined' && Array.isArray(KSU_WET_CHEM_ASS
   if (wetToPush.length > 0) INITIAL_ASSETS.push(...wetToPush);
 }
 
+if (typeof KSU_FACP_ASSETS !== 'undefined' && Array.isArray(KSU_FACP_ASSETS)) {
+  const existingFacpIds = new Set(INITIAL_ASSETS.map(a => a.id));
+  const facpToPush = KSU_FACP_ASSETS.filter(a => !existingFacpIds.has(a.id));
+  if (facpToPush.length > 0) INITIAL_ASSETS.push(...facpToPush);
+}
+
 
 // -------------------------------------------------------------
 // DATE RANGE & TIMELINE FILTER UTILITY
@@ -7642,18 +7648,19 @@ function loadState() {
     localStorage.setItem('ksumc_roster_version', OFFICIAL_ROSTER_VERSION);
   }
 
-  // Assets (Synchronized with official 1,587 real extinguishers, official emergency exits, 61 FM-200 Systems & 61 FHC Cabinets)
-  const OFFICIAL_ASSETS_VERSION = '2026.10.12_KSU_REAL_EXTINGUISHERS_REGISTRY_1587_V3';
+  // Assets (Synchronized with official 1,587 real extinguishers, official emergency exits, 61 FM-200 Systems, 61 FHC Cabinets & 10 FACP Panels)
+  const OFFICIAL_ASSETS_VERSION = '2026.11.09_KSU_FACP_REGISTRY_V6';
   const assetsVersion = localStorage.getItem('ksumc_assets_version');
   const storedAssets = localStorage.getItem(STORAGE_KEY_ASSETS);
   const realExtinguishers = (typeof KSU_REAL_EXTINGUISHERS !== 'undefined' && Array.isArray(KSU_REAL_EXTINGUISHERS)) ? KSU_REAL_EXTINGUISHERS : [];
   const realFM200 = (typeof KSU_FM200_ASSETS !== 'undefined' && Array.isArray(KSU_FM200_ASSETS)) ? KSU_FM200_ASSETS : [];
   const realFHC = (typeof KSU_FHC_ASSETS !== 'undefined' && Array.isArray(KSU_FHC_ASSETS)) ? KSU_FHC_ASSETS : [];
-  const otherAssets = INITIAL_ASSETS.filter(a => a.category !== 'طفايات الحريق' && !a.id.startsWith('FE-') && !a.id.startsWith('EXT-') && !(a.category && a.category.includes('FM-200')) && !(a.category && a.category.includes('صناديق') && a.id && a.id.startsWith('PL')));
+  const realFACP = (typeof KSU_FACP_ASSETS !== 'undefined' && Array.isArray(KSU_FACP_ASSETS)) ? KSU_FACP_ASSETS : [];
+  const otherAssets = INITIAL_ASSETS.filter(a => a.category !== 'طفايات الحريق' && !a.id.startsWith('FE-') && !a.id.startsWith('EXT-') && !(a.category && a.category.includes('FM-200')) && !(a.category && a.category.includes('صناديق') && a.id && a.id.startsWith('PL')) && !(a.id && a.id.startsWith('FACP-')));
 
   if (assetsVersion !== OFFICIAL_ASSETS_VERSION || !storedAssets || (storedAssets && JSON.parse(storedAssets).length < 1800)) {
-    // Purge previous extinguishers and adopt official 1,587 registry
-    state.assets = [...realExtinguishers, ...otherAssets, ...realFM200, ...realFHC];
+    // Purge previous extinguishers and adopt official 1,587 registry + FACP registry
+    state.assets = [...realExtinguishers, ...otherAssets, ...realFM200, ...realFHC, ...realFACP];
     localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(state.assets));
     localStorage.setItem('ksumc_assets_version', OFFICIAL_ASSETS_VERSION);
   } else {
@@ -7662,9 +7669,9 @@ function loadState() {
     const nonExtinguisherAssets = state.assets.filter(a => a.category !== 'طفايات الحريق' && !a.id.startsWith('FE-') && !a.id.startsWith('EXT-'));
     state.assets = [...realExtinguishers, ...nonExtinguisherAssets];
     
-    // Ensure all official exits, FM-200 systems & FHC cabinets are present even in cached state
+    // Ensure all official exits, FM-200 systems, FHC cabinets & FACP panels are present even in cached state
     const currentAssetIds = new Set(state.assets.map(a => a.id));
-    const missingAssets = [...otherAssets, ...realFM200, ...realFHC].filter(a => !currentAssetIds.has(a.id));
+    const missingAssets = [...otherAssets, ...realFM200, ...realFHC, ...realFACP].filter(a => !currentAssetIds.has(a.id));
     if (missingAssets.length > 0) {
       const seen = new Set(currentAssetIds);
       missingAssets.forEach(a => {
@@ -7674,6 +7681,12 @@ function loadState() {
         }
       });
     }
+    // Explicitly guarantee FACP panels are never missing from state.assets
+    realFACP.forEach(facp => {
+      if (!state.assets.some(a => a.id === facp.id)) {
+        state.assets.push(facp);
+      }
+    });
     localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(state.assets));
     localStorage.setItem('ksumc_assets_version', OFFICIAL_ASSETS_VERSION);
   }
@@ -7723,7 +7736,11 @@ function notifyCloudSync() {
 }
 
 function saveRounds(targetRound) {
-  localStorage.setItem(STORAGE_KEY_ROUNDS, JSON.stringify(state.rounds));
+  const serializedRounds = JSON.stringify(state.rounds || []);
+  localStorage.setItem(STORAGE_KEY_ROUNDS, serializedRounds);
+  localStorage.setItem('ksumc_field_rounds', serializedRounds);
+  localStorage.setItem('ksumc_rounds_registry', serializedRounds);
+  localStorage.setItem('ksumc_rounds', serializedRounds);
   if (typeof syncRoundsToShiftInspectionLog === 'function') {
     syncRoundsToShiftInspectionLog();
   }
@@ -7757,9 +7774,18 @@ function saveAlarms(targetAlarm) {
   localStorage.setItem(STORAGE_KEY_ALARMS, JSON.stringify(state.alarms));
   renderAlarmsList();
   updateAlarmBadges();
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveAlarm === 'function') {
-    const payload = targetAlarm || (state.alarms && state.alarms.length > 0 ? state.alarms : null);
-    if (payload) window.KSUOracleSync.saveAlarm(payload);
+  if (!window._ksumcApplyingRemoteSync) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.saveAlarm === 'function') {
+      const payload = targetAlarm || (state.alarms && state.alarms.length > 0 ? state.alarms : null);
+      if (payload) window.KSUOracleSync.saveAlarm(payload);
+    }
+    if (window.ksuFirebaseSync) {
+      if (targetAlarm && typeof window.ksuFirebaseSync.syncAlarm === 'function') {
+        try { window.ksuFirebaseSync.syncAlarm(targetAlarm); } catch (_) {}
+      } else if (typeof window.ksuFirebaseSync.syncAlarmsList === 'function' && Array.isArray(state.alarms)) {
+        try { window.ksuFirebaseSync.syncAlarmsList(state.alarms); } catch (_) {}
+      }
+    }
   }
   notifyCloudSync();
   if (typeof renderHeadOperationalCenter === 'function') renderHeadOperationalCenter();
@@ -7772,9 +7798,18 @@ function savePermits(targetPermit) {
   } catch(_) {}
   renderPermitsList();
   if (typeof updateFieldLiveCounters === 'function') updateFieldLiveCounters();
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.savePermit === 'function') {
-    const payload = targetPermit || (state.permits && state.permits.length > 0 ? state.permits : null);
-    if (payload) window.KSUOracleSync.savePermit(payload);
+  if (!window._ksumcApplyingRemoteSync) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.savePermit === 'function') {
+      const payload = targetPermit || (state.permits && state.permits.length > 0 ? state.permits : null);
+      if (payload) window.KSUOracleSync.savePermit(payload);
+    }
+    if (window.ksuFirebaseSync) {
+      if (targetPermit && typeof window.ksuFirebaseSync.syncPermit === 'function') {
+        try { window.ksuFirebaseSync.syncPermit(targetPermit); } catch (_) {}
+      } else if (typeof window.ksuFirebaseSync.syncPermitsList === 'function' && Array.isArray(state.permits)) {
+        try { window.ksuFirebaseSync.syncPermitsList(state.permits); } catch (_) {}
+      }
+    }
   }
   notifyCloudSync();
   if (typeof renderQualityDoorsAndPermitsInbox === 'function') renderQualityDoorsAndPermitsInbox();
@@ -7782,24 +7817,44 @@ function savePermits(targetPermit) {
 function saveDoors(targetDoor) {
   localStorage.setItem(STORAGE_KEY_DOORS, JSON.stringify(state.doors));
   renderDoorsList();
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveDoor === 'function') {
-    const payload = targetDoor || (state.doors && state.doors.length > 0 ? state.doors : null);
-    if (payload) window.KSUOracleSync.saveDoor(payload);
+  if (!window._ksumcApplyingRemoteSync) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.saveDoor === 'function') {
+      const payload = targetDoor || (state.doors && state.doors.length > 0 ? state.doors : null);
+      if (payload) window.KSUOracleSync.saveDoor(payload);
+    }
+    if (window.ksuFirebaseSync) {
+      if (targetDoor && typeof window.ksuFirebaseSync.syncDoor === 'function') {
+        try { window.ksuFirebaseSync.syncDoor(targetDoor); } catch (_) {}
+      } else if (typeof window.ksuFirebaseSync.syncDoorsList === 'function' && Array.isArray(state.doors)) {
+        try { window.ksuFirebaseSync.syncDoorsList(state.doors); } catch (_) {}
+      }
+    }
   }
   notifyCloudSync();
   if (typeof renderQualityDoorsAndPermitsInbox === 'function') renderQualityDoorsAndPermitsInbox();
 }
 function saveCAPA(targetCAPA) {
   if (!state.capa) state.capa = [];
+  const serializedCapa = JSON.stringify(state.capa);
   if (window.KSUBridge && typeof window.KSUBridge.writeList === 'function') {
     window.KSUBridge.writeList('ksumc_capa_registry', state.capa);
   } else {
-    localStorage.setItem('ksumc_capa_registry', JSON.stringify(state.capa));
+    localStorage.setItem('ksumc_capa_registry', serializedCapa);
   }
+  localStorage.setItem('ksumc_capa_records', serializedCapa);
   if (typeof renderFieldCAPARegistry === 'function') renderFieldCAPARegistry();
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveCAPA === 'function') {
-    const payload = targetCAPA || (state.capa && state.capa.length > 0 ? state.capa : null);
-    if (payload) window.KSUOracleSync.saveCAPA(payload);
+  if (!window._ksumcApplyingRemoteSync) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.saveCAPA === 'function') {
+      const payload = targetCAPA || (state.capa && state.capa.length > 0 ? state.capa : null);
+      if (payload) window.KSUOracleSync.saveCAPA(payload);
+    }
+    if (window.ksuFirebaseSync) {
+      if (targetCAPA && typeof window.ksuFirebaseSync.syncCAPARecord === 'function') {
+        try { window.ksuFirebaseSync.syncCAPARecord(targetCAPA); } catch (_) {}
+      } else if (typeof window.ksuFirebaseSync.syncCAPAList === 'function' && Array.isArray(state.capa)) {
+        try { window.ksuFirebaseSync.syncCAPAList(state.capa); } catch (_) {}
+      }
+    }
   }
   notifyCloudSync();
 }
@@ -7807,22 +7862,40 @@ function saveSafetyViolations(targetViol) {
   localStorage.setItem(STORAGE_KEY_SAFETY_VIOLATIONS, JSON.stringify(state.safetyViolations));
   renderSafetyViolations();
   updateViolationBadges();
-  notifyCloudSync();
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveSafetyViolation === 'function') {
-    const payload = targetViol || (state.safetyViolations && state.safetyViolations.length > 0 ? state.safetyViolations : null);
-    if (payload) window.KSUOracleSync.saveSafetyViolation(payload);
+  if (!window._ksumcApplyingRemoteSync) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.saveSafetyViolation === 'function') {
+      const payload = targetViol || (state.safetyViolations && state.safetyViolations.length > 0 ? state.safetyViolations : null);
+      if (payload) window.KSUOracleSync.saveSafetyViolation(payload);
+    }
+    if (window.ksuFirebaseSync) {
+      if (targetViol && typeof window.ksuFirebaseSync.syncSafetyViolation === 'function') {
+        try { window.ksuFirebaseSync.syncSafetyViolation(targetViol); } catch (_) {}
+      } else if (typeof window.ksuFirebaseSync.syncSafetyViolationsList === 'function' && Array.isArray(state.safetyViolations)) {
+        try { window.ksuFirebaseSync.syncSafetyViolationsList(state.safetyViolations); } catch (_) {}
+      }
+    }
   }
+  notifyCloudSync();
   if (typeof renderHeadOperationalCenter === 'function') renderHeadOperationalCenter();
 }
 function saveSmokingViolations(targetViol) {
   localStorage.setItem(STORAGE_KEY_SMOKING_VIOLATIONS, JSON.stringify(state.smokingViolations));
   renderSmokingViolations();
   updateViolationBadges();
-  notifyCloudSync();
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveSmokingViolation === 'function') {
-    const payload = targetViol || (state.smokingViolations && state.smokingViolations.length > 0 ? state.smokingViolations : null);
-    if (payload) window.KSUOracleSync.saveSmokingViolation(payload);
+  if (!window._ksumcApplyingRemoteSync) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.saveSmokingViolation === 'function') {
+      const payload = targetViol || (state.smokingViolations && state.smokingViolations.length > 0 ? state.smokingViolations : null);
+      if (payload) window.KSUOracleSync.saveSmokingViolation(payload);
+    }
+    if (window.ksuFirebaseSync) {
+      if (targetViol && typeof window.ksuFirebaseSync.syncSmokingViolation === 'function') {
+        try { window.ksuFirebaseSync.syncSmokingViolation(targetViol); } catch (_) {}
+      } else if (typeof window.ksuFirebaseSync.syncSmokingViolationsList === 'function' && Array.isArray(state.smokingViolations)) {
+        try { window.ksuFirebaseSync.syncSmokingViolationsList(state.smokingViolations); } catch (_) {}
+      }
+    }
   }
+  notifyCloudSync();
   if (typeof renderHeadOperationalCenter === 'function') renderHeadOperationalCenter();
 }
 function updateViolationBadges() {
@@ -8101,6 +8174,8 @@ function getFilteredAssets() {
         matchType = (a.category && (a.category.includes('صناديق') || a.category.includes('خراطيم'))) ||
                     (a.type && (a.type.includes('صندوق') || a.type.includes('خرطوم'))) ||
                     (a.id && (a.id.startsWith('FHC-') || a.id.startsWith('FH-') || a.id.startsWith('PL0') || a.id.startsWith('PL')));
+      } else if (type === 'لوحات إنذار الحريق' || type.includes('إنذار') || type.includes('FACP')) {
+        matchType = (a.category && a.category.includes('إنذار')) || (a.id && a.id.startsWith('FACP-')) || (a.type && a.type.includes('FACP'));
       } else {
         matchType = (a.type && a.type.includes(type)) || (a.name && a.name.includes(type)) || (a.category && a.category.includes(type));
       }
@@ -8188,6 +8263,7 @@ function renderAssetsTableRows(filtered) {
               a.category === 'طفايات الحريق' ? 'local_fire_department' :
               a.category === 'مخارج الطوارئ' ? 'sensor_door' :
               (a.category && a.category.includes('FM')) ? 'air' :
+              (a.category && (a.category.includes('إنذار') || a.category.includes('لوحات'))) ? 'emergency_home' :
               a.category === 'صناديق وخراطيم الإطفاء' ? 'fire_hydrant' : 'qr_code_2'
             }</span>
           </span>
@@ -9459,7 +9535,7 @@ window.printAllPortalCards = printAllPortalCards;
 const BUILDING_FLOOR_MAP = {
   'المستشفى': ['القبو الثاني (B2)', 'القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'الدور الرابع (4)', 'الدور الخامس (5)', 'الدور السادس (6)', 'السطح (Roof)'],
   'التوسعة الشرقية': ['القبو الثاني (B2)', 'القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'الدور الرابع (4)', 'الدور الخامس (5)', 'ملحق السطح والخدمات (Roof)'],
-  'كلية الطب': ['الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'السطح (Roof)'],
+  'كلية الطب': ['القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'السطح (Roof)'],
   'توسعة كلية الطب': ['القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'السطح (Roof)'],
   'المبنى الإداري': ['القبو الثاني (B2)', 'القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'الدور الرابع (4)', 'السطح (Roof)'],
   'مبنى العيادات': ['القبو الأول (B1)', 'القبو (B)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)', 'السطح (Roof)'],
@@ -9514,7 +9590,8 @@ function resolveCanonicalBuildingCode(rawBuilding) {
 
   // 3. كلية الطب (East Medicine College - Code C - Blocks 1, 2, 4, 5, 7, 8, 22, 23)
   if (
-    (b.includes('كلية الطب') || b.includes('كليه الطب') || b.includes('المبنى الشرقي لكلية الطب') || b.toLowerCase().includes('east medicine college')) &&
+    (b.includes('كلية الطب') || b.includes('كليه الطب') || b.includes('المبنى الشرقي') || b.toLowerCase().includes('east medicine college')) &&
+    !b.includes('المستشفى الشرقي') &&
     !b.includes('توسعة') &&
     !b.includes('توسعه') &&
     !b.includes('الغربي')
@@ -9674,6 +9751,28 @@ function getAllPlantRoomAssets() {
   return (typeof KSU_PLANT_ROOM_ASSETS !== 'undefined' && Array.isArray(KSU_PLANT_ROOM_ASSETS)) ? KSU_PLANT_ROOM_ASSETS : [];
 }
 
+function getAllFacpAssets() {
+  if (typeof KSU_FACP_ASSETS !== 'undefined' && Array.isArray(KSU_FACP_ASSETS) && KSU_FACP_ASSETS.length > 0) {
+    return KSU_FACP_ASSETS;
+  }
+  const fromState = (state.assets || []).filter(a => {
+    if (!a) return false;
+    // Strictly exclude extinguishers and hose cabinets
+    if (a.category && (a.category.includes('طفايات') || a.category.includes('صناديق') || a.category.includes('خراطيم'))) return false;
+    if (a.id && (a.id.startsWith('FE-') || a.id.startsWith('EXT-') || a.id.startsWith('FHC-') || a.id.startsWith('FH-') || a.id.startsWith('PL'))) return false;
+    return (
+      (a.category && (a.category.includes('لوحات إنذار') || a.category.includes('لوحة إنذار') || (a.category.includes('لوحات') && !a.category.includes('طفايات')))) ||
+      (a.id && (a.id.startsWith('FACP-') || a.id.startsWith('FA-') || a.id.startsWith('FA00') || a.id.startsWith('NM-'))) ||
+      (a.type && (a.type.includes('لوحة إنذار') || a.type.includes('FACP')))
+    );
+  });
+  if (fromState.length > 0) return fromState;
+  return (typeof KSU_FACP_ASSETS !== 'undefined' && Array.isArray(KSU_FACP_ASSETS)) ? KSU_FACP_ASSETS : [];
+}
+if (typeof window !== 'undefined') {
+  window.getAllFacpAssets = getAllFacpAssets;
+}
+
 function populateRoundFloorOptions(selectedBuilding, desiredFloor = null) {
   const floorSelect = document.getElementById('inp-round-floor');
   if (!floorSelect) return;
@@ -9818,9 +9917,55 @@ function populateRoundFloorOptions(selectedBuilding, desiredFloor = null) {
     return;
   }
 
+  if (formType === 'fas_insp' || formType === 'fas_test') {
+    const facpAssets = getAllFacpAssets();
+    const bldFacpAssets = facpAssets.filter(a => matchBuilding(a.building || a.buildingTab, selectedBuilding));
+    const baseFloors = [...(BUILDING_FLOOR_MAP[selectedBuilding] || ['القبو الأول (B1)', 'الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)'])];
+
+    // Ensure any floor present in bldFacpAssets is included
+    bldFacpAssets.forEach(a => {
+      if (a.floor && !baseFloors.some(f => matchFloor(f, a.floor))) {
+        baseFloors.push(a.floor);
+      }
+    });
+
+    const optionsHtml = baseFloors.map(f => {
+      const cnt = bldFacpAssets.filter(a => matchFloor(a.floor, f)).length;
+      const cntBadge = cnt > 0 ? ` — [${cnt === 1 ? 'لوحة إنذار واحدة' : (cnt === 2 ? 'لوحتان' : `${cnt} لوحات`)}]` : '';
+      return `<option value="${f}">${f}${cntBadge}</option>`;
+    });
+    floorSelect.innerHTML = optionsHtml.join('');
+
+    let defaultTargetFloor = 'الدور الأرضي (G)';
+    const firstWithPanel = baseFloors.find(f => bldFacpAssets.some(a => matchFloor(a.floor, f)));
+    if (matchBuilding(selectedBuilding, 'كلية الطب')) {
+      defaultTargetFloor = 'القبو الأول (B1)';
+    } else if (firstWithPanel) {
+      defaultTargetFloor = firstWithPanel;
+    }
+
+    const currentDraftFloor = (state.currentRoundDraft && state.currentRoundDraft.building === selectedBuilding) ? state.currentRoundDraft.floor : null;
+    const hasPanelsOnCurrentDraftFloor = currentDraftFloor && bldFacpAssets.some(a => matchFloor(a.floor, currentDraftFloor));
+
+    const targetFloor = desiredFloor || (hasPanelsOnCurrentDraftFloor ? currentDraftFloor : defaultTargetFloor);
+    if (baseFloors.includes(targetFloor)) {
+      floorSelect.value = targetFloor;
+    } else {
+      floorSelect.value = defaultTargetFloor;
+    }
+    if (state.currentRoundDraft) {
+      state.currentRoundDraft.floor = floorSelect.value;
+    }
+    return;
+  }
+
   const floors = BUILDING_FLOOR_MAP[selectedBuilding] || ['الدور الأرضي (G)', 'الدور الأول (1)', 'الدور الثاني (2)', 'الدور الثالث (3)'];
   floorSelect.innerHTML = floors.map(f => `<option value="${f}">${f}</option>`).join('');
-  const targetFloor = desiredFloor || state.currentRoundDraft?.floor || 'الدور الأرضي (G)';
+  let defaultTargetFloor = 'الدور الأرضي (G)';
+  if ((formType === 'fas_insp' || formType === 'fas_test') && matchBuilding(selectedBuilding, 'كلية الطب')) {
+    defaultTargetFloor = 'القبو الأول (B1)';
+  }
+  const targetFloor = desiredFloor || (state.currentRoundDraft && state.currentRoundDraft.building === selectedBuilding ? state.currentRoundDraft.floor : null) || defaultTargetFloor;
   if (floors.includes(targetFloor)) {
     floorSelect.value = targetFloor;
   } else {
@@ -9867,6 +10012,14 @@ function populateDynamicDropdowns() {
           const displayName = bldAliasLabels[b.name] || b.name;
           return `<option value="${b.name}">[${b.code}] ${displayName}${cnt > 0 ? ` — (${cnt} غرفة صناعية)` : ' — (0)'}</option>`;
         }).join('');
+    } else if (formType === 'fas_insp' || formType === 'fas_test') {
+      const facpAssets = getAllFacpAssets();
+      buildingSelect.innerHTML = bldList.map(b => {
+        const cnt = facpAssets.filter(a => matchBuilding(a.building || a.buildingTab, b.name)).length;
+        const displayName = bldAliasLabels[b.name] || b.name;
+        const cntText = cnt === 1 ? 'لوحة إنذار واحدة' : (cnt === 2 ? 'لوحتان' : `${cnt} لوحات إنذار`);
+        return `<option value="${b.name}">[${b.code}] ${displayName}${cnt > 0 ? ` — (${cntText})` : ' — (0)'}</option>`;
+      }).join('');
     } else {
       buildingSelect.innerHTML = bldList.map(b => {
         const displayName = bldAliasLabels[b.name] || b.name;
@@ -9971,6 +10124,11 @@ function onRoundBuildingChange(buildingName) {
 
   state.currentRoundDraft.floorAssetsStatus = null;
   renderFloorAssetsReconciliation();
+
+  const formType = (state.currentRoundDraft && state.currentRoundDraft.formType) || document.getElementById('inp-round-form-type')?.value;
+  if (typeof window.updateSpecializedFormFields === 'function') {
+    window.updateSpecializedFormFields(formType);
+  }
 }
 
 function onRoundFloorChange(floorName) {
@@ -9982,6 +10140,11 @@ function onRoundFloorChange(floorName) {
   }
   state.currentRoundDraft.floorAssetsStatus = null;
   renderFloorAssetsReconciliation();
+
+  const formType = (state.currentRoundDraft && state.currentRoundDraft.formType) || document.getElementById('inp-round-form-type')?.value;
+  if (typeof window.updateSpecializedFormFields === 'function') {
+    window.updateSpecializedFormFields(formType);
+  }
 }
 
 function onFm200RoundSearch(queryStr) {
@@ -9999,9 +10162,9 @@ function renderFloorAssetsReconciliation() {
   const formType = (state.currentRoundDraft && state.currentRoundDraft.formType) || document.getElementById('inp-round-form-type')?.value || 'fex';
   const fm200Search = (state.currentRoundDraft?.fm200SearchQuery || '').trim().toLowerCase();
 
-  // 5 inspection forms currently have registered assets in the system:
-  // Fire Extinguishers (fex), FM-200 (fm200), Emergency Exits (ext), Fire Hose Cabinets (fhc), Plant Rooms (ind_room)
-  const assetSupportedForms = ['fex', 'fm200', 'ext', 'fhc', 'ind_room'];
+  // 6 inspection forms currently have registered assets in the system:
+  // Fire Extinguishers (fex), FM-200 (fm200), Emergency Exits (ext), Fire Hose Cabinets (fhc), Plant Rooms (ind_room), Fire Alarm Panels (fas_insp, fas_test)
+  const assetSupportedForms = ['fex', 'fm200', 'ext', 'fhc', 'ind_room', 'fas_insp', 'fas_test'];
   if (!assetSupportedForms.includes(formType)) {
     container.classList.add('hidden');
     container.innerHTML = '';
@@ -10045,6 +10208,12 @@ function renderFloorAssetsReconciliation() {
     floorAssets = allPlantRooms.filter(a =>
       matchBuilding(a.building || a.buildingTab, currentBuilding) &&
       matchFloor(a.floor, currentFloor)
+    );
+  } else if (formType === 'fas_insp' || formType === 'fas_test') {
+    const allFacp = getAllFacpAssets();
+    floorAssets = allFacp.filter(a =>
+      matchBuilding(a.building || a.buildingTab, currentBuilding) &&
+      (currentFloor === 'all' || matchFloor(a.floor, currentFloor))
     );
   } else {
     floorAssets = (state.assets || []).filter(a => matchBuilding(a.building, currentBuilding) && matchFloor(a.floor, currentFloor));
@@ -10109,9 +10278,11 @@ function renderFloorAssetsReconciliation() {
                 ? 'سجل أصول ومطابقة أنظمة الإطفاء بالغاز النظيف (FM-200) بالمدينة الطبية (61 نظام معتمد)'
                 : (formType === 'ind_room'
                     ? 'سجل أصول ومطابقة الغرف الصناعية ومحطات الخدمات بالمدينة الطبية (40 غرفة معتمدة)'
-                    : (formType === 'elevators'
-                        ? 'سجل ومطابقة مصاعد المبنى ومخارج الطوارئ بالدور'
-                        : 'سجل ومطابقة أصول السلامة والوقاية بالدور (شامل)')))));
+                    : (formType === 'fas_insp' || formType === 'fas_test'
+                        ? 'سجل أصول ومطابقة لوحات نظام إنذار الحريق (Fire Alarm Control Panels - 10 لوحات معتمدة)'
+                        : (formType === 'elevators'
+                            ? 'سجل ومطابقة مصاعد المبنى ومخارج الطوارئ بالدور'
+                            : 'سجل ومطابقة أصول السلامة والوقاية بالدور (شامل)'))))));
 
   const headerIcon = formType === 'ext' 
     ? 'sensor_door' 
@@ -10121,9 +10292,11 @@ function renderFloorAssetsReconciliation() {
             ? 'air' 
             : (formType === 'ind_room'
                 ? 'precision_manufacturing'
-                : (formType === 'elevators' 
-                    ? 'elevator' 
-                    : (formType === 'fex' ? 'fire_extinguisher' : 'fact_check')))));
+                : (formType === 'fas_insp' || formType === 'fas_test'
+                    ? 'emergency_home'
+                    : (formType === 'elevators' 
+                        ? 'elevator' 
+                        : (formType === 'fex' ? 'fire_extinguisher' : 'fact_check'))))));
 
   // Build FM-200 Quick Building & Floor Filter Bar if formType === 'fm200'
   let fm200FilterPanelHtml = '';
@@ -10377,7 +10550,7 @@ function renderFloorAssetsReconciliation() {
           <div class="p-6 rounded-xl bg-surface-container-low border border-dashed border-outline-variant text-center flex flex-col items-center gap-2">
             <span class="material-symbols-outlined text-3xl text-primary/60">inventory_2</span>
             <p class="text-xs font-bold text-primary">لا توجد أصول مسجلة لهذا النموذج في (${currentBuilding === 'all' ? 'جميع المباني' : currentBuilding} — ${currentFloor === 'all' ? 'جميع الأدوار' : currentFloor}).</p>
-            <p class="text-[11px] text-on-surface-variant">النماذج المزودة بأصول مسجلة حالياً: طفايات الحريق، نظام FM-200، مخارج الطوارئ، وصناديق الحريق.</p>
+            <p class="text-[11px] text-on-surface-variant">النماذج المزودة بأصول مسجلة حالياً: طفايات الحريق، نظام FM-200، مخارج الطوارئ، صناديق الحريق، ولوحات إنذار الحريق (SBC 801).</p>
           </div>
         ` : floorAssets.map((asset) => {
           const status = state.currentRoundDraft.floorAssetsStatus[asset.id] || 'pending';
@@ -10387,9 +10560,10 @@ function renderFloorAssetsReconciliation() {
           const isFhcAsset = (asset.category && (asset.category.includes('صناديق') || asset.category.includes('خراطيم'))) || (asset.type && (asset.type.includes('صندوق') || asset.type.includes('خرطوم'))) || (asset.id && (asset.id.startsWith('FHC-') || asset.id.startsWith('FH-') || asset.id.startsWith('PL0') || asset.id.startsWith('PL')));
           const isFm200Asset = (asset.category && (asset.category.includes('FM') || asset.category.includes('غاز'))) || (asset.id && asset.id.startsWith('FM'));
           const isIndAsset = (asset.category && asset.category.includes('الغرف الصناعية')) || (asset.id && asset.id.startsWith('IND-'));
+          const isFacpAsset = (asset.category && (asset.category.includes('إنذار') || asset.category.includes('لوحات'))) || (asset.id && asset.id.startsWith('FACP-'));
           const isExtAsset = asset.category === 'طفايات الحريق' || (asset.id && (asset.id.startsWith('FE-') || asset.id.startsWith('EXT-')));
-          const assetIconName = isExitAsset ? 'sensor_door' : (isFhcAsset ? 'fire_hydrant' : (isFm200Asset ? 'air' : (isIndAsset ? 'precision_manufacturing' : (isExtAsset ? 'fire_extinguisher' : 'inventory_2'))));
-          const assetBadgeColor = isExitAsset ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : (isFhcAsset ? 'bg-red-50 text-red-800 border-red-200' : (isFm200Asset ? 'bg-sky-50 text-sky-900 border-sky-200' : (isIndAsset ? 'bg-indigo-50 text-indigo-900 border-indigo-200' : 'bg-amber-50 text-amber-800 border-amber-200')));
+          const assetIconName = isFacpAsset ? 'emergency_home' : (isExitAsset ? 'sensor_door' : (isFhcAsset ? 'fire_hydrant' : (isFm200Asset ? 'air' : (isIndAsset ? 'precision_manufacturing' : (isExtAsset ? 'fire_extinguisher' : 'inventory_2')))));
+          const assetBadgeColor = isFacpAsset ? 'bg-red-50 text-red-900 border-red-200' : (isExitAsset ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : (isFhcAsset ? 'bg-red-50 text-red-800 border-red-200' : (isFm200Asset ? 'bg-sky-50 text-sky-900 border-sky-200' : (isIndAsset ? 'bg-indigo-50 text-indigo-900 border-indigo-200' : 'bg-amber-50 text-amber-800 border-amber-200'))));
           
           return `
             <div class="rounded-xl border ${isCompliant ? 'border-emerald-500 bg-emerald-50/20' : (isObservation ? 'border-red-400 bg-red-50/20' : 'border-outline-variant/50 bg-surface-container-lowest')} p-3 flex flex-col sm:flex-row items-center justify-between gap-2 transition-all hover:shadow-sm">
@@ -10417,6 +10591,9 @@ function renderFloorAssetsReconciliation() {
                     <span>${asset.category || 'أصل سلامة'}</span>
                   </span>
                   ${asset.block ? `<span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-bold font-mono">${asset.block}</span>` : ''}
+                  ${asset.loopsCount ? `<span class="px-2 py-0.5 rounded-full bg-red-100 text-red-950 border border-red-300 text-[10px] font-bold font-mono">🔄 ${asset.loopsCount} دوائر</span>` : ''}
+                  ${asset.devicesCount ? `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-950 border border-amber-300 text-[10px] font-bold font-mono">📡 ${asset.devicesCount.toLocaleString()} نقطة/جهاز</span>` : ''}
+                  ${asset.zone ? `<span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-bold">التغطية: ${asset.zone}</span>` : ''}
                   ${asset.manufacturer ? `<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200 text-[10px] font-bold">${asset.manufacturer}${asset.model ? ' - ' + asset.model : ''}</span>` : ''}
                   ${isCompliant 
                     ? `<span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold"><span class="material-symbols-outlined text-xs">check</span> فحصت وسليمة</span>`
@@ -10468,6 +10645,16 @@ function verifyAllFloorAssets() {
       matchBuilding(a.building || a.buildingTab, currentBuilding) &&
       matchFloor(a.floor, currentFloor)
     );
+  } else if (formType === 'fas_insp' || formType === 'fas_test') {
+    floorAssets = getAllFacpAssets().filter(a =>
+      matchBuilding(a.building || a.buildingTab, currentBuilding) &&
+      matchFloor(a.floor, currentFloor)
+    );
+  } else if (formType === 'ind_room') {
+    floorAssets = getAllPlantRoomAssets().filter(a =>
+      matchBuilding(a.building || a.buildingTab, currentBuilding) &&
+      matchFloor(a.floor, currentFloor)
+    );
   } else {
     floorAssets = (state.assets || []).filter(a => matchBuilding(a.building, currentBuilding) && matchFloor(a.floor, currentFloor));
     if (formType === 'fex') floorAssets = floorAssets.filter(a => a.category === 'طفايات الحريق' || (a.id && (a.id.startsWith('FE-') || a.id.startsWith('EXT-'))));
@@ -10484,7 +10671,7 @@ function verifyAllFloorAssets() {
   });
 
   renderFloorAssetsReconciliation();
-  const label = formType === 'ext' ? 'مخارج طوارئ' : (formType === 'fhc' ? 'صناديق حريق' : (formType === 'fm200' ? 'أنظمة الإطفاء بغاز FM-200' : 'أصول سلامة'));
+  const label = formType === 'ext' ? 'مخارج طوارئ' : (formType === 'fhc' ? 'صناديق حريق' : (formType === 'fm200' ? 'أنظمة الإطفاء بغاز FM-200' : ((formType === 'fas_insp' || formType === 'fas_test') ? 'لوحات إنذار الحريق' : (formType === 'ind_room' ? 'الغرف الصناعية' : 'أصول سلامة'))));
   showToast(`تم فحص وتأكيد جاهزية جميع ${label} (${floorAssets.length}) بنجاح بنسبة 100%.`, 'success');
 }
 
@@ -10497,6 +10684,8 @@ function toggleFloorAssetStatus(assetId, status) {
       showToast('تعليمات فحص صندوق الحريق: التأكد من سلامة الصندوق والزجاج، خلو الممر من العوائق، سلامة محبس المياه والبكرة وفوهة القذف وعدم وجود أي تسريب مياه.', 'info');
     } else if (formType === 'fm200') {
       showToast('تعليمات فحص نظام FM-200: التحقق من ضغط الأسطوانات في النطاق الأخضر، سلامة لوحة التحكم وخلوها من أعطال (Fault/Trouble)، وجود مسمار الأمان على وحدة الإطلاق اليدوي، سلامة الفوهات، وإحكام إغلاق الغرفة.', 'info');
+    } else if (formType === 'fas_insp' || formType === 'fas_test') {
+      showToast('تعليمات فحص لوحة إنذار الحريق: التأكد من خلو اللوحة من إشارات الأعطال (Trouble)، استقرار التيار الكهربائي AC، سلامة شحن البطاريات، وسلامة مصابيح البيان ومفاتيح التشغيل.', 'info');
     } else {
       showToast('تعليمات فحص الطفاية: التأكد من مؤشر الضغط في النطاق الأخضر، سريان بطاقة الفحص الشهرية، سلامة مسمار الأمان والخرطوم، وسهولة الوصول إليها.', 'info');
     }
@@ -10510,6 +10699,22 @@ function toggleFloorAssetStatus(assetId, status) {
     state.currentRoundDraft.floorAssetsStatus[assetId] = 'pending';
   } else {
     state.currentRoundDraft.floorAssetsStatus[assetId] = status;
+    if (status === 'compliant' && (formType === 'fas_insp' || formType === 'fas_test')) {
+      const allFacp = (typeof getAllFacpAssets === 'function') ? getAllFacpAssets() : [];
+      const panel = allFacp.find(p => p.id === assetId || p.controlNo === assetId);
+      if (panel) {
+        state.currentRoundDraft.facpAssetId = panel.id;
+        state.currentRoundDraft.zone = panel.zone;
+        state.currentRoundDraft.loopNo = panel.loopsCount;
+        state.currentRoundDraft.devicesNo = panel.devicesCount;
+        const inpLoop = document.getElementById('inp-round-loop');
+        const inpDev = document.getElementById('inp-round-devices');
+        const inpPpm = document.getElementById('inp-round-ppm-date');
+        if (inpLoop && panel.loopsCount) inpLoop.value = String(panel.loopsCount);
+        if (inpDev && panel.devicesCount) inpDev.value = String(panel.devicesCount);
+        if (inpPpm && panel.nextPpmDate) inpPpm.value = panel.nextPpmDate;
+      }
+    }
   }
   renderFloorAssetsReconciliation();
 }
@@ -11372,13 +11577,101 @@ function applySystemMetrics() {
 // -------------------------------------------------------------
 // EXISTING INSPECTION & OPERATIONS LOGIC
 // -------------------------------------------------------------
+function normalizeShiftIdentifierForScope(raw) {
+  const s = String(raw || '').trim().toLowerCase();
+  if (!s || s === 'all' || s.includes('جميع')) return '';
+  if (s === 'shift1' || s.includes('1') || s.includes('صباح') || s.includes('الأولى') || s.includes('الاولى') || /^m1\b/i.test(s)) return 'shift1';
+  if (s === 'shift2' || s.includes('2') || s.includes('مسائ') || s.includes('الثانية') || /^m2\b/i.test(s)) return 'shift2';
+  if (s === 'shift3' || s.includes('3') || s.includes('ليل') || s.includes('الثالثة') || /^m3\b/i.test(s)) return 'shift3';
+  return s;
+}
+
+function isRecordOwnedByCurrentUser(r, user) {
+  if (!r || !user) return false;
+  const uId = String(user.id || '').trim().toLowerCase();
+  const uEmp = String(user.empId || user.employeeId || '').trim().toLowerCase();
+  const uUser = String(user.username || '').trim().toLowerCase();
+  const uName = String(user.name || '').trim();
+
+  const rInspId = String(r.inspectorId || '').trim().toLowerCase();
+  const rUser = String(r.inspectorUsername || '').trim().toLowerCase();
+  const rBadge = String(r.badge || r.employeeId || '').trim().toLowerCase();
+  const rName = String(r.inspector || r.reportedBy || '').trim();
+
+  if (uId && rInspId && uId === rInspId) return true;
+  if (uUser && (rUser === uUser || rBadge === uUser || rInspId === uUser)) return true;
+  if (uEmp && (rBadge === uEmp || rUser === uEmp || rInspId === uEmp)) return true;
+  if (uName && rName && (rName === uName || rName.includes(uName) || uName.includes(rName))) return true;
+  return false;
+}
+
+function getScopedRoundsForCurrentUser(roundsList, filterMode = 'none') {
+  let list = Array.isArray(roundsList) ? roundsList.slice() : [];
+  const currentUserObj = state.currentUser || (window.KSUAuth && typeof window.KSUAuth.getUser === 'function' ? window.KSUAuth.getUser() : null);
+
+  if (currentUserObj) {
+    const roleCat = (typeof getUserRoleCategory === 'function')
+      ? getUserRoleCategory(currentUserObj)
+      : ((window.KSUAuth && typeof window.KSUAuth.getRoleCategory === 'function') ? window.KSUAuth.getRoleCategory(currentUserObj) : (currentUserObj.roleCategory || 'field_inspector'));
+    const isDev = (typeof isSystemDeveloper === 'function')
+      ? isSystemDeveloper(currentUserObj)
+      : (currentUserObj.id === 'USR-01' || currentUserObj.role === 'admin' || roleCat === 'developer' || roleCat === 'admin');
+    const isSupervisorOrHigher = isDev || ['shift_supervisor', 'head', 'quality', 'executive', 'admin', 'developer'].includes(roleCat) || (currentUserObj.role && currentUserObj.role.includes('مشرف'));
+
+    if (!isSupervisorOrHigher) {
+      const userShift = normalizeShiftIdentifierForScope(currentUserObj.shift || currentUserObj.empId || currentUserObj.role);
+      if (userShift) {
+        list = list.filter(r => {
+          if (!r) return false;
+          if (isRecordOwnedByCurrentUser(r, currentUserObj)) return true;
+          const recShift = normalizeShiftIdentifierForScope(r.shift || r.shiftName);
+          return recShift === userShift;
+        });
+      }
+    }
+  }
+
+  if (filterMode === 'today') {
+    const todayStr = new Date().toISOString().split('T')[0];
+    list = list.filter(r => r && String(r.date || '') === todayStr);
+  } else if (filterMode === 'mine') {
+    if (currentUserObj) {
+      list = list.filter(r => isRecordOwnedByCurrentUser(r, currentUserObj));
+    }
+  }
+
+  return list;
+}
+window.getScopedRoundsForCurrentUser = getScopedRoundsForCurrentUser;
+
+function setFieldRoundsFilter(filterKey) {
+  state.fieldRoundsFilter = filterKey || 'all';
+  ['all', 'today', 'mine'].forEach(k => {
+    const btn = document.getElementById(`btn-rounds-filter-${k}`);
+    if (btn) {
+      if (k === state.fieldRoundsFilter) {
+        btn.className = 'rounds-quick-filter-btn px-3 py-1.5 rounded-xl bg-primary text-white font-black text-xs shadow-xs transition-all';
+      } else {
+        btn.className = 'rounds-quick-filter-btn px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs transition-all';
+      }
+    }
+  });
+  updateDashboardKPIs();
+  if (typeof renderInspectorWorkflowTracker === 'function') {
+    renderInspectorWorkflowTracker();
+  }
+}
+window.setFieldRoundsFilter = setFieldRoundsFilter;
+
 function updateDashboardKPIs() {
   let totalItems = 0;
   let totalCompliant = 0;
   let totalObservations = 0;
   let totalViolations = 0;
 
-  state.rounds.forEach(r => {
+  const scopedRounds = getScopedRoundsForCurrentUser(state.rounds || [], 'none');
+
+  scopedRounds.forEach(r => {
     totalItems += (r.compliantCount || 0) + (r.observationCount || 0) + (r.violationCount || 0);
     totalCompliant += (r.compliantCount || 0);
     totalObservations += (r.observationCount || 0);
@@ -11399,13 +11692,24 @@ function updateDashboardKPIs() {
   const elSidebarBar = document.getElementById('kpi-sidebar-bar');
   const elPendingRisks = document.getElementById('kpi-pending-risks');
   const elTotalRounds = document.getElementById('kpi-total-rounds');
+  const elPendingObs = document.getElementById('kpi-pending-obs');
+  const elCriticalViols = document.getElementById('kpi-critical-viols');
 
   if (elRate) elRate.textContent = rate + '%';
   if (elRateBar) elRateBar.style.width = rate + '%';
   if (elSidebarRate) elSidebarRate.textContent = rate + '%';
   if (elSidebarBar) elSidebarBar.style.width = rate + '%';
-  if (elPendingRisks) elPendingRisks.textContent = totalViolations;
-  if (elTotalRounds) elTotalRounds.textContent = state.rounds.length;
+  if (elPendingRisks) elPendingRisks.textContent = String(totalViolations);
+  if (elTotalRounds) elTotalRounds.textContent = String(scopedRounds.length);
+  if (elPendingObs) elPendingObs.textContent = String(totalObservations);
+  if (elCriticalViols) elCriticalViols.textContent = String(totalViolations);
+
+  const elFilterCountAll = document.getElementById('rounds-filter-count-all');
+  const elFilterCountToday = document.getElementById('rounds-filter-count-today');
+  const elFilterCountMine = document.getElementById('rounds-filter-count-mine');
+  if (elFilterCountAll) elFilterCountAll.textContent = String(scopedRounds.length);
+  if (elFilterCountToday) elFilterCountToday.textContent = String(getScopedRoundsForCurrentUser(state.rounds || [], 'today').length);
+  if (elFilterCountMine) elFilterCountMine.textContent = String(getScopedRoundsForCurrentUser(state.rounds || [], 'mine').length);
 
   applySystemMetrics();
   renderRoundsTables();
@@ -11415,7 +11719,10 @@ function renderRoundsTables() {
   const container = document.getElementById('rounds-list-container');
   if (!container) return;
 
-  if (state.rounds.length === 0) {
+  const activeFilter = state.fieldRoundsFilter || 'all';
+  const displayRounds = getScopedRoundsForCurrentUser(state.rounds || [], activeFilter === 'all' ? 'none' : activeFilter);
+
+  if (displayRounds.length === 0) {
     container.innerHTML = `
       <div class="p-8 text-center text-on-surface-variant bg-surface-container-low rounded-xl">
         <span class="material-symbols-outlined text-4xl text-outline-variant mb-2">checklist</span>
@@ -11430,19 +11737,19 @@ function renderRoundsTables() {
   const isDev = (typeof isSystemDeveloper === 'function') ? isSystemDeveloper(currentUserObj) : (currentUserObj && (currentUserObj.id === 'USR-01' || currentUserObj.role === 'admin'));
   const isSupervisor = roleCat === 'shift_supervisor' || isDev || (currentUserObj && currentUserObj.role && currentUserObj.role.includes('مشرف'));
 
-  container.innerHTML = state.rounds.map(r => {
+  container.innerHTML = displayRounds.map(r => {
     let workflowBadge = '';
     let supervisorActionBtn = '';
+    const roundShiftTitle = (typeof getShiftTitleArabic === 'function') ? getShiftTitleArabic(r.shift || r.shiftName) : 'الوردية المناوبة';
 
     if (r.workflowStatus === 'approved_cbahi' || r.workflowStatus === 'approved_quality') {
       workflowBadge = `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-black border border-emerald-300">معتمد في سجل الامتثال (CBAHI) ✓</span>`;
     } else if (r.workflowStatus === 'pending_quality') {
-      workflowBadge = `<span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[11px] font-black border border-sky-300">معتمد من المشرف - بانتظار الجودة</span>`;
+      workflowBadge = `<span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[11px] font-black border border-sky-300">${r.workflowStatusLabel || 'مرسل لقسم الجودة وتقييم الأداء - بانتظار الاعتماد'}</span>`;
     } else if (r.workflowStatus === 'returned_by_quality') {
       workflowBadge = `<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[11px] font-black border border-rose-300">معاد من الجودة للتصحيح ⚠️</span>`;
     } else {
       const canApprove = (typeof canSupervisorApproveRound === 'function') ? canSupervisorApproveRound(currentUserObj, r) : false;
-      const roundShiftTitle = (typeof getShiftTitleArabic === 'function') ? getShiftTitleArabic(r.shift || r.shiftName) : 'الوردية المناوبة';
 
       if (canApprove) {
         workflowBadge = `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-black border border-amber-300">بانتظار اعتمادك (مشرف ${roundShiftTitle})</span>`;
@@ -11778,6 +12085,40 @@ function openNewRoundModal(formType = 'all', targetBuilding = null) {
       shiftSelect.value = activeShiftKey;
     }
 
+    // 3c. Inspector Card UI handling: Auto-bind for fas_insp & fas_test
+    const manualInspGroup = document.getElementById('round-inspector-manual-selection-group');
+    const autoBoundBadge = document.getElementById('round-inspector-auto-bound-badge');
+    const autoNameEl = document.getElementById('round-inspector-auto-name');
+    const autoBadgeEl = document.getElementById('round-inspector-auto-badge');
+    const autoShiftEl = document.getElementById('round-inspector-auto-shift');
+    const inspectorCardTitle = document.getElementById('round-inspector-card-title');
+
+    const isFireAlarmForm = (formType === 'fas_insp' || formType === 'fas_test');
+    if (isFireAlarmForm) {
+      if (manualInspGroup) {
+        manualInspGroup.classList.add('hidden');
+        manualInspGroup.style.display = 'none';
+      }
+      if (autoBoundBadge) {
+        autoBoundBadge.classList.remove('hidden');
+        autoBoundBadge.style.display = 'flex';
+      }
+      if (autoNameEl) autoNameEl.textContent = defaultInspectorName;
+      if (autoBadgeEl) autoBadgeEl.textContent = `الرقم الوظيفي: ${defaultBadge}`;
+      if (autoShiftEl) autoShiftEl.textContent = typeof getShiftLabel === 'function' ? getShiftLabel(activeShiftKey) : 'الوردية الحالية';
+      if (inspectorCardTitle) inspectorCardTitle.textContent = 'ملاحظات التفتيش والإجراءات التصحيحية المعتمدة (CAPA)';
+    } else {
+      if (manualInspGroup) {
+        manualInspGroup.classList.remove('hidden');
+        manualInspGroup.style.display = '';
+      }
+      if (autoBoundBadge) {
+        autoBoundBadge.classList.add('hidden');
+        autoBoundBadge.style.display = 'none';
+      }
+      if (inspectorCardTitle) inspectorCardTitle.textContent = 'بيانات المفتش والإجراءات التصحيحية المعتمدة';
+    }
+
     // 4. Ensure current draft has current selected floor from dropdown
     const floorSelect = document.getElementById('inp-round-floor');
     if (floorSelect && floorSelect.value) {
@@ -11835,7 +12176,23 @@ function saveNewInspectionRound() {
     const actualPressure = document.getElementById('inp-round-pressure')?.value || '';
     const loopNo = document.getElementById('inp-round-loop')?.value || '';
     const devicesNo = document.getElementById('inp-round-devices')?.value || '';
+    const zone = document.getElementById('inp-round-zone')?.value || '';
+    const facpAssetId = document.getElementById('sel-round-facp-asset')?.value || '';
     const ppmDate = document.getElementById('inp-round-ppm-date')?.value || '';
+
+    // Synchronize comprehensive FACP panel metadata for fas_insp & fas_test
+    const allFacp = (typeof getAllFacpAssets === 'function') ? getAllFacpAssets() : ((typeof KSU_FACP_ASSETS !== 'undefined') ? KSU_FACP_ASSETS : []);
+    const matchedFacp = allFacp.find(p => p.id === facpAssetId || p.controlNo === facpAssetId) ||
+      (state.currentRoundDraft?.facpAssetId ? allFacp.find(p => p.id === state.currentRoundDraft.facpAssetId) : null);
+    const resolvedFacpId = facpAssetId || (matchedFacp ? matchedFacp.id : (state.currentRoundDraft?.facpAssetId || ''));
+    const resolvedFacpControlNo = (matchedFacp && matchedFacp.controlNo) ? matchedFacp.controlNo : (state.currentRoundDraft?.facpControlNo || (resolvedFacpId ? resolvedFacpId.replace('FACP-', '') : ''));
+    const resolvedFacpName = (matchedFacp && matchedFacp.name) ? matchedFacp.name : (state.currentRoundDraft?.facpName || '');
+    const resolvedFacpStatus = (matchedFacp && matchedFacp.status) ? matchedFacp.status : (state.currentRoundDraft?.facpStatus || '');
+    const resolvedFacpOpStatus = (matchedFacp && matchedFacp.operationalStatus) ? matchedFacp.operationalStatus : (state.currentRoundDraft?.facpOperationalStatus || '');
+    const resolvedZone = zone || (matchedFacp ? matchedFacp.zone : (state.currentRoundDraft?.zone || ''));
+    const resolvedLoop = loopNo || (matchedFacp ? matchedFacp.loopsCount : (state.currentRoundDraft?.loopNo || ''));
+    const resolvedDevices = devicesNo || (matchedFacp ? matchedFacp.devicesCount : (state.currentRoundDraft?.devicesNo || ''));
+    const resolvedPpmDate = ppmDate || (matchedFacp ? matchedFacp.nextPpmDate : (state.currentRoundDraft?.ppmDate || ''));
     const blok = document.getElementById('inp-round-blok')?.value || '';
     const photos = (window.roundPhotosList && window.roundPhotosList.length > 0) ? [...window.roundPhotosList] : (state.currentRoundDraft?.photos || []);
     const formTypeEl = document.getElementById('inp-round-form-type');
@@ -11885,7 +12242,7 @@ function saveNewInspectionRound() {
     const today = new Date().toISOString().split('T')[0];
     const nowIso = new Date().toISOString();
     const nowTimeStr = new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
-    const badgeCode = (currentUserObj && (currentUserObj.empId || currentUserObj.username)) ? (currentUserObj.empId || currentUserObj.username) : 'KSU-SAF-882';
+    const badgeCode = (currentUserObj && (currentUserObj.empId || currentUserObj.employeeId || currentUserObj.badge || currentUserObj.username)) ? (currentUserObj.empId || currentUserObj.employeeId || currentUserObj.badge || currentUserObj.username) : 'KSU-SAF-882';
 
     if (!Array.isArray(state.rounds)) state.rounds = [];
 
@@ -11904,7 +12261,10 @@ function saveNewInspectionRound() {
           floor,
           date: today,
           time: nowTimeStr,
+          timestamp: nowIso,
           inspector: inspector,
+          inspectorId: existingRound.inspectorId || (currentUserObj && (currentUserObj.id || currentUserObj.empId || currentUserObj.username)) || '',
+          inspectorUsername: existingRound.inspectorUsername || ((currentUserObj && currentUserObj.username) ? currentUserObj.username : ''),
           badge: existingRound.badge || badgeCode,
           shift: selectedShiftKey,
           shiftName: selectedShiftLabel,
@@ -11914,6 +12274,7 @@ function saveNewInspectionRound() {
           resubmittedAt: nowIso,
           updatedAt: nowIso,
           updatedAtMs: Date.now(),
+          _isOfflinePending: true,
           previousReturnReason: existingRound.qualityReturnReason || '',
           previousReturnNotes: existingRound.qualityReturnNotes || '',
           score,
@@ -11922,6 +12283,15 @@ function saveNewInspectionRound() {
           violationCount: violation,
           notes,
           signature: inspector,
+          loopNo: resolvedLoop,
+          devicesNo: resolvedDevices,
+          zone: resolvedZone,
+          facpAssetId: resolvedFacpId,
+          facpControlNo: resolvedFacpControlNo,
+          facpName: resolvedFacpName,
+          facpStatus: resolvedFacpStatus,
+          facpOperationalStatus: resolvedFacpOpStatus,
+          ppmDate: resolvedPpmDate,
           items: state.currentRoundDraft.items,
           workflowHistory: [
             ...(existingRound.workflowHistory || []),
@@ -11936,13 +12306,7 @@ function saveNewInspectionRound() {
         });
         state.rounds[editIdx] = updatedRound;
         state.editingRoundId = null;
-        try { saveRounds(); } catch (e) { console.warn('saveRounds error:', e); }
-        if (window.KSUOracleSync && typeof window.KSUOracleSync.saveRound === 'function') {
-          try { window.KSUOracleSync.saveRound(updatedRound); } catch (_) {}
-        }
-        if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncRound === 'function') {
-          try { window.ksuFirebaseSync.syncRound(updatedRound); } catch (_) {}
-        }
+        try { saveRounds(updatedRound); } catch (e) { console.warn('saveRounds error:', e); }
         closeNewRoundModal();
         if (typeof window.openOfficialInspectionCardModal === 'function') {
           try { window.openOfficialInspectionCardModal(updatedRound.id); } catch (_) {}
@@ -11956,13 +12320,16 @@ function saveNewInspectionRound() {
     const isDev = (typeof isSystemDeveloper === 'function') ? isSystemDeveloper(currentUserObj) : (currentUserObj && (currentUserObj.id === 'USR-01' || currentUserObj.role === 'admin'));
     const isSupervisor = roleCat === 'shift_supervisor' || isDev || (currentUserObj && currentUserObj.role && currentUserObj.role.includes('مشرف'));
 
-    const initialWorkflowStatus = isSupervisor ? 'pending_quality' : 'pending_supervisor';
-    const shiftTitle = (typeof getShiftTitleArabic === 'function') ? getShiftTitleArabic(selectedShiftKey) : 'الوردية المناوبة';
-    const initialWorkflowLabel = isSupervisor ? 'معتمد من مشرف الوردية - بانتظار اعتماد الجودة' : `بانتظار مراجعة واعتماد مشرف ${shiftTitle}`;
-    const initialHistoryLabel = isSupervisor ? 'تم رصد التفتيش واعتماده وتصديره لقسم الجودة وتقييم الأداء' : `تم رصد التفتيش الميداني ورفعه لمشرف ${shiftTitle} للاعتماد والتصدير`;
+    const initialWorkflowStatus = 'pending_quality';
+    const initialWorkflowLabel = isSupervisor
+      ? 'معتمد من مشرف الوردية - بانتظار اعتماد الجودة'
+      : 'معتمد من المفتش الميداني - بانتظار اعتماد الجودة (CBAHI)';
+    const initialHistoryLabel = isSupervisor
+      ? 'تم رصد التفتيش واعتماده وتصديره لقسم الجودة وتقييم الأداء'
+      : 'تم اعتماد جولة التفتيش الميدانية وإرسالها مباشرة لقسم الجودة وتقييم الأداء (CBAHI)';
 
     const newRound = {
-      id: 'insp-' + Date.now(),
+      id: 'insp-' + Date.now() + '-' + Math.random().toString(36).slice(2, 5),
       formType,
       formTitle,
       hospital,
@@ -11970,7 +12337,9 @@ function saveNewInspectionRound() {
       floor,
       date: today,
       time: nowTimeStr,
+      timestamp: nowIso,
       inspector: inspector,
+      inspectorId: (currentUserObj && (currentUserObj.id || currentUserObj.empId || currentUserObj.username)) ? String(currentUserObj.id || currentUserObj.empId || currentUserObj.username) : '',
       inspectorUsername: (currentUserObj && currentUserObj.username) ? currentUserObj.username : '',
       badge: badgeCode,
       shift: selectedShiftKey,
@@ -11981,8 +12350,10 @@ function saveNewInspectionRound() {
       approvedBySupervisor: isSupervisor ? (currentUserObj ? currentUserObj.name : 'مشرف الوردية') : null,
       supervisorApprovedAt: isSupervisor ? nowIso : null,
       submittedAt: nowIso,
+      createdAt: nowIso,
       updatedAt: nowIso,
       updatedAtMs: Date.now(),
+      _isOfflinePending: true,
       score,
       compliantCount: compliant,
       observationCount: observation,
@@ -11993,9 +12364,15 @@ function saveNewInspectionRound() {
       actions,
       elevatorNumbers,
       actualPressure,
-      loopNo,
-      devicesNo,
-      ppmDate,
+      loopNo: resolvedLoop,
+      devicesNo: resolvedDevices,
+      zone: resolvedZone,
+      facpAssetId: resolvedFacpId,
+      facpControlNo: resolvedFacpControlNo,
+      facpName: resolvedFacpName,
+      facpStatus: resolvedFacpStatus,
+      facpOperationalStatus: resolvedFacpOpStatus,
+      ppmDate: resolvedPpmDate,
       blok,
       photos,
       items: state.currentRoundDraft.items,
@@ -12020,18 +12397,15 @@ function saveNewInspectionRound() {
     state.rounds.unshift(newRound);
     try { saveRounds(newRound); } catch (e) { console.warn('saveRounds error:', e); }
 
-    // Direct LocalStorage fallback guarantee
+    // Direct LocalStorage fallback guarantee across all round mirror keys
     try {
-      localStorage.setItem(STORAGE_KEY_ROUNDS, JSON.stringify(state.rounds));
+      const serialized = JSON.stringify(state.rounds);
+      localStorage.setItem(STORAGE_KEY_ROUNDS, serialized);
+      localStorage.setItem('ksumc_field_rounds', serialized);
+      localStorage.setItem('ksumc_rounds_registry', serialized);
+      localStorage.setItem('ksumc_rounds', serialized);
     } catch (lsErr) {
       console.warn('LocalStorage save error:', lsErr);
-    }
-
-    if (window.KSUOracleSync && typeof window.KSUOracleSync.saveRound === 'function') {
-      try { window.KSUOracleSync.saveRound(newRound); } catch (_) {}
-    }
-    if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncRound === 'function') {
-      try { window.ksuFirebaseSync.syncRound(newRound); } catch (_) {}
     }
 
     // Auto-transfer non-compliant items (observations / violations) to CAPA Registry
@@ -12057,7 +12431,11 @@ function saveNewInspectionRound() {
           assignedTo: 'قسم صيانة وسائل السلامة',
           reportedBy: inspector,
           reportedByBadge: badgeCode,
+          timestamp: nowIso,
           createdAt: nowIso,
+          updatedAt: nowIso,
+          updatedAtMs: Date.now(),
+          _isOfflinePending: true,
           targetDate: new Date(Date.now() + 3*24*60*60*1000).toISOString().split('T')[0],
           resolutionNotes: '',
           closedAt: null
@@ -12275,14 +12653,17 @@ function submitImmediateHazard() {
     code: 'CODE-RED-HAZARD',
     title: type,
     location: location,
+    date: new Date().toISOString().split('T')[0],
     time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
+    timestamp: new Date().toISOString(),
     status: 'استجابة فورية نشطة',
     severity: 'critical',
-    reportedBy: 'مفتش السلامة الميداني'
+    reportedBy: 'مفتش السلامة الميداني',
+    _isOfflinePending: true
   };
 
   state.alarms.unshift(newAlarm);
-  saveAlarms();
+  saveAlarms(newAlarm);
   closeHazardModal();
   playEmergencySound();
   showToast('تم إرسال البلاغ وتوجيه فرق الإسناد السريع بالمدينة الطبية فوراً!', 'error');
@@ -12813,21 +13194,17 @@ function saveNewPermit() {
     qualityStatus: 'archived_approved',
     routedTo: 'ARCHIVE',
     routedToTitle: 'أرشيف التصاريح المعتمدة',
+    timestamp: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     updatedAtMs: Date.now(),
+    _isOfflinePending: true,
     qrToken: 'KSU-HWP-' + ((state.permits ? state.permits.length : 0) + 100) + '-APPROVED'
   };
 
   if (!state.permits) state.permits = [];
   state.permits.unshift(newPermit);
   savePermits(newPermit);
-  if (window.KSUOracleSync && typeof window.KSUOracleSync.savePermit === 'function') {
-    window.KSUOracleSync.savePermit(newPermit);
-  }
-  if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncPermit === 'function') {
-    window.ksuFirebaseSync.syncPermit(newPermit);
-  }
   closeNewPermitModal();
   renderPermitsList();
   showToast('تم إصدار تصريح العمل الساخن واعتماده فورياً وحفظه في أرشيف التصاريح المعتمدة ✓', 'success');
@@ -13073,7 +13450,11 @@ function convertObservationToCAPA(roundId, itemId) {
     assignedTo: 'قسم صيانة وسائل السلامة',
     reportedBy: round.inspector,
     reportedByBadge: round.badge,
+    timestamp: nowIso,
     createdAt: nowIso,
+    updatedAt: nowIso,
+    updatedAtMs: Date.now(),
+    _isOfflinePending: true,
     targetDate: new Date(Date.now() + 3*24*60*60*1000).toISOString().split('T')[0],
     resolutionNotes: '',
     closedAt: null
@@ -13139,7 +13520,11 @@ function saveFieldCAPA() {
     assignedTo: assignedTo,
     reportedBy: reportedBy,
     reportedByBadge: (currentUserObj && (currentUserObj.empId || currentUserObj.username)) || 'KSU-SAF',
+    timestamp: nowIso,
     createdAt: nowIso,
+    updatedAt: nowIso,
+    updatedAtMs: Date.now(),
+    _isOfflinePending: true,
     targetDate: new Date(Date.now() + 3*24*60*60*1000).toISOString().split('T')[0],
     resolutionNotes: '',
     closedAt: null
@@ -13433,16 +13818,15 @@ function saveNewDoorRequest() {
     qualityStatus: 'archived_approved',
     routedTo: 'ARCHIVE',
     routedToTitle: 'أرشيف طلبات فتح الأبواب المعتمدة',
+    timestamp: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    updatedAtMs: Date.now()
+    updatedAtMs: Date.now(),
+    _isOfflinePending: true
   };
 
   state.doors.unshift(newDoor);
-  saveDoors();
-  if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncDoor === 'function') {
-    window.ksuFirebaseSync.syncDoor(newDoor);
-  }
+  saveDoors(newDoor);
   removeDoorIdCardPhoto();
   closeNewDoorModal();
   showToast('تم توثيق طلب فتح الباب واعتماده فورياً وحفظه في أرشيف فتح الأبواب ✓', 'success');
@@ -13642,19 +14026,19 @@ function saveNewSafetyViolation() {
     violatorSignature: violatorSignature,
     officerSignature: officerSignature,
     status: actionTaken,
+    severity: 'high',
     routedTo: 'H1',
     routedToTitle: 'المشرف العام الملك خالد (H1)',
     headApprovalStatus: 'pending_head',
+    timestamp: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    updatedAtMs: Date.now()
+    updatedAtMs: Date.now(),
+    _isOfflinePending: true
   };
 
   state.safetyViolations.unshift(newViol);
-  saveSafetyViolations();
-  if (window.KSUOracleSync && typeof window.KSUOracleSync.saveSafetyViolation === 'function') {
-    window.KSUOracleSync.saveSafetyViolation(newViol);
-  }
+  saveSafetyViolations(newViol);
   closeNewSafetyViolationModal();
   showToast('تم اعتماد محضر مخالفة السلامة وإرساله للمشرف العام الملك خالد (H1).', 'success');
 }
@@ -13877,16 +14261,15 @@ function saveNewSmokingViolation() {
     routedTo: 'H1',
     routedToTitle: 'المشرف العام الملك خالد (H1)',
     headApprovalStatus: 'pending_head',
+    timestamp: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    updatedAtMs: Date.now()
+    updatedAtMs: Date.now(),
+    _isOfflinePending: true
   };
 
   state.smokingViolations.unshift(newViol);
-  saveSmokingViolations();
-  if (window.KSUOracleSync && typeof window.KSUOracleSync.saveSmokingViolation === 'function') {
-    window.KSUOracleSync.saveSmokingViolation(newViol);
-  }
+  saveSmokingViolations(newViol);
   closeNewSmokingViolationModal();
   showToast('تم حفظ محضر ضبط مخالفة التدخين وإرساله للمشرف العام الملك خالد (H1).', 'success');
 }
@@ -14101,12 +14484,15 @@ function submitShiftQuickIncident() {
     reportedBy: reporter,
     details: desc,
     actionTaken: action || 'تمت المباشرة الفورية وتأمين الموقع والتنسيق الميداني.',
+    severity: (type === 'elevator_trapped' || type === 'alarm_bell') ? 'critical' : 'medium',
     status: 'تمت المعالجة والإغلاق',
     routedTo: 'H1',
     routedToTitle: 'المشرف العام الملك خالد (H1)',
+    timestamp: now.toISOString(),
     createdAt: now.toISOString(),
     updatedAt: now.toISOString(),
     updatedAtMs: Date.now(),
+    _isOfflinePending: true,
     ...extraMeta
   };
 
@@ -14131,12 +14517,14 @@ function submitShiftQuickIncident() {
       reportedBy: reporter,
       routedTo: 'H1',
       routedToTitle: 'المشرف العام الملك خالد (H1)',
+      timestamp: now.toISOString(),
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),
-      updatedAtMs: Date.now()
+      updatedAtMs: Date.now(),
+      _isOfflinePending: true
     };
     state.alarms.unshift(newAlm);
-    saveAlarms();
+    saveAlarms(newAlm);
   }
 
   saveShiftIncidents();
@@ -15136,8 +15524,10 @@ function submitSafetyDeptReport() {
       headRouting,
       headNotes,
       headName,
+      timestamp: existingReport.timestamp || nowIso,
       updatedAt: nowIso,
-      updatedAtMs: Date.now()
+      updatedAtMs: Date.now(),
+      _isOfflinePending: true
     });
   } else {
     reportToSave = {
@@ -15146,6 +15536,7 @@ function submitSafetyDeptReport() {
       day,
       date,
       time,
+      timestamp: nowIso,
       building,
       buildingCode: bldCode,
       block,
@@ -15155,6 +15546,8 @@ function submitSafetyDeptReport() {
       details,
       action: action || 'تم الرصد والرفع للمتابعة الإدارية والفنية.',
       inspector,
+      inspectorId: (state.currentUser && (state.currentUser.id || state.currentUser.empId || state.currentUser.username)) || '',
+      inspectorUsername: (state.currentUser && state.currentUser.username) || '',
       shift,
       shiftKey: shiftKeyNormalized,
       signature,
@@ -15182,6 +15575,7 @@ function submitSafetyDeptReport() {
       updatedAt: nowIso,
       updatedAtMs: Date.now(),
       createdAt: nowIso,
+      _isOfflinePending: true,
       workflowHistory: [
         {
           stage: 'pending_h1',
@@ -16522,14 +16916,20 @@ function printSafetyViolation(id) {
     return;
   }
 
-  // إذا كانت المخالفة مصحوبة بكارت الفحص البصري المعتمد
-  if (v.cardInnerHtml) {
+  // إذا كانت المخالفة مصحوبة بكارت الفحص البصري المعتمد (سواء المخزن سابقاً أو المُعاد بناؤه ديناميكياً)
+  const visualCardHtml = v.cardInnerHtml || ((v.hasVisualInspectionCard || v.visionData) && typeof window.buildCardHtmlFromViolation === 'function'
+    ? window.buildCardHtmlFromViolation(v)
+    : '');
+  if (visualCardHtml) {
     if (typeof window.triggerIsolatedPrint === 'function') {
-      window.triggerIsolatedPrint(v.cardInnerHtml);
+      window.triggerIsolatedPrint(visualCardHtml);
       return;
     }
-    if (typeof window.printHtmlContent === 'function' && v.fullPageHtml) {
-      window.printHtmlContent(v.fullPageHtml, `كارت فحص ومحضر مخالفة - ${v.id}`);
+    const visualFullHtml = v.fullPageHtml || (typeof window.buildFullPageHtmlFromViolation === 'function'
+      ? window.buildFullPageHtmlFromViolation(v)
+      : '');
+    if (typeof window.printHtmlContent === 'function' && visualFullHtml) {
+      window.printHtmlContent(visualFullHtml, `كارت فحص ومحضر مخالفة - ${v.id}`);
       return;
     }
   }
@@ -17838,7 +18238,7 @@ function printSingleRound(roundId) {
       <td colspan="2" style="border: 1px solid #000; padding: 4px 8px; vertical-align: middle;">
         <div style="display: flex; justify-content: space-between; font-weight: 800; margin-bottom: 2px; font-size: 10px;">
           <span style="font-family: Arial, sans-serif;">Head Of Department</span>
-          <span>رئيس الادارة</span>
+          <span>رئيس إدارة السلامة</span>
         </div>
         <div style="font-weight: 800; color: #000; text-align: center; font-size: 11px;">
           مصعب عبد الله الحماد
@@ -20352,9 +20752,11 @@ function syncRoundsToShiftInspectionLog(silent = false) {
       headNotes: round.headNotes || '',
       supervisor: round.supervisor || 'مشرف الوردية المناوب',
       duration: round.duration || '15 دقيقة',
+      timestamp: round.timestamp || round.updatedAt || round.submittedAt || new Date().toISOString(),
       updatedAt: round.updatedAt || round.submittedAt || new Date().toISOString(),
       updatedAtMs: round.updatedAtMs || Date.now()
     };
+    if (round._isOfflinePending) mappedRecord._isOfflinePending = true;
 
     recordMap.set(recId, Object.assign({}, recordMap.get(recId) || {}, mappedRecord));
   });
@@ -20401,9 +20803,11 @@ function syncRoundsToShiftInspectionLog(silent = false) {
       headNotes: rep.headNotes || '',
       supervisor: rep.supName || 'مشرف الوردية',
       duration: '15 دقيقة',
+      timestamp: rep.timestamp || rep.updatedAt || rep.createdAt || new Date().toISOString(),
       updatedAt: rep.updatedAt || rep.createdAt || new Date().toISOString(),
       updatedAtMs: rep.updatedAtMs || Date.now()
     };
+    if (rep._isOfflinePending) mappedReport._isOfflinePending = true;
 
     recordMap.set(recId, Object.assign({}, recordMap.get(recId) || {}, mappedReport));
   });
@@ -21666,7 +22070,8 @@ function renderHomeRecentRounds() {
   const container = document.getElementById('home-recent-rounds-list');
   if (!container) return;
 
-  const rounds = (state.rounds && state.rounds.length) ? state.rounds.slice(0, 5) : [];
+  const scopedAll = getScopedRoundsForCurrentUser(state.rounds || [], 'none');
+  const rounds = scopedAll.length ? scopedAll.slice(0, 5) : [];
   if (rounds.length === 0) {
     container.innerHTML = `
       <div class="p-3 text-center text-gray-400 text-xs">
@@ -21684,16 +22089,16 @@ function renderHomeRecentRounds() {
   container.innerHTML = rounds.map(r => {
     let badgeHtml = '';
     let actionBtnHtml = '';
+    const roundShiftTitle = (typeof getShiftTitleArabic === 'function') ? getShiftTitleArabic(r.shift || r.shiftName) : 'الوردية المناوبة';
 
     if (r.workflowStatus === 'approved_cbahi' || r.workflowStatus === 'approved_quality') {
       badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black border border-emerald-300">معتمد CBAHI ✓</span>`;
     } else if (r.workflowStatus === 'pending_quality') {
-      badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[10px] font-black border border-sky-300">بانتظار الجودة</span>`;
+      badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 text-[10px] font-black border border-sky-300">بانتظار اعتماد الجودة</span>`;
     } else if (r.workflowStatus === 'returned_by_quality') {
       badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-black border border-rose-300">معاد للتصحيح ⚠️</span>`;
     } else {
       const canApprove = (typeof canSupervisorApproveRound === 'function') ? canSupervisorApproveRound(currentUserObj, r) : false;
-      const roundShiftTitle = (typeof getShiftTitleArabic === 'function') ? getShiftTitleArabic(r.shift || r.shiftName) : 'الوردية المناوبة';
 
       if (canApprove) {
         badgeHtml = `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-black border border-amber-300">بانتظار اعتمادك (مشرف ${roundShiftTitle})</span>`;
@@ -24571,6 +24976,7 @@ function getUnifiedWorkflowItems() {
       building: r.building || 'المستشفى',
       floor: r.floor || 'الدور الأرضي (G)',
       inspector: r.inspector || 'مفتش السلامة',
+      inspectorId: r.inspectorId || '',
       inspectorUsername: r.inspectorUsername || '',
       badge: r.badge || 'KSU-SAF',
       shift: shiftKey,
@@ -25206,8 +25612,11 @@ function renderInspectorWorkflowTracker() {
   const alertBanner = document.getElementById('inspector-returned-alert-banner');
   if (!container && !alertBanner) return;
 
-  const items = getUnifiedWorkflowItems();
-  const returnedItems = items.filter(i => i.workflowStatus === 'returned_by_quality' || i.workflowStatus === 'returned_by_head');
+  const rawItems = getUnifiedWorkflowItems();
+  const scopedItems = getScopedRoundsForCurrentUser(rawItems, 'none');
+  const activeFilter = state.fieldRoundsFilter || 'all';
+  const items = activeFilter === 'all' ? scopedItems : getScopedRoundsForCurrentUser(rawItems, activeFilter);
+  const returnedItems = scopedItems.filter(i => i.workflowStatus === 'returned_by_quality' || i.workflowStatus === 'returned_by_head');
 
   if (alertBanner) {
     if (returnedItems.length > 0) {

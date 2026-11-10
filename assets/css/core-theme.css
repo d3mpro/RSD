@@ -412,7 +412,7 @@ main.pb-24 {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid rgba(195, 198, 206, 0.5) !important;
-  z-index: 50 !important;
+  z-index: 40 !important;
   padding: 0.35rem 0.5rem !important;
   padding-bottom: calc(0.35rem + env(safe-area-inset-bottom, 0px)) !important;
   box-shadow: 0 -4px 20px rgba(0, 22, 43, 0.08) !important;
@@ -656,6 +656,33 @@ main.pb-24 {
   background-color: #eff6ff !important;
   border-color: #bfdbfe !important;
   color: #004b87 !important;
+}
+
+/* ==========================================================================
+   KSUMC Mobile Modals, Sheets & Inspection Forms - Rock-Solid Responsive Stacking
+   ========================================================================== */
+.modal-backdrop,
+#field-notifications-sheet,
+#field-portal-sheet,
+#newRoundModal,
+#viewRoundModal,
+#newCAPAModal,
+#hazardModal,
+#newPermitModal,
+#newDoorModal,
+#newSafetyViolationModal,
+#newSmokingViolationModal {
+  z-index: 100 !important;
+}
+
+@supports (height: 100dvh) {
+  @media (max-width: 639.98px) {
+    #newRoundModal > div,
+    #viewRoundModal > div {
+      height: 100dvh !important;
+      max-height: 100dvh !important;
+    }
+  }
 }
 
 

@@ -44,6 +44,10 @@
     "cleanUrls": false,
     "rewrites": [
       {
+        "source": "/api",
+        "destination": "/api.html"
+      },
+      {
         "source": "/field",
         "destination": "/field.html"
       },

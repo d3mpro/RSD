@@ -177,7 +177,36 @@
           </span>
         </div>
       `;
-    } else if (fType === 'wet_chem' || fType === 'fas_insp' || fType === 'fm200') {
+    } else if (fType === 'fas_insp' || fType === 'fas_test') {
+      const ctrlNo = round.facpControlNo || (round.facpAssetId ? round.facpAssetId.replace('FACP-', '') : '');
+      const panelLabel = ctrlNo ? `[${ctrlNo}] ${round.facpName || 'لوحة إنذار الحريق'}` : (round.facpName || round.facpAssetId || 'لوحة إنذار الحريق الرئيسية');
+      const loop = round.loopNo ? `${round.loopNo} دائرة` : '1 دائرة';
+      const devices = round.devicesNo ? `${round.devicesNo} نقطة/جهاز` : 'معتمد';
+      const zone = round.zone || 'كامل المبنى';
+      const ppm = round.ppmDate || 'ساري ومحدث';
+      const isTrouble = (round.facpStatus && round.facpStatus.includes('عطل')) || (round.facpOperationalStatus && round.facpOperationalStatus.includes('Trouble')) || ctrlNo === 'NM-0022113';
+
+      specializedParamsHtml = `
+        <div style="margin-bottom: 8px; padding: 6px 10px; background: ${isTrouble ? '#fffbeb' : '#fef2f2'}; border: 1.5px solid ${isTrouble ? '#f59e0b' : '#dc2626'}; border-radius: 6px; font-size: 8.5px; display: flex; flex-direction: column; gap: 4px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; border-bottom: 1px dashed ${isTrouble ? '#fde68a' : '#fca5a5'}; padding-bottom: 4px;">
+            <div>
+              <strong style="color: ${isTrouble ? '#b45309' : '#991b1b'};">لوحة إنذار الحريق (FACP Panel):</strong>
+              <span style="font-weight: bold; color: #0f172a; margin-right: 4px;">${panelLabel}</span>
+            </div>
+            <div>
+              <strong style="color: ${isTrouble ? '#b45309' : '#991b1b'};">منطقة التغطية (Zone):</strong>
+              <span style="font-weight: bold; color: #1e293b; margin-right: 4px;">${zone}</span>
+            </div>
+            ${isTrouble ? '<span style="background: #fef3c7; color: #92400e; border: 1px solid #f59e0b; padding: 1px 6px; border-radius: 4px; font-weight: bold;">⚠️ تنبيه عطل (Trouble)</span>' : '<span style="background: #dcfce7; color: #166534; border: 1px solid #86efac; padding: 1px 6px; border-radius: 4px; font-weight: bold;">✓ تعمل (Active)</span>'}
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+            <div><strong style="color: ${isTrouble ? '#b45309' : '#991b1b'};">عدد الدوائر (Loops):</strong> <span style="font-family: monospace; font-weight: bold;">${loop}</span></div>
+            <div><strong style="color: ${isTrouble ? '#b45309' : '#991b1b'};">الأجهزة والنقاط:</strong> <span style="font-weight: bold;">${devices}</span></div>
+            <div><strong style="color: ${isTrouble ? '#b45309' : '#991b1b'};">تاريخ صيانة PPM:</strong> <span style="font-weight: bold; color: #16a34a;">${ppm}</span></div>
+          </div>
+        </div>
+      `;
+    } else if (fType === 'wet_chem' || fType === 'fm200') {
       const loop = round.loopNo || 'LOOP-01';
       const devices = round.devicesNo || '32 نقطة';
       const ppm = round.ppmDate || 'ساري ومحدث';
@@ -430,9 +459,9 @@
               </div>
             </td>
             <td style="width: 32%; text-align: center; vertical-align: top; font-size: 8px; padding: 2px;">
-              <div style="font-weight: bold; color: #334155; margin-bottom: 12px;">مشرف الوردية / رئيس الإدارة</div>
+              <div style="font-weight: bold; color: #334155; margin-bottom: 12px;">رئيس إدارة السلامة</div>
               <div style="font-weight: bold; color: #082B49;">${headOfDept}</div>
-              <div style="font-size: 7px; color: #004B87; font-weight: bold; margin-top: 2px;">رئيس إدارة السلامة والأمن الميداني</div>
+              <div style="font-size: 7px; color: #004B87; font-weight: bold; margin-top: 2px;">إدارة السلامة</div>
             </td>
           </tr>
         </table>
@@ -483,13 +512,13 @@
 
     modal = document.createElement('div');
     modal.id = 'ksu-official-card-modal';
-    modal.className = 'fixed inset-0 z-[9999] bg-slate-900/85 backdrop-blur-md flex flex-col items-center justify-start p-3 sm:p-6 overflow-y-auto font-cairo';
+    modal.className = 'fixed inset-0 z-[9999] bg-slate-900/85 backdrop-blur-md flex flex-col items-center justify-start p-2.5 sm:p-6 overflow-y-auto font-cairo pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(1.75rem,env(safe-area-inset-bottom))]';
     modal.style.direction = 'rtl';
 
     const cardContentHtml = window.generateOfficialInspectionCardHtml(round);
 
     modal.innerHTML = `
-      <div class="max-w-4xl w-full flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200 my-auto">
+      <div class="max-w-4xl w-full flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200 my-0 sm:my-auto">
         
         <!-- Top Action Bar (no-print) -->
         <div class="no-print bg-slate-800 text-white px-4 py-3 rounded-2xl flex items-center justify-between shadow-xl border border-slate-700">
@@ -673,8 +702,18 @@
           </div>
         </div>
       `;
-    } else if (formType === 'wet_chem' || formType === 'fas_insp' || formType === 'fm200') {
+    } else if (formType === 'wet_chem' || formType === 'fas_insp' || formType === 'fas_test' || formType === 'fm200') {
       container.classList.remove('hidden');
+      const curBld = document.getElementById('inp-round-building')?.value || (window.state && window.state.currentRoundDraft && window.state.currentRoundDraft.building) || 'المستشفى';
+      const curFl = document.getElementById('inp-round-floor')?.value || (window.state && window.state.currentRoundDraft && window.state.currentRoundDraft.floor) || 'الدور الأرضي (G)';
+      const allFacp = (typeof getAllFacpAssets === 'function') ? getAllFacpAssets() : [];
+      const floorPanels = allFacp.filter(a => (typeof matchBuilding === 'function' ? matchBuilding(a.building || a.buildingTab, curBld) : true) && (typeof matchFloor === 'function' ? matchFloor(a.floor, curFl) : true));
+      const activePanel = floorPanels[0] || allFacp.find(a => (typeof matchBuilding === 'function' ? matchBuilding(a.building || a.buildingTab, curBld) : true)) || null;
+
+      const defaultLoop = (activePanel && activePanel.loopsCount) ? `${activePanel.loopsCount}` : 'LOOP-01';
+      const defaultDevices = (activePanel && activePanel.devicesCount) ? `${activePanel.devicesCount}` : '32 نقطة';
+      const defaultPpm = (activePanel && activePanel.nextPpmDate) ? activePanel.nextPpmDate : '';
+
       container.innerHTML = `
         <div class="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200 flex flex-col gap-2">
           <div class="flex items-center justify-between">
@@ -687,15 +726,15 @@
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div>
               <label class="text-[10px] font-bold text-slate-700 block mb-1">رقم الدائرة (Loop NO):</label>
-              <input type="text" id="inp-round-loop" placeholder="مثال: LOOP-01" value="LOOP-01" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 outline-none">
+              <input type="text" id="inp-round-loop" placeholder="مثال: LOOP-01" value="${defaultLoop}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 outline-none">
             </div>
             <div>
               <label class="text-[10px] font-bold text-slate-700 block mb-1">عدد النقاط (Devices):</label>
-              <input type="text" id="inp-round-devices" placeholder="مثال: 24 نقطة" value="32 نقطة" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 outline-none">
+              <input type="text" id="inp-round-devices" placeholder="مثال: 24 نقطة" value="${defaultDevices}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 outline-none">
             </div>
             <div>
               <label class="text-[10px] font-bold text-slate-700 block mb-1">تاريخ الـ PPM القادم:</label>
-              <input type="date" id="inp-round-ppm-date" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 outline-none">
+              <input type="date" id="inp-round-ppm-date" value="${defaultPpm}" class="w-full px-2.5 py-1.5 rounded-xl bg-white border border-amber-300 text-xs font-bold text-slate-800 outline-none">
             </div>
           </div>
         </div>
@@ -1083,6 +1122,180 @@
       </html>
     `);
     printWin.document.close();
+  };
+
+  /**
+   * إدارة تفاعلية متكاملة لسجل لوحات إنذار الحريق (FACP Panel Registry)
+   */
+  window._activeFacpFilter = 'all';
+
+  window.setFacpBuildingFilter = function(filterKey) {
+    window._activeFacpFilter = filterKey || 'all';
+    document.querySelectorAll('.facp-filter-pill').forEach(btn => {
+      const pillKey = btn.getAttribute('data-facp-pill');
+      if (pillKey === window._activeFacpFilter) {
+        btn.className = 'facp-filter-pill px-3 py-1.5 rounded-xl font-bold transition-all shadow-2xs bg-red-600 text-white';
+      } else {
+        btn.className = 'facp-filter-pill px-3 py-1.5 rounded-xl font-semibold transition-all bg-white border border-slate-300 text-slate-700 hover:bg-slate-100';
+      }
+    });
+    if (typeof window.filterFacpPanels === 'function') {
+      window.filterFacpPanels();
+    }
+  };
+
+  window.filterFacpPanels = function() {
+    const searchVal = (document.getElementById('inp-facp-search')?.value || '').trim().toLowerCase();
+    const currentFilter = window._activeFacpFilter || 'all';
+    let visibleCount = 0;
+
+    document.querySelectorAll('.facp-panel-card').forEach(card => {
+      const bldCode = card.getAttribute('data-building-code') || '';
+      const ctrlNo = (card.getAttribute('data-control-no') || '').toLowerCase();
+      const zone = (card.getAttribute('data-zone') || '').toLowerCase();
+      const textContent = (card.textContent || '').toLowerCase();
+
+      const matchesFilter = (currentFilter === 'all') || (bldCode === currentFilter);
+      const matchesSearch = !searchVal || ctrlNo.includes(searchVal) || zone.includes(searchVal) || textContent.includes(searchVal);
+
+      if (matchesFilter && matchesSearch) {
+        card.style.display = '';
+        visibleCount++;
+      } else {
+        card.style.display = 'none';
+      }
+    });
+
+    const emptyEl = document.getElementById('facp-empty-state');
+    if (emptyEl) {
+      if (visibleCount === 0) {
+        emptyEl.classList.remove('hidden');
+        emptyEl.classList.add('flex');
+      } else {
+        emptyEl.classList.add('hidden');
+        emptyEl.classList.remove('flex');
+      }
+    }
+  };
+
+  window.selectFacpPanelCard = function(panelId) {
+    if (!panelId) return;
+    const allFacp = (typeof getAllFacpAssets === 'function') ? getAllFacpAssets() : ((typeof KSU_FACP_ASSETS !== 'undefined') ? KSU_FACP_ASSETS : []);
+    const panel = allFacp.find(p => p.id === panelId || p.controlNo === panelId);
+    if (!panel) return;
+
+    // 1. Update visual card borders and radio icons
+    document.querySelectorAll('.facp-panel-card').forEach(card => {
+      const cardId = card.getAttribute('data-panel-id');
+      const isThis = cardId === panel.id;
+      const isTrouble = (card.getAttribute('data-control-no') === 'NM-0022113') || card.innerHTML.includes('Trouble');
+
+      if (isThis) {
+        card.className = 'facp-panel-card cursor-pointer p-3 rounded-xl border-2 transition-all flex flex-col justify-between gap-2 shadow-xs border-red-600 bg-red-50/90 ring-1 ring-red-400';
+        const radio = card.querySelector('.facp-card-radio');
+        if (radio) {
+          radio.textContent = 'radio_button_checked';
+          radio.className = 'material-symbols-outlined facp-card-radio text-lg text-red-600';
+        }
+      } else {
+        card.className = `facp-panel-card cursor-pointer p-3 rounded-xl border-2 transition-all flex flex-col justify-between gap-2 shadow-2xs ${
+          isTrouble ? 'border-amber-300 bg-amber-50/40 hover:border-amber-400' : 'border-slate-200 bg-white hover:border-red-300 hover:bg-slate-50/60'
+        }`;
+        const radio = card.querySelector('.facp-card-radio');
+        if (radio) {
+          radio.textContent = 'radio_button_unchecked';
+          radio.className = 'material-symbols-outlined facp-card-radio text-lg text-slate-400';
+        }
+      }
+    });
+
+    // 2. Synchronize Dropdown and Banner
+    const selDropdown = document.getElementById('sel-round-facp-asset');
+    if (selDropdown) {
+      selDropdown.value = panel.id;
+    }
+    const bannerTitle = document.getElementById('facp-selected-panel-title');
+    if (bannerTitle) {
+      bannerTitle.textContent = `[${panel.controlNo}] ${panel.name} — ${panel.floor}`;
+    }
+
+    // 3. Auto-populate specialized inputs
+    const loopInp = document.getElementById('inp-round-loop');
+    const devInp = document.getElementById('inp-round-devices');
+    const zoneInp = document.getElementById('inp-round-zone');
+    const ppmInp = document.getElementById('inp-round-ppm-date');
+    const roomInp = document.getElementById('inp-round-room');
+
+    if (loopInp) loopInp.value = panel.loopsCount || '';
+    if (devInp) devInp.value = panel.devicesCount || '';
+    if (zoneInp) zoneInp.value = panel.zone || '';
+    if (ppmInp && panel.nextPpmDate) ppmInp.value = panel.nextPpmDate;
+    if (roomInp && panel.room) roomInp.value = panel.room;
+
+    // 4. Synchronize Building and Floor dropdowns in modal
+    const bldSelect = document.getElementById('inp-round-building');
+    if (bldSelect) {
+      const targetBldOpt = Array.from(bldSelect.options).find(opt => {
+        const v = opt.value;
+        if (v === panel.building || v === panel.buildingTab) return true;
+        if (typeof window.resolveCanonicalBuildingCode === 'function' && window.resolveCanonicalBuildingCode(v) === panel.buildingCode) return true;
+        if (typeof window.matchBuilding === 'function' && window.matchBuilding(v, panel.building)) return true;
+        return false;
+      });
+      if (targetBldOpt) {
+        bldSelect.value = targetBldOpt.value;
+        if (window.state && window.state.currentRoundDraft) {
+          window.state.currentRoundDraft.building = targetBldOpt.value;
+        }
+        if (typeof window.populateRoundFloorOptions === 'function') {
+          window.populateRoundFloorOptions(targetBldOpt.value, panel.floor);
+        }
+      }
+    }
+
+    const floorSelect = document.getElementById('inp-round-floor');
+    if (floorSelect && panel.floor) {
+      const targetFloorOpt = Array.from(floorSelect.options).find(opt => {
+        if (typeof window.matchFloor === 'function' && window.matchFloor(opt.value, panel.floor)) return true;
+        if (opt.value.includes(panel.floorCode) || opt.text.includes(panel.floorCode)) return true;
+        return false;
+      });
+      if (targetFloorOpt) {
+        floorSelect.value = targetFloorOpt.value;
+        if (window.state && window.state.currentRoundDraft) {
+          window.state.currentRoundDraft.floor = targetFloorOpt.value;
+        }
+      }
+    }
+
+    // 5. Update draft state
+    if (window.state && window.state.currentRoundDraft) {
+      window.state.currentRoundDraft.facpAssetId = panel.id;
+      window.state.currentRoundDraft.facpControlNo = panel.controlNo;
+      window.state.currentRoundDraft.facpName = panel.name;
+      window.state.currentRoundDraft.facpStatus = panel.status;
+      window.state.currentRoundDraft.facpOperationalStatus = panel.operationalStatus;
+      window.state.currentRoundDraft.zone = panel.zone;
+      window.state.currentRoundDraft.loopNo = panel.loopsCount;
+      window.state.currentRoundDraft.devicesNo = panel.devicesCount;
+      window.state.currentRoundDraft.ppmDate = panel.nextPpmDate;
+    }
+
+    // 6. Update Floor Assets Reconciliation table if present
+    if (typeof window.renderFloorAssetsReconciliation === 'function') {
+      try { window.renderFloorAssetsReconciliation(); } catch (_) {}
+    }
+  };
+
+  /**
+   * دالة المزامنة عند تغيير القائمة المنسدلة
+   */
+  window.onFacpPanelSelectChange = function(panelId) {
+    if (!panelId) return;
+    if (panelId === 'custom') {
+      return;
+    }
+    window.selectFacpPanelCard(panelId);
   };
 
 })();

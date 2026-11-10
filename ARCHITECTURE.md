@@ -97,6 +97,8 @@
   - `Source_Code/assets/js/ksu-fm200-assets.js`
 - **سجل غرف الخدمات والمحطات (Plant Rooms):**
   - `Source_Code/assets/js/ksu-plant-rooms-assets.js`
+- **سجل أصول لوحات إنذار الحريق (Fire Alarm Control Panels - FACP):**
+  - `assets/js/ksu-facp-assets.js`
 
 #### 2. ملفات الجداول والإكسل المعتمدة للأصول الميدانية (Excel/CSV):
 - **أصول طفايات الحريق الشاملة:** `أصول_طفايات_الحريق_المدينة_.xlsx`

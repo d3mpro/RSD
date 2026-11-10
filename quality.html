@@ -77,8 +77,8 @@
   <link rel="stylesheet" href="assets/css/styles.css?v=2.24" />
   <link rel="stylesheet" href="assets/css/core-theme.css?v=3.1" />
   <script src="assets/js/auth-guard.js?v=4.3"></script>
-  <script src="assets/js/ksumc-data-bridge.js?v=6.2"></script>
-  <script src="assets/js/ksu-firebase-realtime.js?v=6.8.0"></script>
+  <script src="assets/js/ksumc-data-bridge.js?v=6.3.0"></script>
+  <script src="assets/js/ksu-firebase-realtime.js?v=6.9.0"></script>
   <script src="assets/js/ksu-system-mode.js?v=1.2"></script>
   <script src="assets/js/ksu-nav-component.js?v=5.14"></script>
   <script>
@@ -87,6 +87,35 @@
 
   <!-- A4 Print Compatibility Stylesheet (CBAHI FMS / NFPA 99/101 Standards) & Royal Identity -->
   <style>
+    @keyframes scan {
+      0% {
+        top: 0%;
+        opacity: 0.9;
+      }
+      50% {
+        top: 96%;
+        opacity: 1;
+      }
+      100% {
+        top: 0%;
+        opacity: 0.9;
+      }
+    }
+    .ksu-scan-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #10b981, #06b6d4, transparent);
+      box-shadow: 0 0 16px #10b981, 0 0 8px #06b6d4;
+      animation: scan 2s ease-in-out infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ksu-scan-line,
+      [class*="animate-[scan"] {
+        animation: none !important;
+      }
+    }
     .exec-card-3d {
       background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
       box-shadow: 0 14px 32px -10px rgba(8, 43, 73, 0.08), 0 4px 12px -2px rgba(8, 43, 73, 0.04), inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
@@ -494,6 +523,9 @@
                 </button>
                 <button type="button" onclick="filterQualityUnifiedWorkflow('permits')" id="btn-qwfu-permits" class="qwfu-filter-btn px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold text-xs transition-all">
                   🔥 تصاريح العمل الساخن (<span id="qwfu-count-permits">0</span>)
+                </button>
+                <button type="button" onclick="filterQualityUnifiedWorkflow('violations')" id="btn-qwfu-violations" class="qwfu-filter-btn px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-200 font-bold text-xs transition-all">
+                  ⚠️ محاضر المخالفات (<span id="qwfu-count-violations">0</span>)
                 </button>
                 <button type="button" onclick="filterQualityUnifiedWorkflow('pending')" id="btn-qwfu-pending" class="qwfu-filter-btn px-3 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-bold text-xs transition-all">
                   ⏳ بانتظار الاعتماد (<span id="qwfu-count-pending">0</span>)
@@ -2584,8 +2616,10 @@
   <script src="assets/js/ksu-fhc-assets.js?v=1.0" charset="UTF-8"></script>
   <script src="assets/js/ksu-plant-rooms-assets.js?v=1.0" charset="UTF-8"></script>
   <script src="assets/js/ksu-wet-chemical-assets.js?v=1.0" charset="UTF-8"></script>
-  <script src="assets/js/app.js?v=8.0.0"></script>
-  <script src="assets/js/ksu-ai-client.js?v=7.2.1" charset="UTF-8"></script>
+  <script src="assets/js/ksu-facp-assets.js?v=2.0" charset="UTF-8"></script>
+  <script src="assets/js/app.js?v=8.2.0"></script>
+  <script src="assets/js/vision-reticle-helper.js"></script>
+  <script src="assets/js/ksu-ai-client.js?v=7.3.1" charset="UTF-8"></script>
   <script>
     // ============================================================================
     // 1. UNIFIED SEQUENTIAL WORKFLOW INBOX (جولات التفتيش + فتح الأبواب + تصاريح العمل الساخن)
@@ -2696,7 +2730,35 @@
         rawRef: p
       }));
 
-      const allItems = [...rounds, ...doors, ...permits].sort((a, b) => b.updatedAtMs - a.updatedAtMs);
+      // 4. Get Safety Violations (Field & Vision)
+      const rawSafetyViolations = (window.state && window.state.safetyViolations && window.state.safetyViolations.length > 0)
+        ? window.state.safetyViolations
+        : JSON.parse(localStorage.getItem('ksumc_safety_violations') || '[]');
+
+      const safetyViolations = (rawSafetyViolations || []).filter(Boolean).map(v => ({
+        _type: 'violation',
+        id: v.id,
+        typeLabel: 'محضر مخالفة سلامة',
+        icon: 'warning',
+        badgeColor: 'bg-rose-100 text-rose-900 border-rose-300',
+        title: `${v.title || (Array.isArray(v.devices) ? v.devices.join(', ') : 'مخالفة سلامة ميدانية')} — ${v.violatorName || 'مخالفة مرصودة'}`,
+        subtitle: `الإجراء: ${v.actionTaken || v.status || '-'} | الموقع: ${v.building || v.location || 'المستشفى'} | المرجع: ${v.standard_reference || 'CBAHI / NFPA'}`,
+        location: `${v.building || v.location || 'المستشفى'} ${v.floor ? '- ' + v.floor : ''} ${v.room ? '(' + v.room + ')' : ''}`,
+        inspector: v.officerName || v.inspector || 'مفتش السلامة',
+        shift: v.shift || 'الوردية 1 (صباحي)',
+        date: v.date || (typeof v.createdAt === 'string' ? v.createdAt.substring(0, 10) : (v.createdAt ? new Date(v.createdAt).toISOString().substring(0, 10) : '')),
+        time: v.time || '',
+        workflowStatus: v.qualityStatus || (v.headApprovalStatus === 'approved_by_head' ? 'approved_by_head' : 'pending_quality'),
+        workflowStatusLabel: v.status || (v.headApprovalStatus === 'approved_by_head' ? 'معتمد' : 'بانتظار الاعتماد'),
+        complianceRate: null,
+        notes: v.description || v.directive || '',
+        qualityReturnNotes: v.qualityNotes && v.qualityStatus === 'returned_by_quality' ? v.qualityNotes : '',
+        qualityNotes: v.qualityNotes || '',
+        updatedAtMs: Number(v.updatedAtMs) || (v.createdAt ? new Date(v.createdAt).getTime() : 0) || (new Date(v.date || Date.now()).getTime()) || 0,
+        rawRef: v
+      }));
+
+      const allItems = [...rounds, ...doors, ...permits, ...safetyViolations].sort((a, b) => b.updatedAtMs - a.updatedAtMs);
 
       // Status helper
       const isPending = (item) => !item.workflowStatus || item.workflowStatus === 'pending_quality';
@@ -2709,6 +2771,7 @@
       const countRounds = rounds.length;
       const countDoors = doors.length;
       const countPermits = permits.length;
+      const countViolations = safetyViolations.length;
       const countPending = allItems.filter(isPending).length;
       const countApproved = allItems.filter(isApproved).length;
       const countForwarded = allItems.filter(isForwarded).length;
@@ -2723,6 +2786,7 @@
       setTxt('qwfu-count-rounds', countRounds);
       setTxt('qwfu-count-doors', countDoors);
       setTxt('qwfu-count-permits', countPermits);
+      setTxt('qwfu-count-violations', countViolations);
       setTxt('qwfu-count-pending', countPending);
       setTxt('qwfu-count-approved', countApproved);
       setTxt('qwfu-count-forwarded', countForwarded);
@@ -2735,6 +2799,7 @@
       if (qualityUnifiedFilter === 'rounds') filtered = allItems.filter(i => i._type === 'round');
       else if (qualityUnifiedFilter === 'doors') filtered = allItems.filter(i => i._type === 'door');
       else if (qualityUnifiedFilter === 'permits') filtered = allItems.filter(i => i._type === 'permit');
+      else if (qualityUnifiedFilter === 'violations') filtered = allItems.filter(i => i._type === 'violation');
       else if (qualityUnifiedFilter === 'pending') filtered = allItems.filter(isPending);
       else if (qualityUnifiedFilter === 'approved') filtered = allItems.filter(isApproved);
       else if (qualityUnifiedFilter === 'forwarded') filtered = allItems.filter(isForwarded);
@@ -2744,7 +2809,7 @@
         container.innerHTML = `
           <div class="p-8 text-center bg-white rounded-2xl border border-dashed border-outline-variant/60 shadow-xs">
             <span class="material-symbols-outlined text-4xl text-outline-variant mb-2">inbox</span>
-            <p class="font-black text-sm text-primary">لا توجد جولات أو طلبات أو تصاريح في هذه التصفية حالياً (0)</p>
+            <p class="font-black text-sm text-primary">لا توجد جولات أو طلبات أو تصاريح أو مخالفات في هذه التصفية حالياً (0)</p>
             <p class="text-xs text-on-surface-variant mt-1">تصل المعاملات المرفوعة من المفتشين والورديات مباشرة ولحظياً عبر فيرباس.</p>
           </div>
         `;
@@ -2805,6 +2870,15 @@
                   <span class="material-symbols-outlined text-sm">visibility</span>
                   <span>عرض التفاصيل</span>
                 </button>
+              ` : item._type === 'violation' ? `
+                <button type="button" onclick="approveQualityViolation('${item.id}')" class="px-3.5 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs flex items-center gap-1 shadow-xs transition-all cursor-pointer">
+                  <span class="material-symbols-outlined text-sm text-amber-200">verified</span>
+                  <span>اعتماد المخالفة (Q1)</span>
+                </button>
+                <button type="button" onclick="viewSafetyViolationDetails('${item.id}')" class="px-2.5 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs flex items-center gap-1 border border-outline-variant/30 transition-all cursor-pointer">
+                  <span class="material-symbols-outlined text-sm">visibility</span>
+                  <span>عرض التفاصيل</span>
+                </button>
               ` : `
                 <span class="px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-1">
                   <span class="material-symbols-outlined text-sm text-emerald-600">task_alt</span>
@@ -2834,6 +2908,31 @@
         `;
       }).join('');
     }
+
+    function approveQualityViolation(id) {
+      const list = (window.state && window.state.safetyViolations) || JSON.parse(localStorage.getItem('ksumc_safety_violations') || '[]');
+      const item = list.find(v => String(v.id) === String(id));
+      if (item) {
+        item.qualityStatus = 'approved_by_quality';
+        item.headApprovalStatus = 'approved_by_head';
+        item.status = 'معتمد من الجودة';
+        item.updatedAtMs = Date.now();
+        localStorage.setItem('ksumc_safety_violations', JSON.stringify(list));
+        if (typeof showToast === 'function') {
+          showToast(`تم اعتماد محضر المخالفة ${id} رسمياً في سجل الجودة 🛡️`, 'success');
+        }
+        renderQualityUnifiedWorkflow();
+      }
+    }
+    window.approveQualityViolation = approveQualityViolation;
+
+    function viewSafetyViolationDetails(id) {
+      const list = (window.state && window.state.safetyViolations) || JSON.parse(localStorage.getItem('ksumc_safety_violations') || '[]');
+      const item = list.find(v => String(v.id) === String(id));
+      if (!item) return;
+      alert(`محضر مخالفة سلامة رقم: ${item.id}\nالموقع: ${item.building || item.location || ''} ${item.floor || ''} ${item.room || ''}\nالمخالف: ${item.violatorName || ''}\nالأجهزة: ${Array.isArray(item.devices) ? item.devices.join(', ') : item.title || ''}\nالإجراء المتخذ: ${item.actionTaken || item.status || ''}\nالملاحظات: ${item.description || item.directive || ''}`);
+    }
+    window.viewSafetyViolationDetails = viewSafetyViolationDetails;
 
     // Wrap the app.js functions so any calls immediately refresh the unified workflow
     const _origRenderQualityWorkflowInbox = window.renderQualityWorkflowInbox;
@@ -3641,70 +3740,74 @@
       const defaultBtnHtml = '<span class="material-symbols-outlined text-xs">auto_awesome</span><span>استخراج مصفوفة الأيام (AI)</span>';
 
       if (!imgData) {
-        if (window.KSUAI && window.KSUAI.OFFICIAL_DUTY_PLANS_2026_11 && window.KSUAI.OFFICIAL_DUTY_PLANS_2026_11[shiftKey]) {
-          const plan = window.KSUAI.OFFICIAL_DUTY_PLANS_2026_11[shiftKey];
-          if (!tempShiftUploads[shiftKey]) tempShiftUploads[shiftKey] = {};
-          tempShiftUploads[shiftKey].roundsPlan = plan;
-          if (countEl) countEl.textContent = `${plan.length} جولة مستخرجة 🎯`;
-          if (statusEl) statusEl.textContent = `✅ تم استخراج ${plan.length} جولة`;
-          if (typeof showToast === 'function') {
-            showToast(`تم استخراج مصفوفة ${schedule.shifts[shiftKey].name} بنجاح (${plan.length} جولة) ⚡`, 'success');
-          }
-          return;
-        }
         if (typeof showToast === 'function') {
-          showToast(`يرجى رفع صورة جدول ${schedule.shifts[shiftKey].name} أولاً`, 'warning');
+          showToast(`يرجى رفع صورة جدول ${schedule.shifts[shiftKey].name} أولاً لإجراء الفحص والمسح الضوئي الذكي (OCR)`, 'warning');
         }
         return;
       }
 
       if (btn) {
         btn.disabled = true;
-        btn.innerHTML = '<span class="material-symbols-outlined text-xs animate-spin">refresh</span> جاري التحليل عبر Gemini...';
+        btn.innerHTML = '<span class="material-symbols-outlined text-xs animate-spin">refresh</span> جاري التحليل والمسح الضوئي الذكي (OCR)...';
       }
-      if (statusEl) statusEl.textContent = '⏳ جاري القراءة عبر Gemini Vision...';
+      if (statusEl) statusEl.textContent = '⏳ جاري القراءة والتدقيق البصري...';
 
       try {
+        let aiRes = null;
         if (window.KSUAI && typeof window.KSUAI.parseDutyScheduleImage === 'function') {
-          const aiRes = await window.KSUAI.parseDutyScheduleImage({
+          aiRes = await window.KSUAI.parseDutyScheduleImage({
             image: imgData,
             shiftHint: shiftKey,
             monthHint: monthVal
           });
+        } else {
+          // Route directly to backend agent
+          const agentUrl = (window.KSUAI && window.KSUAI.oracleAgentUrl) || 'https://rsdsafety.online';
+          const resp = await fetch(`${agentUrl}/safety/api/ai/ask-safety-assistant`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: `استخرج مصفوفة الجولات التفتيشية لوردية ${shiftKey} لشهر ${monthVal}`,
+              context: 'duty_schedule_ocr'
+            })
+          });
+          if (resp.ok) {
+            aiRes = await resp.json();
+          }
+        }
 
-          if (aiRes && aiRes.data) {
-            const d = aiRes.data;
-            if (!tempShiftUploads[shiftKey]) tempShiftUploads[shiftKey] = {};
-            tempShiftUploads[shiftKey].roundsPlan = d.roundsPlan || [];
-            tempShiftUploads[shiftKey].supervisor = d.supervisor || supInp?.value;
-            tempShiftUploads[shiftKey].monthTitle = d.monthTitle;
+        if (aiRes && aiRes.data) {
+          const d = aiRes.data;
+          if (!tempShiftUploads[shiftKey]) tempShiftUploads[shiftKey] = {};
+          tempShiftUploads[shiftKey].roundsPlan = d.roundsPlan || [];
+          tempShiftUploads[shiftKey].supervisor = d.supervisor || supInp?.value;
+          tempShiftUploads[shiftKey].monthTitle = d.monthTitle;
 
-            if (d.supervisor && supInp) {
-              supInp.value = d.supervisor;
-            }
-            if (countEl) {
-              countEl.textContent = `${d.roundsPlan?.length || 0} جولة مستخرجة 🎯`;
-            }
-            if (statusEl) {
-              statusEl.textContent = `✅ تم استخراج ${d.roundsPlan?.length || 0} جولة`;
-            }
-            if (typeof showToast === 'function') {
-              showToast(`تم استخراج مصفوفة ${schedule.shifts[shiftKey].name} بنجاح (${d.roundsPlan?.length || 0} جولة) ⚡`, 'success');
-            }
+          if (d.supervisor && supInp) {
+            supInp.value = d.supervisor;
+          }
+          if (countEl) {
+            countEl.textContent = `${d.roundsPlan?.length || 0} جولة مستخرجة 🎯`;
+          }
+          if (statusEl) {
+            statusEl.textContent = `✅ تم استخراج ${d.roundsPlan?.length || 0} جولة (${aiRes.source || 'ذكاء اصطناعي'})`;
+          }
+          if (typeof showToast === 'function') {
+            showToast(`تم استخراج مصفوفة ${schedule.shifts[shiftKey].name} بنجاح (${d.roundsPlan?.length || 0} جولة) ⚡`, 'success');
           }
         }
       } catch (err) {
-        console.error(`[AI Schedule] Parsing error for ${shiftKey}:`, err);
-        // Fallback to official verified matrix
+        console.warn(`[AI Schedule] Primary parsing failed, activating verified fallback for ${shiftKey}:`, err);
+        // Robust fallback to official verified matrix
         if (window.KSUAI && window.KSUAI.OFFICIAL_DUTY_PLANS_2026_11 && window.KSUAI.OFFICIAL_DUTY_PLANS_2026_11[shiftKey]) {
           const plan = window.KSUAI.OFFICIAL_DUTY_PLANS_2026_11[shiftKey];
           if (!tempShiftUploads[shiftKey]) tempShiftUploads[shiftKey] = {};
           tempShiftUploads[shiftKey].roundsPlan = plan;
           if (countEl) countEl.textContent = `${plan.length} جولة مستخرجة 🎯`;
-          if (statusEl) statusEl.textContent = `✅ تم استخراج ${plan.length} جولة`;
+          if (statusEl) statusEl.textContent = `✅ تم استخراج ${plan.length} جولة (محرك احتياطي)`;
         }
         if (typeof showToast === 'function') {
-          showToast(`تم اعتماد مصفوفة ${schedule.shifts[shiftKey].name} بنجاح ⚡`, 'success');
+          showToast(`تم اعتماد مصفوفة ${schedule.shifts[shiftKey].name} بنجاح عبر محرك الطوارئ المعتمد ⚡`, 'info');
         }
       } finally {
         if (btn) {
