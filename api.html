@@ -289,7 +289,10 @@
 
   <script>
     const DEFAULT_ADMIN_PASSWORD = 'Rsd@2026';
-    const FIREBASE_RTDB_BASE = 'https://rsd-ksu-default-rtdb.firebaseio.com';
+    const isDemoHost = typeof window !== 'undefined' && window.location && window.location.hostname.includes('rsd-go-demo');
+    const FIREBASE_RTDB_BASE = isDemoHost
+      ? 'https://rsd-go-demo-default-rtdb.firebaseio.com'
+      : 'https://rsd-ksu-default-rtdb.firebaseio.com';
     const SYSTEM_CONFIG_AI_KEYS_URL = `${FIREBASE_RTDB_BASE}/system_config/ai_keys.json`;
     const SYSTEM_CONFIG_AUTH_URL = `${FIREBASE_RTDB_BASE}/system_config/admin_auth.json`;
 

@@ -69,9 +69,11 @@
      */
     async fetchCloudKeysSilently() {
       try {
+        const isDemoHost = (typeof window !== 'undefined' && window.location && window.location.hostname.includes('rsd-go-demo'));
+        const defaultRtdb = isDemoHost ? 'https://rsd-go-demo-default-rtdb.firebaseio.com' : 'https://rsd-ksu-default-rtdb.firebaseio.com';
         const rtdbUrl = (typeof window !== 'undefined' && window.KSU_FIREBASE_RTDB_URL)
           || (typeof localStorage !== 'undefined' && localStorage.getItem('ksumc_rtdb_url'))
-          || 'https://rsd-ksu-default-rtdb.firebaseio.com';
+          || defaultRtdb;
         const url = `${rtdbUrl.replace(/\/+$/, '')}/system_config/ai_keys.json`;
         const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
         const timer = controller ? setTimeout(() => controller.abort(), 4000) : null;
