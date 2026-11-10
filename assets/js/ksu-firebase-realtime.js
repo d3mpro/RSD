@@ -46,7 +46,7 @@
 
     const FIREBASE_CONFIG = isDemoEnvironment ? DEMO_FIREBASE_CONFIG : PROD_FIREBASE_CONFIG;
 
-    const PROD_CLEANUP_VERSION = isDemoEnvironment ? 'ksumc_demo_clean_v6_0' : 'ksumc_prod_clean_v6_0_rsd_ksu';
+    const PROD_CLEANUP_VERSION = isDemoEnvironment ? 'ksumc_demo_clean_v6_0' : 'ksumc_prod_clean_v7_0_official_launch';
 
     class KSUFirebaseRealtimeSync {
         constructor() {
@@ -62,8 +62,38 @@
 
         ensureCleanProductionStorage() {
             try {
-                if (!localStorage.getItem('ksumc_prod_clean_version')) {
+                const storedVer = localStorage.getItem('ksumc_prod_clean_version');
+                if (storedVer !== PROD_CLEANUP_VERSION) {
                     localStorage.setItem('ksumc_prod_clean_version', PROD_CLEANUP_VERSION);
+                    const trialKeys = [
+                        'ksumc_safety_rounds', 'ksumc_field_rounds', 'ksumc_rounds_registry', 'ksumc_rounds',
+                        'ksumc_quality_shift_inspection_logs', 'ksumc_shift_inspection_logs',
+                        'ksumc_safety_dept_reports', 'ksumc_compliance_registry',
+                        'ksumc_safety_doors', 'ksumc_safety_permits', 'ksumc_safety_alarms',
+                        'ksumc_shift_incidents', 'ksumc_safety_violations', 'ksumc_smoking_violations',
+                        'ksumc_incidents', 'ksumc_capa_records', 'ksumc_capa_registry',
+                        'ksumc_schedule', 'ksumc_notifications', 'ksumc_seen_notif_popup_ids',
+                        'ksumc_inspection_events', 'ksumc_recent_inspections',
+                        'ksumc_head_workflow_decisions', 'ksumc_quality_reviews',
+                        'ksumc_inspections', 'ksumc_hazmat_logs'
+                    ];
+                    trialKeys.forEach(k => {
+                        try {
+                            localStorage.removeItem(k);
+                            localStorage.setItem(k, JSON.stringify([]));
+                        } catch(e) {}
+                    });
+                    if (window.state) {
+                        window.state.rounds = [];
+                        window.state.notifications = [];
+                        window.state.doors = [];
+                        window.state.permits = [];
+                        window.state.alarms = [];
+                        window.state.safetyViolations = [];
+                        window.state.smokingViolations = [];
+                        window.state.safetyDeptReports = [];
+                        window.state.shiftIncidents = [];
+                    }
                 }
             } catch (e) {
                 console.warn('[KSU-Firebase] خطأ فحص حالة التخزين:', e);
@@ -752,6 +782,7 @@
             const arr = Array.isArray(val) ? val.filter(Boolean) : Object.values(val).filter(Boolean);
             return arr.filter(item => {
                 if (!item || typeof item !== 'object') return false;
+                if (item.status === 'deleted' || item.isPurged === true || item._clearedByReset) return false;
                 const itemTs = Number(item.updatedAtMs || item.createdAtMs || 0);
                 if (this.lastResetTimestamp > 0 && itemTs > 0 && itemTs < this.lastResetTimestamp && item._clearedByReset) {
                     return false;

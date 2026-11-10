@@ -1391,31 +1391,465 @@ const INITIAL_BUILDINGS = [
 const INITIAL_SCHEDULE = [];
 
 // Initial Users & Roles Data
-// Initial Users & Roles Data - Official Safety Department Roster (21 Personnel)
-const OFFICIAL_ROSTER_VERSION = '2026.09.24_PRODUCTION_ALSAQRI_ONLY';
+// Initial Users & Roles Data - Official Safety Department Roster (22 Accounts)
+const OFFICIAL_ROSTER_VERSION = '2026.11.10_PRODUCTION_ROSTER_V8';
 const INITIAL_USERS = [
   {
     id: 'USR-01',
     name: 'أ. علي سليمان الصقري',
-    employeeId: '95972',
-    empId: '95972',
-    username: 'alsaqri',
-    role: 'مطور النظام ومسؤول التقنية',
+    employeeId: 'DEV',
+    empId: 'DEV',
+    altEmpId: '95972',
+    username: 'DEV',
+    altUsername: 'alsaqri',
+    role: 'مطور النظام ومسؤول التقنية والمشرف العام',
     department: 'الإدارة العامة للأمن والسلامة - القيادة والأنظمة',
-    shift: 'الإدارة العليا / جميع الورديات',
+    shift: 'جميع الورديات',
     email: 'aalsaqri@ksu.edu.sa',
     phone: '0532722622',
     radioChannel: 'القناة 1 (القيادة والتحكم)',
     status: 'نشط',
     password: 'admin123',
     permissions: {
-      approveReports: true,
+      all: true,
+      developer: true,
+      fullAccess: true,
+      manageUsers: true,
+      manageFacilities: true,
       manageBuildings: true,
       manageTemplates: true,
-      manageUsers: true,
+      approveReports: true,
+      fieldInspect: true,
+      qualityAudit: true,
       issuePermits: true,
       conductInspections: true
     }
+  },
+  {
+    id: 'USR-DIR-01',
+    name: 'المدير العام للسلامة والأمن',
+    employeeId: 'D1',
+    empId: 'D1',
+    username: 'D1',
+    role: 'مدير الإدارة العامة للأمن والسلامة بالمدينة الطبية',
+    roleCategory: 'head',
+    workflowRole: 'director',
+    portal: 'dashboard',
+    facility: 'المدينة الطبية الجامعية (KSUMC)',
+    department: 'الإدارة العامة للأمن والسلامة',
+    shift: 'جميع الورديات',
+    email: '',
+    phone: '',
+    status: 'نشط',
+    password: '123456',
+    permissions: {
+      all: true,
+      directorGeneral: true,
+      headOfDepartment: true,
+      approveReports: true
+    }
+  },
+  {
+    id: 'USR-HEAD-02',
+    name: 'أ. مصعب عبدالله آل حماد',
+    employeeId: 'H2',
+    empId: 'H2',
+    username: 'H2',
+    role: 'رئيس إدارة السلامة بالمدينة الطبية',
+    roleCategory: 'head',
+    workflowRole: 'dept_head',
+    portal: 'head',
+    facility: 'المدينة الطبية الجامعية (KSUMC)',
+    department: 'إدارة السلامة',
+    shift: 'جميع الورديات',
+    email: '',
+    phone: '',
+    status: 'نشط',
+    password: '123456',
+    permissions: {
+      headOfDepartment: true,
+      generalSupervisor: false,
+      receiveSafetyReports: true,
+      approveReports: true,
+      conductInspections: true,
+      issuePermits: true,
+      manageBuildings: true,
+      manageTemplates: true
+    }
+  },
+  {
+    id: 'USR-7453',
+    name: 'أ. حسن إبراهيم دعاك',
+    employeeId: 'H1',
+    empId: 'H1',
+    username: 'H1',
+    role: 'المشرف العام الملك خالد (H1) - مشرف وحدة السلامة',
+    roleCategory: 'head',
+    workflowRole: 'h1',
+    portal: 'head',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'جميع الورديات',
+    email: '',
+    phone: '',
+    status: 'نشط',
+    password: '123456',
+    permissions: {
+      headOfDepartment: false,
+      generalSupervisor: true,
+      receiveSafetyReports: true,
+      receiveCodeReports: true,
+      receiveSafetyViolations: true,
+      receiveSmokingViolations: true,
+      approveReports: true,
+      conductInspections: true,
+      issuePermits: true,
+      manageBuildings: true,
+      manageTemplates: true,
+      manageUsers: true
+    }
+  },
+  {
+    id: 'USR-Q1',
+    name: 'قسم الجودة وتقييم الأداء',
+    employeeId: 'Q1',
+    empId: 'Q1',
+    username: 'Q1',
+    role: 'مسؤول الجودة والاعتماد (CBAHI / JCI)',
+    roleCategory: 'quality',
+    portal: 'quality',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'جميع الورديات',
+    email: '',
+    phone: '',
+    status: 'نشط',
+    password: '123456',
+    permissions: {
+      qualityAudit: true,
+      receiveFieldInspections: true,
+      receiveDoorRequests: true,
+      receiveHotWorkPermits: true,
+      approveReports: true,
+      approveDoorRequests: true,
+      approveHotWorkPermits: true,
+      manageTemplates: true,
+      conductInspections: true,
+      issuePermits: true,
+      manageBuildings: false,
+      manageUsers: false
+    }
+  },
+  // مشرفو الورديات (S1, S2, S3)
+  {
+    id: 'USR-SH1-201',
+    name: 'أ. ناصر فلاح القحطاني',
+    employeeId: 'S1',
+    empId: 'S1',
+    altEmpId: 'KSU-SH1-201',
+    username: 'S1',
+    role: 'مشرف الوردية الأولى (صباحي)',
+    roleCategory: 'shift_supervisor',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 1 (صباحي)',
+    email: '',
+    phone: '',
+    status: 'نشط',
+    password: '123456',
+    permissions: {
+      approveReports: true,
+      conductInspections: true,
+      issuePermits: true
+    }
+  },
+  {
+    id: 'USR-SH2-301',
+    name: 'أ. أحمد عبدالله الأكلبي',
+    employeeId: 'S2',
+    empId: 'S2',
+    altEmpId: 'KSU-SH2-301',
+    username: 'S2',
+    role: 'مشرف الوردية الثانية (مسائي)',
+    roleCategory: 'shift_supervisor',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 2 (مسائي)',
+    email: '',
+    phone: '',
+    status: 'نشط',
+    password: '123456',
+    permissions: {
+      approveReports: true,
+      conductInspections: true,
+      issuePermits: true
+    }
+  },
+  {
+    id: 'USR-SH3-401',
+    name: 'أ. سيف عبدالكريم مكرمي',
+    employeeId: 'S3',
+    empId: 'S3',
+    altEmpId: 'KSU-SH3-401',
+    username: 'S3',
+    role: 'مشرف الوردية الثالثة (ليلي)',
+    roleCategory: 'shift_supervisor',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 3 (ليلي)',
+    email: '',
+    phone: '',
+    status: 'نشط',
+    password: '123456',
+    permissions: {
+      approveReports: true,
+      conductInspections: true,
+      issuePermits: true
+    }
+  },
+  // مفتشو الوردية الأولى (صباحي - M1 إلى M6)
+  {
+    id: 'USR-SH1-202',
+    name: 'أ. عادل عاضة الشلوي',
+    employeeId: 'M1',
+    empId: 'M1',
+    altEmpId: 'KSU-SH1-202',
+    username: 'M1',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 1 (صباحي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
+  },
+  {
+    id: 'USR-SH1-203',
+    name: 'أ. عادل خلف العنزي',
+    employeeId: 'M2',
+    empId: 'M2',
+    altEmpId: 'KSU-SH1-203',
+    username: 'M2',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 1 (صباحي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
+  },
+  {
+    id: 'USR-SH1-204',
+    name: 'أ. عبدالله إبراهيم الدامغ',
+    employeeId: 'M3',
+    empId: 'M3',
+    altEmpId: 'KSU-SH1-204',
+    username: 'M3',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 1 (صباحي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
+  },
+  {
+    id: 'USR-SH1-205',
+    name: 'أ. محمد سعود الصقري',
+    employeeId: 'M4',
+    empId: 'M4',
+    altEmpId: 'KSU-SH1-205',
+    username: 'M4',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 1 (صباحي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
+  },
+  {
+    id: 'USR-SH1-206',
+    name: 'أ. ياسر قينان الزهراني',
+    employeeId: 'M5',
+    empId: 'M5',
+    altEmpId: 'KSU-SH1-206',
+    username: 'M5',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 1 (صباحي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
+  },
+  {
+    id: 'USR-SH1-207',
+    name: 'أ. مشعان خلف العنزي',
+    employeeId: 'M6',
+    empId: 'M6',
+    altEmpId: 'KSU-SH1-207',
+    username: 'M6',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 1 (صباحي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
+  },
+  // مفتشو الوردية الثانية (مسائي - M7 إلى M10)
+  {
+    id: 'USR-SH2-302',
+    name: 'أ. عبدالرحمن حسين الكعبي',
+    employeeId: 'M7',
+    empId: 'M7',
+    altEmpId: 'KSU-SH2-302',
+    username: 'M7',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 2 (مسائي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
+  },
+  {
+    id: 'USR-SH2-303',
+    name: 'أ. أحمد قاسم ابوعيشة',
+    employeeId: 'M8',
+    empId: 'M8',
+    altEmpId: 'KSU-SH2-303',
+    username: 'M8',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 2 (مسائي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
+  },
+  {
+    id: 'USR-SH2-304',
+    name: 'أ. محمد علي الربعي',
+    employeeId: 'M9',
+    empId: 'M9',
+    altEmpId: 'KSU-SH2-304',
+    username: 'M9',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 2 (مسائي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
+  },
+  {
+    id: 'USR-SH2-305',
+    name: 'أ. سلطان علي العاصمي',
+    employeeId: 'M10',
+    empId: 'M10',
+    altEmpId: 'KSU-SH2-305',
+    username: 'M10',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 2 (مسائي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
+  },
+  // مفتشو الوردية الثالثة (ليلي - M11 إلى M14)
+  {
+    id: 'USR-SH3-402',
+    name: 'أ. سليمان سالم العنزي',
+    employeeId: 'M11',
+    empId: 'M11',
+    altEmpId: 'KSU-SH3-402',
+    username: 'M11',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 3 (ليلي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
+  },
+  {
+    id: 'USR-SH3-403',
+    name: 'أ. فواز حمد العازمي',
+    employeeId: 'M12',
+    empId: 'M12',
+    altEmpId: 'KSU-SH3-403',
+    username: 'M12',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 3 (ليلي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
+  },
+  {
+    id: 'USR-SH3-404',
+    name: 'أ. صالح محمد العريف',
+    employeeId: 'M13',
+    empId: 'M13',
+    altEmpId: 'KSU-SH3-404',
+    username: 'M13',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 3 (ليلي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
+  },
+  {
+    id: 'USR-SH3-405',
+    name: 'أ. ناصر فلاح القحطاني',
+    employeeId: 'M14',
+    empId: 'M14',
+    altEmpId: 'KSU-SH3-405',
+    username: 'M14',
+    role: 'مفتش سلامة ميداني',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    department: 'مستشفى الملك خالد الجامعي (KKUH)',
+    shift: 'الوردية 3 (ليلي)',
+    status: 'نشط',
+    password: '123456',
+    permissions: { conductInspections: true, issuePermits: true }
   }
 ];
 
@@ -7451,10 +7885,10 @@ function generateQRCodeSVG(text, size = 110) {
 // Load State from LocalStorage
 function loadState() {
   const sampleDataVersion = localStorage.getItem('ksumc_sample_data_version');
-  const OFFICIAL_SAMPLE_DATA_VERSION = 'v6.0-clean-pilot-launch-2026';
+  const OFFICIAL_SAMPLE_DATA_VERSION = 'v7.0-clean-production-official-2026';
 
   if (sampleDataVersion !== OFFICIAL_SAMPLE_DATA_VERSION) {
-    // Complete production reset of all sample reports and statistics for Pilot Release
+    // Complete production reset of all sample reports, inspection rounds, and notifications
     state.rounds = [];
     state.alarms = [];
     state.permits = [];
@@ -7466,6 +7900,7 @@ function loadState() {
     state.shiftTasks = [];
     state.qualityDirectives = [];
     state.schedule = [];
+    state.notifications = [];
     state.systemMetrics = { ...DEFAULT_SYSTEM_METRICS };
 
     const resetKeys = [
@@ -7484,8 +7919,18 @@ function loadState() {
       'ksumc_safety_rounds',
       'ksumc_field_rounds',
       'ksumc_rounds_registry',
+      'ksumc_rounds',
       'ksumc_smoking_viols',
-      'ksumc_safety_viols'
+      'ksumc_safety_viols',
+      'ksumc_notifications',
+      'ksumc_seen_notif_popup_ids',
+      'ksumc_inspection_events',
+      'ksumc_recent_inspections',
+      'ksumc_head_workflow_decisions',
+      'ksumc_quality_reviews',
+      'ksumc_compliance_registry',
+      'ksumc_capa_records',
+      'ksumc_capa_registry'
     ];
     resetKeys.forEach(k => {
       try { localStorage.setItem(k, JSON.stringify([])); } catch(e) {}
@@ -7493,7 +7938,7 @@ function loadState() {
     localStorage.setItem(STORAGE_KEY_METRICS, JSON.stringify(state.systemMetrics));
     localStorage.setItem('ksumc_sample_data_version', OFFICIAL_SAMPLE_DATA_VERSION);
   } else {
-  // Auto-sanitize any lingering CBAHI / NFPA text from stored rounds or templates
+    // Auto-sanitize any lingering CBAHI / NFPA text from stored rounds or templates
     try {
       let storedRnds = localStorage.getItem(STORAGE_KEY_ROUNDS);
       if (storedRnds && (storedRnds.includes('CBAHI') || storedRnds.includes('NFPA'))) {
@@ -7515,12 +7960,8 @@ function loadState() {
         localStorage.setItem(STORAGE_KEY_ROUNDS, JSON.stringify(parsed));
       }
     } catch (_) {}
-    const storedRounds = localStorage.getItem(STORAGE_KEY_ROUNDS);
-  if ((!storedRounds || storedRounds === '[]') && window.KSU_CBAHI_DEMO && typeof window.KSU_CBAHI_DEMO.seed === 'function') {
-    window.KSU_CBAHI_DEMO.seed(true);
-  }
-  const finalStoredRounds = localStorage.getItem(STORAGE_KEY_ROUNDS);
-  state.rounds = finalStoredRounds ? JSON.parse(finalStoredRounds) : [];
+    const finalStoredRounds = localStorage.getItem(STORAGE_KEY_ROUNDS);
+    state.rounds = finalStoredRounds ? JSON.parse(finalStoredRounds) : [];
   }
 
   const storedAlarms = localStorage.getItem(STORAGE_KEY_ALARMS);
@@ -7604,9 +8045,8 @@ function loadState() {
   const storedUsers = localStorage.getItem(STORAGE_KEY_USERS);
 
   if (!storedUsers) {
-    // Official production reset: only preserve system administrator alsaqri
     INITIAL_USERS.forEach(u => {
-      if (!u.password) u.password = 'admin123';
+      if (!u.password) u.password = u.id === 'USR-01' ? 'admin123' : '123456';
     });
     state.users = JSON.parse(JSON.stringify(INITIAL_USERS));
     localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(state.users));
@@ -7617,33 +8057,49 @@ function loadState() {
     } catch (e) {
       state.users = JSON.parse(JSON.stringify(INITIAL_USERS));
     }
-    let usersUpdated = false;
+    const isNewRoster = rosterVersion !== OFFICIAL_ROSTER_VERSION;
+    let usersUpdated = isNewRoster;
     INITIAL_USERS.forEach(initUser => {
       if (!initUser.password) {
-        initUser.password = initUser.id === 'USR-01' ? 'admin123' : 'ksu123';
+        initUser.password = initUser.id === 'USR-01' ? 'admin123' : '123456';
       }
-      const existingIdx = state.users.findIndex(u => u.id === initUser.id || u.employeeId === initUser.employeeId);
+      const existingIdx = state.users.findIndex(u =>
+        u.id === initUser.id ||
+        (u.empId && initUser.empId && u.empId.toLowerCase() === initUser.empId.toLowerCase()) ||
+        (u.employeeId && initUser.employeeId && u.employeeId.toLowerCase() === initUser.employeeId.toLowerCase()) ||
+        (u.username && initUser.username && u.username.toLowerCase() === initUser.username.toLowerCase()) ||
+        (initUser.altEmpId && (u.empId === initUser.altEmpId || u.employeeId === initUser.altEmpId))
+      );
       if (existingIdx >= 0) {
         const existingUser = state.users[existingIdx];
-        // Retain any user-modified permissions, roles, password, details while accepting new schema defaults
         state.users[existingIdx] = {
-          password: existingUser.password || initUser.password,
           ...initUser,
           ...existingUser,
+          id: initUser.id,
+          name: isNewRoster ? initUser.name : (existingUser.name || initUser.name),
+          username: initUser.username,
+          empId: initUser.empId,
+          employeeId: initUser.employeeId,
+          role: isNewRoster ? initUser.role : (existingUser.role || initUser.role),
+          shift: isNewRoster ? initUser.shift : (existingUser.shift || initUser.shift),
+          portal: initUser.portal || existingUser.portal,
+          password: existingUser.password || initUser.password,
           permissions: {
             ...initUser.permissions,
             ...(existingUser.permissions || {})
           }
         };
         usersUpdated = true;
-      } else if (!state.users.some(u => u.name === initUser.name)) {
-        initUser.password = initUser.password || (initUser.id === 'USR-01' ? 'admin123' : 'ksu123');
+      } else {
         state.users.push(JSON.parse(JSON.stringify(initUser)));
         usersUpdated = true;
       }
     });
     if (usersUpdated) {
       localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(state.users));
+      if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.pushUsersToFirebase === 'function') {
+        try { window.ksuFirebaseSync.pushUsersToFirebase(state.users, 'initial_roster_sync_v8'); } catch (_) {}
+      }
     }
     localStorage.setItem('ksumc_roster_version', OFFICIAL_ROSTER_VERSION);
   }
@@ -7709,7 +8165,12 @@ function loadState() {
   const activeAuthUser = (window.KSUAuth && typeof window.KSUAuth.getUser === 'function' ? window.KSUAuth.getUser() : null) || (function() {
     try {
       const raw = localStorage.getItem('ksu_active_user');
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.id || parsed.username || parsed.empId || parsed.employeeId)) {
+        return parsed;
+      }
+      return null;
     } catch(e) { return null; }
   })();
   if (activeAuthUser) {
@@ -7938,6 +8399,11 @@ function saveUsers() {
 
   if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveUser === 'function') {
     if (state.users && state.users.length > 0) window.KSUOracleSync.saveUser(state.users);
+  }
+  if (!window._ksumcApplyingRemoteSync && window.ksuFirebaseSync && typeof window.ksuFirebaseSync.pushUsersToFirebase === 'function') {
+    if (state.users && state.users.length > 0) {
+      window.ksuFirebaseSync.pushUsersToFirebase(state.users, 'admin_save_users');
+    }
   }
 }
 function saveAssets(targetAsset) {
@@ -20602,11 +21068,64 @@ state.qualityShiftLogFilter = {
 };
 
 function getNormalizedShiftKey(val) {
-  if (!val) return '';
-  const s = String(val).toLowerCase();
-  if (s.includes('shift1') || s.includes('الأولى') || s.includes('الاولى') || s.includes('صباح') || s.includes('1')) return 'shift1';
-  if (s.includes('shift2') || s.includes('الثانية') || s.includes('الثانيه') || s.includes('مساء') || s.includes('مسائ') || s.includes('2')) return 'shift2';
-  if (s.includes('shift3') || s.includes('الثالثة') || s.includes('الثالثه') || s.includes('ليل') || s.includes('مناوب') || s.includes('3')) return 'shift3';
+  if (val === null || val === undefined) return '';
+  const raw = String(val).trim();
+  if (!raw) return '';
+
+  const s = raw.toLowerCase();
+
+  // 1. Exact match / Canonical keys / Single digit tokens / Short supervisor codes
+  if (s === 'shift1' || s === '1' || s === '١' || s === 's1') return 'shift1';
+  if (s === 'shift2' || s === '2' || s === '٢' || s === 's2') return 'shift2';
+  if (s === 'shift3' || s === '3' || s === '٣' || s === 's3') return 'shift3';
+
+  // 2. Specific English shift tokens with word boundaries (e.g. 'shift 1', 'shift-2', 'shift_3')
+  const hasShift1En = /\bshift[-_\s]*1\b/i.test(s);
+  const hasShift2En = /\bshift[-_\s]*2\b/i.test(s);
+  const hasShift3En = /\bshift[-_\s]*3\b/i.test(s);
+
+  // 3. Arabic explicit shift phrases with character normalization
+  const normAr = s
+    .replace(/[\u064B-\u065F\u0670]/g, '') // strip diacritics / tashkeel
+    .replace(/[إأآٱ]/g, 'ا')               // unify alef
+    .replace(/ة/g, 'ه')                   // unify taa marbuta
+    .replace(/١/g, '1')                   // normalize eastern arabic digits
+    .replace(/٢/g, '2')
+    .replace(/٣/g, '3');
+
+  // Explicit shift noun + number or ordinal pattern:
+  // e.g. "الورديه 1", "ورديه 1", "الورديه الاولى", "ورديه اولى", "مشرف الورديه 1"
+  const hasShift1Ar = /(?:الورديه|ورديه)\s*[:#-]?\s*(?:1|الاولى|اولى)\b/u.test(normAr) ||
+                      /(?:مشرف|مفتش)\s*(?:الورديه|ورديه)?\s*[:#-]?\s*(?:1|الاولى|اولى)\b/u.test(normAr) ||
+                      /(?:^|[^\p{L}\p{N}])(?:الاولى|اولى)(?:[^\p{L}\p{N}]|$)/u.test(normAr);
+
+  const hasShift2Ar = /(?:الورديه|ورديه)\s*[:#-]?\s*(?:2|الثانيه|ثانيه)\b/u.test(normAr) ||
+                      /(?:مشرف|مفتش)\s*(?:الورديه|ورديه)?\s*[:#-]?\s*(?:2|الثانيه|ثانيه)\b/u.test(normAr) ||
+                      /(?:^|[^\p{L}\p{N}])(?:الثانيه|ثانيه)(?:[^\p{L}\p{N}]|$)/u.test(normAr);
+
+  const hasShift3Ar = /(?:الورديه|ورديه)\s*[:#-]?\s*(?:3|الثالثه|ثالثه)\b/u.test(normAr) ||
+                      /(?:مشرف|مفتش)\s*(?:الورديه|ورديه)?\s*[:#-]?\s*(?:3|الثالثه|ثالثه)\b/u.test(normAr) ||
+                      /(?:^|[^\p{L}\p{N}])(?:الثالثه|ثالثه)(?:[^\p{L}\p{N}]|$)/u.test(normAr);
+
+  const match1 = hasShift1En || hasShift1Ar;
+  const match2 = hasShift2En || hasShift2Ar;
+  const match3 = hasShift3En || hasShift3Ar;
+
+  // Unambiguous single match
+  if (match1 && !match2 && !match3) return 'shift1';
+  if (match2 && !match1 && !match3) return 'shift2';
+  if (match3 && !match1 && !match2) return 'shift3';
+
+  // 4. Time-of-day period descriptors: "صباحي", "مسائي", "ليلي"
+  const hasMorning = /(?:^|[^\p{L}\p{N}])(?:صباحي|صباحيه|الصباحي|الصباحيه|صباح)(?:[^\p{L}\p{N}]|$)/u.test(normAr);
+  const hasEvening = /(?:^|[^\p{L}\p{N}])(?:مسائي|مسائيه|المسائي|المسائيه|مساء)(?:[^\p{L}\p{N}]|$)/u.test(normAr);
+  const hasNight   = /(?:^|[^\p{L}\p{N}])(?:ليلي|ليليه|الليلي|الليليه|ليل)(?:[^\p{L}\p{N}]|$)/u.test(normAr);
+
+  if (hasMorning && !hasEvening && !hasNight) return 'shift1';
+  if (hasEvening && !hasMorning && !hasNight) return 'shift2';
+  if (hasNight && !hasMorning && !hasEvening) return 'shift3';
+
+  // 5. Fallback: preserve original lowercase string (e.g. 'all', 'جميع الورديات', or non-shift text)
   return s;
 }
 window.getNormalizedShiftKey = getNormalizedShiftKey;
@@ -20663,10 +21182,8 @@ window.canSupervisorApproveRound = canSupervisorApproveRound;
 
 function getCurrentActiveShiftKey(userObj = null) {
   if (userObj) {
-    const s = String(userObj.shift || '') + ' ' + String(userObj.role || '');
-    if (s.includes('shift1') || s.includes('الأولى') || s.includes('الاولى') || s.includes('صباح') || s.includes('1')) return 'shift1';
-    if (s.includes('shift2') || s.includes('الثانية') || s.includes('الثانيه') || s.includes('مساء') || s.includes('مسائ') || s.includes('2')) return 'shift2';
-    if (s.includes('shift3') || s.includes('الثالثة') || s.includes('الثالثه') || s.includes('ليل') || s.includes('مناوب') || s.includes('3')) return 'shift3';
+    const k = getNormalizedShiftKey(userObj.shift || userObj.role);
+    if (k === 'shift1' || k === 'shift2' || k === 'shift3') return k;
   }
   const hour = new Date().getHours();
   if (hour >= 7 && hour < 15) return 'shift1';

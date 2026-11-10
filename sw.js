@@ -1,10 +1,10 @@
 /**
- * KSUMC Safety System - Service Worker (PWA Offline Engine v4.8-user-pass-login)
+ * KSUMC Safety System - Service Worker (PWA Offline Engine v5.0-official-launch)
  * المدينة الطبية بجامعة الملك سعود - محرك العمل دون اتصال
  */
 
 const isDemoHost = typeof self !== 'undefined' && self.location && self.location.hostname && self.location.hostname.includes('rsd-go-demo');
-const CACHE_NAME = isDemoHost ? 'rsd-go-demo-cache-v2.3.0' : 'rsd-ksu-cache-v2.3.0-api-vault-silent-fallback-2026-11-09';
+const CACHE_NAME = isDemoHost ? 'rsd-go-demo-cache-v2.3.0' : 'rsd-ksu-cache-v3.1.0-official-launch';
 const FIREBASE_NOTIFS_URL = isDemoHost
   ? 'https://rsd-go-demo-default-rtdb.firebaseio.com/notifications.json'
   : 'https://rsd-ksu-default-rtdb.firebaseio.com/notifications.json';

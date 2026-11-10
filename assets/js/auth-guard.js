@@ -62,11 +62,12 @@
   }
 
 
-    // قائمة الحسابات المعتمدة بالمنظومة للتشغيل الفعلي المعتمد (الإصدار v7.0)
+    // قائمة الحسابات المعتمدة بالمنظومة للتشغيل الفعلي المعتمد (الإصدار v8.0)
   const DEFAULT_USERS = [
+    // 1. الإدارة العامة والقيادة
     {
       id: 'USR-01',
-      name: 'مطور النظام',
+      name: 'أ. علي سليمان الصقري',
       empId: 'DEV',
       employeeId: 'DEV',
       altEmpId: '95972',
@@ -99,39 +100,15 @@
       }
     },
     {
-      id: 'USR-DIR-01',
-      name: 'مدير عام',
-      empId: 'D1',
-      employeeId: 'D1',
-      username: 'D1',
-      email: '',
-      phone: '',
-      role: 'مدير الإدارة العامة للأمن والسلامة بالمدينة الطبية',
-      roleCategory: 'head',
-      workflowRole: 'director',
-      portal: 'dashboard',
-      facility: 'المدينة الطبية الجامعية (KSUMC)',
-      department: 'الإدارة العامة للأمن والسلامة',
-      shift: 'جميع الورديات',
-      passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
-      status: 'نشط',
-      verifiedLocally: true,
-      permissions: {
-        all: true,
-        directorGeneral: true,
-        headOfDepartment: true,
-        approveReports: true
-      }
-    },
-    {
       id: 'USR-HEAD-02',
-      name: 'رئيس إدارة',
+      name: 'أ. مصعب عبدالله آل حماد',
       empId: 'H2',
       employeeId: 'H2',
       username: 'H2',
+      altUsername: 'mosab',
       email: '',
       phone: '',
-      role: 'رئيس إدارة السلامة بالمدينة الطبية',
+      role: 'رئيس قسم السلامة بالمدينة الطبية',
       roleCategory: 'head',
       workflowRole: 'dept_head',
       portal: 'head',
@@ -154,13 +131,14 @@
     },
     {
       id: 'USR-7453',
-      name: 'مشرف عام',
+      name: 'أ. حسن إبراهيم دعاك',
       empId: 'H1',
       employeeId: 'H1',
       username: 'H1',
+      altUsername: 'hassan',
       email: '',
       phone: '',
-      role: 'المشرف العام الملك خالد (H1) - مشرف وحدة السلامة',
+      role: 'المشرف العام للسلامة',
       roleCategory: 'head',
       workflowRole: 'h1',
       portal: 'head',
@@ -186,18 +164,47 @@
       }
     },
     {
+      id: 'USR-SAF-01',
+      name: 'أ. أحمد الأحمري',
+      empId: 'SAF1',
+      employeeId: 'SAF1',
+      altEmpId: 'A1',
+      username: 'SAF1',
+      altUsername: 'A1',
+      email: '',
+      phone: '',
+      role: 'أخصائي سلامة ميدانية',
+      roleCategory: 'head',
+      workflowRole: 'specialist',
+      portal: 'field',
+      facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+      department: 'إدارة السلامة الميدانية',
+      shift: 'جميع الورديات',
+      passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
+      status: 'نشط',
+      verifiedLocally: true,
+      permissions: {
+        receiveSafetyReports: true,
+        receiveFieldInspections: true,
+        approveReports: true,
+        conductInspections: true,
+        issuePermits: true
+      }
+    },
+    {
       id: 'USR-Q1',
-      name: 'مسؤول الجودة والاعتماد',
+      name: 'أ. علي سليمان الصقري',
       empId: 'Q1',
       employeeId: 'Q1',
       username: 'Q1',
-      email: '',
+      altUsername: 'alsaqri',
+      email: 'aalsaqri@ksu.edu.sa',
       phone: '',
       role: 'مسؤول الجودة والاعتماد (CBAHI / JCI)',
       roleCategory: 'quality',
       portal: 'quality',
       facility: 'مستشفى الملك خالد الجامعي (KKUH)',
-      department: 'مستشفى الملك خالد الجامعي (KKUH)',
+      department: 'إدارة الجودة والاعتماد',
       shift: 'جميع الورديات',
       passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
       status: 'نشط',
@@ -223,7 +230,7 @@
     // ==========================================
     {
       id: 'USR-SH1-201',
-      name: 'مشرف الوردية',
+      name: 'أ. ناصر فلاح القحطاني',
       empId: 'S1',
       employeeId: 'S1',
       altEmpId: 'KSU-SH1-201',
@@ -245,7 +252,7 @@
     },
     {
       id: 'USR-SH2-301',
-      name: 'مشرف الوردية',
+      name: 'أ. أحمد عبدالله الأكلبي',
       empId: 'S2',
       employeeId: 'S2',
       altEmpId: 'KSU-SH2-301',
@@ -267,7 +274,7 @@
     },
     {
       id: 'USR-SH3-401',
-      name: 'مشرف الوردية',
+      name: 'أ. سيف عبدالكريم مكرمي',
       empId: 'S3',
       employeeId: 'S3',
       altEmpId: 'KSU-SH3-401',
@@ -291,10 +298,10 @@
     // ==========================================
     // مفتشو السلامة الميدانيون (Field Inspectors)
     // ==========================================
-    // 1. الوردية الأولى (صباحي - Shift 1)
+    // 1. الوردية الأولى (صباحي - Shift 1) - 7 مفتشين
     {
       id: 'USR-SH1-202',
-      name: 'مفتش الوردية',
+      name: 'أ. عادل خلف العنزي',
       empId: 'M1',
       employeeId: 'M1',
       altEmpId: 'KSU-SH1-202',
@@ -311,7 +318,7 @@
     },
     {
       id: 'USR-SH1-203',
-      name: 'مفتش الوردية',
+      name: 'أ. عبدالله إبراهيم الدامغ',
       empId: 'M2',
       employeeId: 'M2',
       altEmpId: 'KSU-SH1-203',
@@ -328,7 +335,7 @@
     },
     {
       id: 'USR-SH1-204',
-      name: 'مفتش الوردية',
+      name: 'أ. صالح محمد العريف',
       empId: 'M3',
       employeeId: 'M3',
       altEmpId: 'KSU-SH1-204',
@@ -345,7 +352,7 @@
     },
     {
       id: 'USR-SH1-205',
-      name: 'مفتش الوردية',
+      name: 'أ. عادل عاضة الشلوي',
       empId: 'M4',
       employeeId: 'M4',
       altEmpId: 'KSU-SH1-205',
@@ -362,7 +369,7 @@
     },
     {
       id: 'USR-SH1-206',
-      name: 'مفتش الوردية',
+      name: 'أ. مشعان خلف العنزي',
       empId: 'M5',
       employeeId: 'M5',
       altEmpId: 'KSU-SH1-206',
@@ -379,7 +386,7 @@
     },
     {
       id: 'USR-SH1-207',
-      name: 'مفتش الوردية',
+      name: 'أ. ياسر قينان الزهراني',
       empId: 'M6',
       employeeId: 'M6',
       altEmpId: 'KSU-SH1-207',
@@ -394,31 +401,31 @@
       status: 'نشط',
       permissions: { conductInspections: true, issuePermits: true }
     },
-
-    // 2. الوردية الثانية (مسائي - Shift 2)
     {
-      id: 'USR-SH2-302',
-      name: 'مفتش الوردية',
+      id: 'USR-SH1-208',
+      name: 'أ. محمد سعود الصقري',
       empId: 'M7',
       employeeId: 'M7',
-      altEmpId: 'KSU-SH2-302',
+      altEmpId: 'KSU-SH1-208',
       username: 'M7',
       role: 'مفتش سلامة ميداني',
       roleCategory: 'field_inspector',
       portal: 'field',
       facility: 'مستشفى الملك خالد الجامعي (KKUH)',
       department: 'مستشفى الملك خالد الجامعي (KKUH)',
-      shift: 'الوردية 2 (مسائي)',
+      shift: 'الوردية 1 (صباحي)',
       passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
       status: 'نشط',
       permissions: { conductInspections: true, issuePermits: true }
     },
+
+    // 2. الوردية الثانية (مسائي - Shift 2) - 4 مفتشين
     {
-      id: 'USR-SH2-303',
-      name: 'مفتش الوردية',
+      id: 'USR-SH2-302',
+      name: 'أ. أحمد قاسم أبو عيشة',
       empId: 'M8',
       employeeId: 'M8',
-      altEmpId: 'KSU-SH2-303',
+      altEmpId: 'KSU-SH2-302',
       username: 'M8',
       role: 'مفتش سلامة ميداني',
       roleCategory: 'field_inspector',
@@ -431,11 +438,11 @@
       permissions: { conductInspections: true, issuePermits: true }
     },
     {
-      id: 'USR-SH2-304',
-      name: 'مفتش الوردية',
+      id: 'USR-SH2-303',
+      name: 'أ. عبدالرحمن حسين كعبي',
       empId: 'M9',
       employeeId: 'M9',
-      altEmpId: 'KSU-SH2-304',
+      altEmpId: 'KSU-SH2-303',
       username: 'M9',
       role: 'مفتش سلامة ميداني',
       roleCategory: 'field_inspector',
@@ -448,11 +455,11 @@
       permissions: { conductInspections: true, issuePermits: true }
     },
     {
-      id: 'USR-SH2-305',
-      name: 'مفتش الوردية',
+      id: 'USR-SH2-304',
+      name: 'أ. محمد علي الربعي',
       empId: 'M10',
       employeeId: 'M10',
-      altEmpId: 'KSU-SH2-305',
+      altEmpId: 'KSU-SH2-304',
       username: 'M10',
       role: 'مفتش سلامة ميداني',
       roleCategory: 'field_inspector',
@@ -464,31 +471,31 @@
       status: 'نشط',
       permissions: { conductInspections: true, issuePermits: true }
     },
-
-    // 3. الوردية الثالثة (ليلي - Shift 3)
     {
-      id: 'USR-SH3-402',
-      name: 'مفتش الوردية',
+      id: 'USR-SH2-305',
+      name: 'أ. سلطان علي العاصم',
       empId: 'M11',
       employeeId: 'M11',
-      altEmpId: 'KSU-SH3-402',
+      altEmpId: 'KSU-SH2-305',
       username: 'M11',
       role: 'مفتش سلامة ميداني',
       roleCategory: 'field_inspector',
       portal: 'field',
       facility: 'مستشفى الملك خالد الجامعي (KKUH)',
       department: 'مستشفى الملك خالد الجامعي (KKUH)',
-      shift: 'الوردية 3 (ليلي)',
+      shift: 'الوردية 2 (مسائي)',
       passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
       status: 'نشط',
       permissions: { conductInspections: true, issuePermits: true }
     },
+
+    // 3. الوردية الثالثة (ليلي - Shift 3) - 3 مفتشين
     {
-      id: 'USR-SH3-403',
-      name: 'مفتش الوردية',
+      id: 'USR-SH3-402',
+      name: 'أ. عبدالرحمن الأحمري',
       empId: 'M12',
       employeeId: 'M12',
-      altEmpId: 'KSU-SH3-403',
+      altEmpId: 'KSU-SH3-402',
       username: 'M12',
       role: 'مفتش سلامة ميداني',
       roleCategory: 'field_inspector',
@@ -501,11 +508,11 @@
       permissions: { conductInspections: true, issuePermits: true }
     },
     {
-      id: 'USR-SH3-404',
-      name: 'مفتش الوردية',
+      id: 'USR-SH3-403',
+      name: 'أ. فواز حمد العازمي',
       empId: 'M13',
       employeeId: 'M13',
-      altEmpId: 'KSU-SH3-404',
+      altEmpId: 'KSU-SH3-403',
       username: 'M13',
       role: 'مفتش سلامة ميداني',
       roleCategory: 'field_inspector',
@@ -518,11 +525,11 @@
       permissions: { conductInspections: true, issuePermits: true }
     },
     {
-      id: 'USR-SH3-405',
-      name: 'مفتش الوردية',
+      id: 'USR-SH3-404',
+      name: 'أ. سليمان سالم العنزي',
       empId: 'M14',
       employeeId: 'M14',
-      altEmpId: 'KSU-SH3-405',
+      altEmpId: 'KSU-SH3-404',
       username: 'M14',
       role: 'مفتش سلامة ميداني',
       roleCategory: 'field_inspector',
@@ -538,7 +545,7 @@
 
   // مزامنة سجل المستخدمين المعتمدين للتشغيل الحقيقي
   try {
-    const syncVerKey = 'ksu_roster_v7_real_production_m1_s1';
+    const syncVerKey = 'ksu_roster_v9_official_approved_roster';
     const lastSync = localStorage.getItem('ksu_roster_sync_version');
     let mergedList = [];
 
@@ -625,7 +632,24 @@
         const raw = localStorage.getItem(STORAGE_KEY_USER);
         if (!raw) return null;
         const u = JSON.parse(raw);
-        if (u && (u.roleCategory === 'shift_supervisor' || (u.role && u.role.includes('مشرف وردية')))) {
+
+        // التحقق الصارم من بنية كائن المستخدم لمنع تجاوزات القيم الأولية (Primitives) والمصفوفات
+        if (!u || typeof u !== 'object' || Array.isArray(u)) {
+          return null;
+        }
+
+        // التحقق من وجود معرف صالح للمستخدم (id أو username أو empId أو employeeId)
+        const hasValidIdentifier = Boolean(
+          (u.id && String(u.id).trim()) ||
+          (u.username && String(u.username).trim()) ||
+          (u.empId && String(u.empId).trim()) ||
+          (u.employeeId && String(u.employeeId).trim())
+        );
+        if (!hasValidIdentifier) {
+          return null;
+        }
+
+        if (u.roleCategory === 'shift_supervisor' || (u.role && u.role.includes('مشرف وردية'))) {
           if (u.roleCategory !== 'head' && u.roleCategory !== 'admin' && u.id !== 'USR-01' && u.id !== 'USR-7453') {
             u.portal = 'field';
           }
@@ -648,33 +672,40 @@
      * تحديد فئة دور المستخدم (يدعم التعديل الفوري للمناصب والصلاحيات من صفحة المطور)
      */
     getRoleCategory: function(user) {
-      if (!user) return 'guest';
+      if (!user || typeof user !== 'object' || Array.isArray(user)) return 'guest';
       const role = (user.role || '').toLowerCase();
       const p = user.permissions || {};
       const emp = (user.empId || user.employeeId || '').toString().trim().toLowerCase();
       const uname = (user.username || '').toString().trim().toLowerCase();
       const email = (user.email || '').toLowerCase().trim();
+      const uid = (user.id || '').toString().trim();
+      const explicitCat = (user.roleCategory || '').toString().trim().toLowerCase();
+
+      // التحقق الدفاعي: الكائنات الفارغة أو المجردة من المعرفات تعتبر زائر (guest)
+      if (!uid && !uname && !emp && !explicitCat && !role && Object.keys(p).length === 0) {
+        return 'guest';
+      }
 
       // 1. مسؤول ومطور النظام (أ. علي سليمان الصقري 95972)
-      if (user.id === 'USR-01' || emp === '95972' || uname === 'alsaqri' || email === 'aalsaqri@ksu.edu.sa' || user.roleCategory === 'developer' || p.developer || role.includes('مطور')) {
+      if (uid === 'USR-01' || emp === '95972' || emp === 'dev' || uname === 'dev' || uname === 'alsaqri' || email === 'aalsaqri@ksu.edu.sa' || explicitCat === 'developer' || p.developer || role.includes('مطور')) {
         return 'developer';
       }
 
       // 2. إذا تم تحديد فئة المنصب صراحةً من قِبل المطور، تُعتمد فوراً
-      if (user.roleCategory && ['head', 'quality', 'admin', 'shift_supervisor', 'field_inspector'].includes(user.roleCategory)) {
-        return user.roleCategory;
+      if (explicitCat && ['head', 'quality', 'admin', 'shift_supervisor', 'field_inspector'].includes(explicitCat)) {
+        return explicitCat;
       }
-      if (user.roleCategory === 'general_supervisor') {
+      if (explicitCat === 'general_supervisor') {
         return 'head';
       }
 
       // 3. قسم الجودة وتقييم الأداء (Q1)
-      if (user.id === 'USR-Q1' || user.id === 'USR-03' || emp === 'q1' || uname === 'q1' || role.includes('جودة') || role.includes('سباهي') || role.includes('cbahi')) {
+      if (uid === 'USR-Q1' || uid === 'USR-03' || emp === 'q1' || uname === 'q1' || role.includes('جودة') || role.includes('سباهي') || role.includes('cbahi')) {
         return 'quality';
       }
 
-      // 4. المشرف العام الملك خالد (H1) / رئيس القسم ومدير السلامة
-      if (user.id === 'USR-02' || user.id === 'USR-7453' || emp === 'h1' || uname === 'h1' || p.headOfDepartment || p.generalSupervisor || role.includes('مشرف عام') || role.includes('المشرف العام') || role.includes('رئيس') || role.includes('مدير')) {
+      // 4. المشرف العام الملك خالد (H1) / رئيس القسم ومدير السلامة (H2, D1)
+      if (uid === 'USR-02' || uid === 'USR-7453' || uid === 'USR-DIR-01' || uid === 'USR-HEAD-02' || emp === 'h1' || emp === 'h2' || emp === 'd1' || uname === 'h1' || uname === 'h2' || uname === 'd1' || p.headOfDepartment || p.generalSupervisor || p.directorGeneral || role.includes('مشرف عام') || role.includes('المشرف العام') || role.includes('رئيس') || role.includes('مدير')) {
         return 'head';
       }
 
@@ -711,8 +742,10 @@
           return 'quality.html';
         case 'shift_supervisor':
         case 'field_inspector':
-        default:
           return 'field.html';
+        case 'guest':
+        default:
+          return 'index.html';
       }
     },
 
@@ -737,6 +770,14 @@
       }
 
       const roleCat = this.getRoleCategory(user);
+      if (roleCat === 'guest') {
+        const currentPath = window.location.pathname.split('/').pop() || 'index.html';
+        if (currentPath && currentPath !== 'index.html' && currentPath !== 'index') {
+          localStorage.setItem(STORAGE_KEY_REDIRECT, currentPath);
+        }
+        window.location.replace('index.html');
+        return false;
+      }
 
       if (portalKey === 'profile') {
         return true;
@@ -792,7 +833,10 @@
      * تسجيل دخول المستخدم وحفظ الجلسة
      */
     login: function(userData) {
-      if (!userData) return false;
+      if (!userData || typeof userData !== 'object' || Array.isArray(userData)) return false;
+      const hasValidId = Boolean(userData.id || userData.username || userData.empId || userData.employeeId);
+      if (!hasValidId) return false;
+
       localStorage.removeItem(STORAGE_KEY_LOGGED_OUT);
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(userData));
       localStorage.setItem('ksu_active_portal', userData.portal || this.getDefaultPortalUrl(userData).replace('.html', ''));

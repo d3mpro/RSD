@@ -24,6 +24,7 @@
       color: 'blue',
       badge: 'مدير عام',
       username: 'D1',
+      name: 'المدير العام للسلامة والأمن',
       portal: 'dashboard.html',
       description: 'الداشبورد التنفيذي الموحد، المؤشرات الإستراتيجية، واعتماد التقارير المحالة من رئيس الإدارة'
     },
@@ -35,6 +36,7 @@
       color: 'blue',
       badge: 'مدير عام',
       username: 'D1',
+      name: 'المدير العام للسلامة والأمن',
       portal: 'dashboard.html',
       description: 'استعراض واعتماد التقارير المرفوعة وإصدار التوجيهات النهائية'
     },
@@ -46,6 +48,7 @@
       color: 'purple',
       badge: 'رئيس إدارة',
       username: 'H2',
+      name: 'أ. مصعب عبدالله آل حماد',
       portal: 'head.html',
       description: 'مراجعة التقارير المحالة من المشرف العام، الحفظ بالأرشيف أو الإحالة للمدير العام'
     },
@@ -57,6 +60,7 @@
       color: 'amber',
       badge: 'مشرف عام',
       username: 'H1',
+      name: 'أ. حسن إبراهيم دعاك',
       portal: 'head.html',
       description: 'استلام تقارير الميدان، الأرشفة، والتوجيه لرئيس إدارة السلامة'
     },
@@ -68,50 +72,55 @@
       color: 'amber',
       badge: 'مشرف عام',
       username: 'H1',
+      name: 'أ. حسن إبراهيم دعاك',
       portal: 'head.html',
       description: 'استلام تقارير الميدان، الأرشفة، والتوجيه لرئيس إدارة السلامة'
     },
     quality: {
       key: 'quality',
-      title: 'مسؤول الجودة والاعتماد',
+      title: 'قسم الجودة وتقييم الأداء',
       subTitle: 'مطابقة معايير CBAHI FMS واعتماد الجولات',
       icon: 'verified',
       color: 'emerald',
       badge: 'الجودة والاعتماد',
       username: 'Q1',
+      name: 'قسم الجودة وتقييم الأداء',
       portal: 'quality.html',
       description: 'تدقيق معايير سباهي FMS، مراجعة الجولات الميدانية، وسجل الامتثال والتحسين'
     },
     supervisor: {
       key: 'supervisor',
-      title: 'مشرف الوردية',
+      title: 'مشرف الوردية الأولى (صباحي)',
       subTitle: 'إشراف الوردية وتدقيق وإرسال تقارير السلامة',
       icon: 'supervisor_account',
       color: 'teal',
       badge: 'مشرف الوردية',
       username: 'S1',
+      name: 'أ. ناصر فلاح القحطاني',
       portal: 'field.html',
       description: 'إشراف الوردية الميدانية، كتابة وإرسال تقارير السلامة للمشرف العام، واعتماد الجولات'
     },
     field_supervisor: {
       key: 'field_supervisor',
-      title: 'مشرف الوردية',
+      title: 'مشرف الوردية الأولى (صباحي)',
       subTitle: 'إشراف الوردية وتدقيق وإرسال تقارير السلامة',
       icon: 'supervisor_account',
       color: 'teal',
       badge: 'مشرف الوردية',
       username: 'S1',
+      name: 'أ. ناصر فلاح القحطاني',
       portal: 'field.html',
       description: 'إشراف الوردية الميدانية، كتابة وإرسال تقارير السلامة للمشرف العام، واعتماد الجولات'
     },
     inspector: {
       key: 'inspector',
-      title: 'مفتش الوردية',
+      title: 'مفتش سلامة ميداني',
       subTitle: 'تنفيذ الجولات والتفتيش الذكي ورفع تقارير السلامة',
       icon: 'checklist_rtl',
       color: 'indigo',
-      badge: 'مفتش الوردية',
+      badge: 'مفتش سلامة',
       username: 'M1',
+      name: 'أ. عادل عاضة الشلوي',
       portal: 'field.html',
       description: 'تنفيذ نماذج CBAHI الـ 14، مسح الباركود، الفحص البصري الذكي، والعمل دون إنترنت'
     }
@@ -437,10 +446,11 @@
         if (resolvedKey === 'head' || resolvedKey === 'general_supervisor' || normKey === 'h1') {
           user = {
             id: 'USR-7453',
-            name: 'المشرف العام',
+            name: 'أ. حسن إبراهيم دعاك',
             empId: 'H1',
+            employeeId: 'H1',
             username: 'H1',
-            role: 'المشرف العام (H1) - مشرف وحدة السلامة',
+            role: 'المشرف العام الملك خالد (H1) - مشرف وحدة السلامة',
             roleCategory: 'head',
             workflowRole: 'h1',
             portal: 'head',
@@ -452,8 +462,9 @@
         } else if (resolvedKey === 'dept_head' || normKey === 'h2') {
           user = {
             id: 'USR-HEAD-02',
-            name: 'رئيس إدارة السلامة',
+            name: 'أ. مصعب عبدالله آل حماد',
             empId: 'H2',
+            employeeId: 'H2',
             username: 'H2',
             role: 'رئيس إدارة السلامة بالمدينة الطبية (H2)',
             roleCategory: 'head',
@@ -464,27 +475,31 @@
             shift: 'جميع الورديات',
             permissions: { headOfDepartment: true, approveReports: true, conductInspections: true }
           };
-        } else if (resolvedKey === 'executive' || resolvedKey === 'director' || normKey === 'd1') {
+        } else if (resolvedKey === 'specialist' || normKey === 'saf1' || normKey === 'a1') {
           user = {
-            id: 'USR-DIR-01',
-            name: 'المدير العام للسلامة والأمن',
-            empId: 'D1',
-            username: 'D1',
-            role: 'مدير الإدارة العامة للأمن والسلامة (D1)',
+            id: 'USR-SAF-01',
+            name: 'أ. أحمد الأحمري',
+            empId: 'SAF1',
+            employeeId: 'SAF1',
+            username: 'SAF1',
+            altUsername: 'A1',
+            role: 'أخصائي سلامة ميدانية (SAF1)',
             roleCategory: 'head',
-            workflowRole: 'director',
-            portal: persona.portal.replace('.html', ''),
-            facility: 'المدينة الطبية الجامعية (KSUMC)',
-            department: 'الإدارة العامة للأمن والسلامة',
+            workflowRole: 'specialist',
+            portal: 'field',
+            facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+            department: 'إدارة السلامة الميدانية',
             shift: 'جميع الورديات',
-            permissions: { all: true, directorGeneral: true, headOfDepartment: true, approveReports: true }
+            permissions: { receiveSafetyReports: true, conductInspections: true, issuePermits: true, approveReports: true }
           };
         } else if (resolvedKey === 'quality' || normKey === 'q1') {
           user = {
             id: 'USR-Q1',
-            name: 'مسؤول الجودة والاعتماد',
+            name: 'أ. علي سليمان الصقري',
             empId: 'Q1',
+            employeeId: 'Q1',
             username: 'Q1',
+            altUsername: 'alsaqri',
             role: 'مسؤول الجودة والاعتماد (Q1) - CBAHI / JCI',
             roleCategory: 'quality',
             portal: 'quality',
@@ -496,8 +511,9 @@
         } else if (resolvedKey === 'inspector' || normKey === 'm1') {
           user = {
             id: 'USR-SH1-202',
-            name: 'مفتش الوردية',
+            name: 'أ. عادل خلف العنزي',
             empId: 'M1',
+            employeeId: 'M1',
             username: 'M1',
             altEmpId: 'KSU-SH1-202',
             role: 'مفتش سلامة ميداني (M1)',
@@ -511,16 +527,35 @@
         } else if (resolvedKey === 'supervisor' || resolvedKey === 'field_supervisor' || normKey === 's1') {
           user = {
             id: 'USR-SH1-201',
-            name: 'مشرف الوردية',
-            empId: 'KSU-SH1-201',
+            name: 'أ. ناصر فلاح القحطاني',
+            empId: 'S1',
+            employeeId: 'S1',
+            altEmpId: 'KSU-SH1-201',
             username: 'S1',
-            role: 'مشرف الوردية الميداني (S1)',
+            role: 'مشرف الوردية الأولى (صباحي)',
             roleCategory: 'shift_supervisor',
             portal: 'field',
             facility: 'مستشفى الملك خالد الجامعي (KKUH)',
             department: 'إدارة السلامة الميدانية',
             shift: 'الوردية 1 (صباحي)',
             permissions: { approveReports: true, conductInspections: true, issuePermits: true }
+          };
+        } else if (resolvedKey === 'developer' || resolvedKey === 'admin' || normKey === 'dev' || normKey === 'alsaqri') {
+          user = {
+            id: 'USR-01',
+            name: 'أ. علي سليمان الصقري (مطور النظام)',
+            empId: 'DEV',
+            employeeId: 'DEV',
+            altEmpId: '95972',
+            username: 'DEV',
+            altUsername: 'alsaqri',
+            role: 'مطور النظام ومسؤول التقنية والمشرف العام',
+            roleCategory: 'developer',
+            portal: 'admin',
+            facility: 'المدينة الطبية',
+            department: 'الإدارة العامة للأمن والسلامة - القيادة والأنظمة',
+            shift: 'جميع الورديات',
+            permissions: { all: true, developer: true, fullAccess: true, manageUsers: true, manageBuildings: true }
           };
         }
       }
