@@ -30,6 +30,13 @@
     INSPECTION_EVENTS: 'ksumc_inspection_events'
   };
 
+  // إعدادات التكامل الآلي مع موقع شيربوينت الرسمي لقسم السلامة - جامعة الملك سعود
+  const SHAREPOINT_CONFIG = {
+    SITE_URL: 'https://ksusa.sharepoint.com/sites/safty',
+    WEBHOOK_URL: 'https://defaultbd79fc33b46b4fbb9d73cd0f06921b.dd.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/07/workflows/2bbd9e69ea1a4c3a876b98c1145b1e85/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=mzkNr6rJT8RXr_g5deUQxo43ZkYXbVzwqDCU1nPQZyQ',
+    ENABLED: true
+  };
+
   // قائمة المنشآت والمستشفيات المعتمدة الافتراضية
   const DEFAULT_FACILITIES = [
     {
@@ -281,6 +288,7 @@
       if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncRound === 'function') {
         window.ksuFirebaseSync.syncRound(newRound);
       }
+      this.syncToSharePoint(newRound, 'inspection');
       return newRound;
     },
 
@@ -1346,6 +1354,56 @@
         lastReminderAt: nowIso,
         message: `تم إرسال تنبيه المتابعة بنجاح إلى المفتش (${inspectorName}) وبثه عبر Firebase`
       };
+    },
+
+    /**
+     * المزامنة التلقائية مع موقع وقوائم شيربوينت قسم السلامة - جامعة الملك سعود
+     */
+    syncToSharePoint: async function(record, type = 'inspection') {
+      try {
+        if (!SHAREPOINT_CONFIG.ENABLED || !SHAREPOINT_CONFIG.WEBHOOK_URL) return;
+        
+        let title = '';
+        if (type === 'inspection') {
+          title = record.title || (record.facility ? `${record.facility} - جولة تفتيشية` : `جولة تفتيش ميداني (${record.id || 'RSD'})`);
+        } else if (type === 'asset') {
+          title = record.name || record.assetId || record.code || `أصل سلامة (${record.id || 'ASSET'})`;
+        } else {
+          title = record.title || record.id || 'سجل سلامة';
+        }
+
+        const payload = {
+          Title: title,
+          type: type,
+          recordId: record.id || record.roundId || '',
+          inspector: record.inspectorName || record.inspector || (record.user && record.user.name) || 'مفتش السلامة',
+          facility: record.facility || record.hospital || 'المدينة الطبية',
+          building: record.building || record.zone || '',
+          floor: record.floor || '',
+          shift: record.shift || '',
+          status: record.status || 'مكتملة',
+          date: record.date || new Date().toISOString().split('T')[0],
+          timestamp: record.timestamp || new Date().toISOString(),
+          notes: record.notes || record.findingsSummary || (record.findings ? `عدد الملاحظات: ${record.findings.length}` : 'تم التوثيق عبر منصة رصد')
+        };
+
+        const response = await fetch(SHAREPOINT_CONFIG.WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (response.ok || response.status === 202) {
+          console.log('[KSU-SharePoint-Sync] تم بنجاح الحفظ التلقائي في شيربوينت قسم السلامة:', payload.Title);
+          return { success: true, payload };
+        } else {
+          console.warn('[KSU-SharePoint-Sync] استجابة شيربوينت:', response.status);
+          return { success: false, status: response.status };
+        }
+      } catch (err) {
+        console.warn('[KSU-SharePoint-Sync] تعذر الاتصال المباشر بشيربوينت:', err);
+        return { success: false, error: err.message };
+      }
     },
 
     /**
