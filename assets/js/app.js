@@ -8319,7 +8319,95 @@ function saveCAPA(targetCAPA) {
   }
   notifyCloudSync();
 }
+function _getViolationActiveUser() {
+  try {
+    if (localStorage.getItem('ksu_logged_out') === 'true') return null;
+  } catch (_) {}
+  try {
+    if (window.KSUAuth && typeof window.KSUAuth.getUser === 'function') {
+      const authU = window.KSUAuth.getUser();
+      if (authU && typeof authU === 'object' && !Array.isArray(authU)) return authU;
+    }
+  } catch (_) {}
+  if (typeof state !== 'undefined' && state && state.currentUser && typeof state.currentUser === 'object') {
+    const cu = state.currentUser;
+    if (cu.id || cu.username || cu.empId || cu.employeeId) return cu;
+  }
+  return null;
+}
+function _escapeViolationHtml(val) {
+  if (window.KSUDataBridge && typeof window.KSUDataBridge.escapeHtml === 'function') {
+    return window.KSUDataBridge.escapeHtml(val);
+  }
+  return String(val == null ? '' : val)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+function _isViolationArchivedFallback(v) {
+  if (window.KSUDataBridge && typeof window.KSUDataBridge.isViolationArchived === 'function') {
+    return window.KSUDataBridge.isViolationArchived(v);
+  }
+  return Boolean(v && typeof v === 'object' && (v.archived === true || v.isArchived === true || v.status === 'archived' || v.status === 'مؤرشف'));
+}
+function _isHeadOrAdminViolationUser(user) {
+  const u = user === undefined ? _getViolationActiveUser() : user;
+  if (window.KSUDataBridge && typeof window.KSUDataBridge.isHeadOrAdminUser === 'function') {
+    return window.KSUDataBridge.isHeadOrAdminUser(u);
+  }
+  if (!u || typeof u !== 'object') return false;
+  if (typeof isSystemDeveloper === 'function' && isSystemDeveloper(u)) return true;
+  const cat = (typeof getUserRoleCategory === 'function') ? getUserRoleCategory(u) : String(u.roleCategory || '').toLowerCase();
+  return ['head', 'admin', 'developer', 'executive'].includes(cat);
+}
+function _getScopedSafetyViolations(options = {}) {
+  const raw = Array.isArray(state.safetyViolations) ? state.safetyViolations : [];
+  if (window.KSUDataBridge && typeof window.KSUDataBridge.getScopedViolationsForUser === 'function') {
+    return window.KSUDataBridge.getScopedViolationsForUser(raw, _getViolationActiveUser(), options);
+  }
+  const u = _getViolationActiveUser();
+  if (!u) return [];
+  const priv = _isHeadOrAdminViolationUser(u);
+  return raw.filter(v => {
+    if (!v || typeof v !== 'object' || v.status === 'deleted') return false;
+    const arch = _isViolationArchivedFallback(v);
+    if (priv) return options.includeArchived ? true : !arch;
+    if (arch) return false;
+    const uIds = [u.authUid, u.uid, u.id, u.empId, u.employeeId, u.username].map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
+    const vIds = [v.createdByUid, v.createdById, v.createdByEmpId, v.createdByUsername, v.officerEmpId, v.officerId].map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
+    if (vIds.length > 0) return vIds.some(id => uIds.includes(id));
+    const uName = String(u.name || '').trim().toLowerCase();
+    const vName = String(v.createdByName || v.officerName || '').trim().toLowerCase();
+    return Boolean(uName && vName && uName === vName);
+  });
+}
+function _getScopedSmokingViolations(options = {}) {
+  const raw = Array.isArray(state.smokingViolations) ? state.smokingViolations : [];
+  if (window.KSUDataBridge && typeof window.KSUDataBridge.getScopedViolationsForUser === 'function') {
+    return window.KSUDataBridge.getScopedViolationsForUser(raw, _getViolationActiveUser(), options);
+  }
+  const u = _getViolationActiveUser();
+  if (!u) return [];
+  const priv = _isHeadOrAdminViolationUser(u);
+  return raw.filter(v => {
+    if (!v || typeof v !== 'object' || v.status === 'deleted') return false;
+    const arch = _isViolationArchivedFallback(v);
+    if (priv) return options.includeArchived ? true : !arch;
+    if (arch) return false;
+    const uIds = [u.authUid, u.uid, u.id, u.empId, u.employeeId, u.username].map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
+    const vIds = [v.createdByUid, v.createdById, v.createdByEmpId, v.createdByUsername, v.officerEmpId, v.officerId].map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
+    if (vIds.length > 0) return vIds.some(id => uIds.includes(id));
+    const uName = String(u.name || '').trim().toLowerCase();
+    const vName = String(v.createdByName || v.officerName || '').trim().toLowerCase();
+    return Boolean(uName && vName && uName === vName);
+  });
+}
 function saveSafetyViolations(targetViol) {
+  if (Array.isArray(state.safetyViolations)) {
+    state.safetyViolations = state.safetyViolations.filter(v => v && v.status !== 'deleted');
+  }
   localStorage.setItem(STORAGE_KEY_SAFETY_VIOLATIONS, JSON.stringify(state.safetyViolations));
   renderSafetyViolations();
   updateViolationBadges();
@@ -8340,6 +8428,9 @@ function saveSafetyViolations(targetViol) {
   if (typeof renderHeadOperationalCenter === 'function') renderHeadOperationalCenter();
 }
 function saveSmokingViolations(targetViol) {
+  if (Array.isArray(state.smokingViolations)) {
+    state.smokingViolations = state.smokingViolations.filter(v => v && v.status !== 'deleted');
+  }
   localStorage.setItem(STORAGE_KEY_SMOKING_VIOLATIONS, JSON.stringify(state.smokingViolations));
   renderSmokingViolations();
   updateViolationBadges();
@@ -8361,10 +8452,10 @@ function saveSmokingViolations(targetViol) {
 }
 function updateViolationBadges() {
   const sbSafety = document.getElementById('sidebar-safety-violations-count');
-  if (sbSafety) sbSafety.textContent = state.safetyViolations ? state.safetyViolations.length : 0;
+  if (sbSafety) sbSafety.textContent = _getScopedSafetyViolations().length;
 
   const sbSmoking = document.getElementById('sidebar-smoking-violations-count');
-  if (sbSmoking) sbSmoking.textContent = state.smokingViolations ? state.smokingViolations.length : 0;
+  if (sbSmoking) sbSmoking.textContent = _getScopedSmokingViolations().length;
 }
 function saveBuildings() {
   localStorage.setItem(STORAGE_KEY_BUILDINGS, JSON.stringify(state.buildings));
@@ -8468,6 +8559,24 @@ function switchTab(tabId) {
     }
   }
 
+  // Master Archive strict gate (حصر الأرشيف التلقائي على رئيس القسم ومسؤول النظام)
+  if (tabId === 'master-archive') {
+    if (!_isHeadOrAdminViolationUser(state.currentUser)) {
+      if (window.KSUDataBridge && typeof window.KSUDataBridge.appendAuditLog === 'function') {
+        window.KSUDataBridge.appendAuditLog('UNAUTHORIZED_ARCHIVE_TAB_ACCESS', { tabId }, state.currentUser);
+      }
+      showToast('عفواً، الأرشيف والسجل المرجعي الشامل مخصص لرئيس القسم ومسؤول النظام فقط.', 'warning');
+      return;
+    }
+    if (state.activePortal !== 'admin' && state.activePortal !== 'executive') {
+      state.activePortal = 'admin';
+      try { localStorage.setItem('ksu_active_portal', 'admin'); } catch (_) {}
+      if (typeof updateActivePortalUI === 'function') {
+        updateActivePortalUI();
+      }
+    }
+  }
+
   // RBAC Permission Guard: Check if the user is allowed to access this tab
   // Developer & System Admin has UNRESTRICTED full access across ALL tabs and portals!
   if (!isDev && typeof getAllowedTabsForUser === 'function') {
@@ -8562,6 +8671,10 @@ function switchTab(tabId) {
     updateShiftIncidentBadges();
     renderInspectionCoverageMatrix();
     renderInspectorSupervisorStats();
+  } else if (tabId === 'master-archive') {
+    if (window.KSUMasterArchive && typeof window.KSUMasterArchive.render === 'function') {
+      window.KSUMasterArchive.render();
+    }
   }
 }
 
@@ -14308,6 +14421,10 @@ function deleteDoorRequest(id) {
   showToast('تم حذف الطلب بنجاح.', 'info');
 }
 
+function _escapeViolationJs(val) {
+  return _escapeViolationHtml(String(val == null ? '' : val).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+}
+
 // =============================================================
 // SAFETY VIOLATIONS MODULE (Official Document 2 Replica)
 // =============================================================
@@ -14327,10 +14444,11 @@ function renderSafetyViolations() {
   const container = document.getElementById('safety-violations-list-container');
   if (!container) return;
 
-  const total = state.safetyViolations.length;
-  const confiscated = state.safetyViolations.filter(v => v.actionTaken && v.actionTaken.includes('مصادرة')).length;
-  const corrected = state.safetyViolations.filter(v => v.actionTaken && (v.actionTaken.includes('تصحيح') || v.actionTaken.includes('سحب'))).length;
-  const referred = state.safetyViolations.filter(v => v.actionTaken && v.actionTaken.includes('الرفع')).length;
+  const scopedList = _getScopedSafetyViolations();
+  const total = scopedList.length;
+  const confiscated = scopedList.filter(v => v.actionTaken && v.actionTaken.includes('مصادرة')).length;
+  const corrected = scopedList.filter(v => v.actionTaken && (v.actionTaken.includes('تصحيح') || v.actionTaken.includes('سحب'))).length;
+  const referred = scopedList.filter(v => v.actionTaken && v.actionTaken.includes('الرفع')).length;
 
   const elTotal = document.getElementById('kpi-safety-viols-total');
   const elConf = document.getElementById('kpi-safety-viols-confiscated');
@@ -14353,42 +14471,45 @@ function filterSafetyViolationsList() {
   const deviceFilter = document.getElementById('sel-filter-safety-device')?.value || 'all';
   const period = state.safetyViolsTimeFilter || 'all';
 
-  let list = state.safetyViolations || [];
+  const scopedAll = _getScopedSafetyViolations();
+  let list = scopedAll;
 
   // Filter by timeline
   list = list.filter(v => isDateInPeriod(v.date, period));
 
   if (deviceFilter !== 'all') {
-    list = list.filter(v => (v.devices || []).some(d => d.includes(deviceFilter)));
+    list = list.filter(v => (v.devices || []).some(d => String(d).includes(deviceFilter)));
   }
 
   if (q) {
-    list = list.filter(v => 
-      (v.id && v.id.toLowerCase().includes(q)) ||
-      (v.violatorName && v.violatorName.toLowerCase().includes(q)) ||
-      (v.location && v.location.toLowerCase().includes(q)) ||
-      (v.room && v.room.toLowerCase().includes(q)) ||
-      (v.actionTaken && v.actionTaken.toLowerCase().includes(q)) ||
+    list = list.filter(v =>
+      (v.id && String(v.id).toLowerCase().includes(q)) ||
+      (v.violatorName && String(v.violatorName).toLowerCase().includes(q)) ||
+      (v.officerName && String(v.officerName).toLowerCase().includes(q)) ||
+      (v.location && String(v.location).toLowerCase().includes(q)) ||
+      (v.room && String(v.room).toLowerCase().includes(q)) ||
+      (v.actionTaken && String(v.actionTaken).toLowerCase().includes(q)) ||
       (v.devices && v.devices.join(' ').toLowerCase().includes(q))
     );
   }
 
-  // Update badge
+  // Update badge (using strictly scoped total)
   const badgeEl = document.getElementById('sv-filter-count-badge');
   if (badgeEl) {
-    badgeEl.textContent = `${list.length} من إجمالي ${state.safetyViolations.length} مخالفة`;
+    badgeEl.textContent = `${list.length} من إجمالي ${scopedAll.length} مخالفة`;
   }
 
   if (list.length === 0) {
     container.innerHTML = `
       <div class="p-8 text-center bg-surface-container-lowest rounded-2xl border border-outline-variant/30 text-on-surface-variant">
         <span class="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-2">check_circle</span>
-        <p class="font-bold text-sm">لا توجد مخالفات سلامة مطابقة لشروط البحث أو الفترة المحددة</p>
+        <p class="font-bold text-sm">لا توجد مخالفات سلامة مطابقة في نطاق صلاحياتك أو الفترة المحددة</p>
       </div>
     `;
     return;
   }
 
+  const canArchive = _isHeadOrAdminViolationUser();
   container.innerHTML = list.map(v => `
     <div class="p-space-md rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-space-md transition-all hover:border-orange-400/50">
       <div class="flex items-start gap-space-md">
@@ -14397,32 +14518,35 @@ function filterSafetyViolationsList() {
         </div>
         <div class="flex flex-col">
           <div class="flex items-center gap-space-xs flex-wrap">
-            <span class="font-title-md text-primary font-bold">${v.location || 'المبنى الرئيسي'} - غرفة ${v.room || '-'}</span>
-            <span class="px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 text-[11px] font-bold">${v.actionTaken || 'مصادرة'}</span>
-            <span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant text-[11px] font-mono font-bold">${v.id}</span>
-            ${v.date ? `<span class="px-2 py-0.5 rounded-full bg-orange-50 text-orange-900 border border-orange-200 text-[11px] font-mono font-semibold">${v.date}</span>` : ''}
+            <span class="font-title-md text-primary font-bold">${_escapeViolationHtml(v.location || 'المبنى الرئيسي')} - غرفة ${_escapeViolationHtml(v.room || '-')}</span>
+            <span class="px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 text-[11px] font-bold">${_escapeViolationHtml(v.actionTaken || 'مصادرة')}</span>
+            <span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant text-[11px] font-mono font-bold">${_escapeViolationHtml(v.id)}</span>
+            ${v.date ? `<span class="px-2 py-0.5 rounded-full bg-orange-50 text-orange-900 border border-orange-200 text-[11px] font-mono font-semibold">${_escapeViolationHtml(v.date)}</span>` : ''}
             ${v.violatorSignature ? '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-0.5"><span class="material-symbols-outlined text-xs">draw</span> توقيع المخالف مسجل</span>' : ''}
           </div>
           <div class="flex items-center gap-1.5 flex-wrap mt-1.5">
             <span class="text-xs font-bold text-on-surface-variant">الأجهزة المخالفة:</span>
-            ${(v.devices || []).map(dev => `<span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-[11px] font-semibold">${dev}</span>`).join('')}
+            ${(v.devices || []).map(dev => `<span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-[11px] font-semibold">${_escapeViolationHtml(dev)}</span>`).join('')}
           </div>
           <span class="font-body-sm text-on-surface mt-1">
-            <strong class="text-primary">الشخص المخالف:</strong> ${v.violatorName || 'غير مسجل'} ${v.violatorEmpId ? `(الرقم: ${v.violatorEmpId})` : ''} 
-            | <strong class="text-primary">المفتش المحرر:</strong> ${v.officerName || 'أ. مصعب آل حماد'}
-            | <strong class="text-primary">التاريخ:</strong> ${v.date || ''} ${v.time || ''}
+            <strong class="text-primary">الشخص المخالف:</strong> ${_escapeViolationHtml(v.violatorName || 'غير مسجل')} ${v.violatorEmpId ? `(الرقم: ${_escapeViolationHtml(v.violatorEmpId)})` : ''} 
+            | <strong class="text-primary">المفتش المحرر:</strong> ${_escapeViolationHtml(v.officerName || v.createdByName || 'مفتش السلامة')}
+            | <strong class="text-primary">التاريخ:</strong> ${_escapeViolationHtml(v.date || '')} ${_escapeViolationHtml(v.time || '')}
           </span>
-          ${v.directive ? `<span class="font-label-sm text-orange-950 bg-orange-50/70 p-1.5 rounded-md border border-orange-200/60 mt-1"><strong class="text-orange-900">توجيه مدير إدارة السلامة:</strong> ${v.directive}</span>` : ''}
+          ${v.directive ? `<span class="font-label-sm text-orange-950 bg-orange-50/70 p-1.5 rounded-md border border-orange-200/60 mt-1"><strong class="text-orange-900">توجيه مدير إدارة السلامة:</strong> ${_escapeViolationHtml(v.directive)}</span>` : ''}
         </div>
       </div>
       <div class="flex items-center gap-2 self-end md:self-center shrink-0">
-        <button onclick="printSafetyViolation('${v.id}')" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-900 border border-orange-200 font-bold text-xs shadow-xs transition-colors">
+        <button onclick="printSafetyViolation('${_escapeViolationJs(v.id)}')" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-900 border border-orange-200 font-bold text-xs shadow-xs transition-colors">
           <span class="material-symbols-outlined text-sm text-orange-700">print</span>
           <span>طباعة المحضر (PDF)</span>
         </button>
-        <button onclick="deleteSafetyViolation('${v.id}')" title="حذف المخالفة" class="w-8 h-8 rounded-lg text-error hover:bg-error/10 flex items-center justify-center transition-colors">
-          <span class="material-symbols-outlined text-base">delete</span>
-        </button>
+        ${canArchive ? `
+          <button onclick="archiveViolationFromUI('safety', '${_escapeViolationJs(v.id)}')" title="أرشفة المخالفة ونقلها للأرشيف المرجعي" class="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 font-bold text-xs transition-colors">
+            <span class="material-symbols-outlined text-sm">inventory_2</span>
+            <span>أرشفة</span>
+          </button>
+        ` : ''}
       </div>
     </div>
   `).join('');
@@ -14434,6 +14558,15 @@ function openNewSafetyViolationModal() {
     modal.classList.remove('hidden');
     modal.classList.add('flex');
     initModalSignaturePads(['canvas-sv-violator', 'canvas-sv-officer']);
+
+    const activeUser = _getViolationActiveUser();
+    const officerInp = document.getElementById('inp-sv-officer-name');
+    if (officerInp) {
+      if (activeUser && activeUser.name) {
+        officerInp.value = activeUser.name;
+      }
+      officerInp.readOnly = !_isHeadOrAdminViolationUser(activeUser);
+    }
 
     const st = document.getElementById('sv-voice-status');
     if (st) st.innerText = 'جاهز للاستماع، انقر على الزر أعلاه وتحدث بحرية.';
@@ -14454,6 +14587,13 @@ function closeNewSafetyViolationModal() {
 }
 
 function saveNewSafetyViolation() {
+  const activeUser = _getViolationActiveUser();
+  if (!activeUser) {
+    showToast('يرجى تسجيل الدخول أولاً قبل اعتماد محضر مخالفة السلامة.', 'error');
+    if (typeof openLoginModal === 'function') openLoginModal();
+    return false;
+  }
+
   const devices = [];
   document.querySelectorAll('input[name="sv-devices"]:checked').forEach(cb => {
     devices.push(cb.value);
@@ -14469,16 +14609,22 @@ function saveNewSafetyViolation() {
   const actionTaken = actionRadio ? actionRadio.value : 'مصادرة الجهاز المخالف';
   const violatorName = document.getElementById('inp-sv-violator-name')?.value || '';
   const violatorEmpId = document.getElementById('inp-sv-violator-empid')?.value || '';
-  const officerName = document.getElementById('inp-sv-officer-name')?.value || 'أ. مصعب عبدالله آل حماد';
+  const inputOfficerName = document.getElementById('inp-sv-officer-name')?.value?.trim() || '';
+  const canOverrideOfficer = _isHeadOrAdminViolationUser(activeUser);
+  const officerName = canOverrideOfficer
+    ? (inputOfficerName || activeUser.name || 'مفتش السلامة الميداني')
+    : (activeUser.name || inputOfficerName || 'مفتش السلامة الميداني');
   const directive = document.getElementById('inp-sv-directive')?.value || '';
 
   const violatorSignature = getSignatureData('canvas-sv-violator');
   const officerSignature = getSignatureData('canvas-sv-officer');
-  const currentShiftLabel = state.currentUser?.shift || (typeof getShiftLabel === 'function' ? getShiftLabel(getCurrentActiveShiftKey()) : 'الوردية 1 (صباحي)');
+  const currentShiftLabel = activeUser.shift || (typeof getShiftLabel === 'function' ? getShiftLabel(getCurrentActiveShiftKey()) : 'الوردية 1 (صباحي)');
+  const nowIso = new Date().toISOString();
+  const authUid = String(activeUser.authUid || activeUser.uid || (window.ksuFirebaseSync && window.ksuFirebaseSync.currentAuthUid) || '').trim();
 
-  const newViol = {
-    id: 'SV-2026-' + String(state.safetyViolations.length + 1).padStart(3, '0') + '-' + Date.now().toString().slice(-3),
-    date: new Date().toISOString().substring(0, 10),
+  const rawViol = {
+    id: 'SV-2026-' + String((state.safetyViolations || []).length + 1).padStart(3, '0') + '-' + Date.now().toString().slice(-3),
+    date: nowIso.substring(0, 10),
     time: new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
     location: location || 'المبنى الرئيسي',
     room: room,
@@ -14486,7 +14632,15 @@ function saveNewSafetyViolation() {
     actionTaken: actionTaken,
     violatorName: violatorName || 'منسوب بالمدينة الطبية',
     violatorEmpId: violatorEmpId,
-    officerName: officerName || state.currentUser?.name || 'مفتش السلامة الميداني',
+    officerName: officerName,
+    officerEmpId: String(activeUser.empId || activeUser.employeeId || activeUser.id || '').trim(),
+    createdByUid: authUid,
+    createdById: String(activeUser.id || '').trim(),
+    createdByEmpId: String(activeUser.empId || activeUser.employeeId || '').trim(),
+    createdByUsername: String(activeUser.username || '').trim(),
+    createdByName: String(activeUser.name || officerName || '').trim(),
+    archived: false,
+    isArchived: false,
     shift: currentShiftLabel,
     directive: directive || 'سحب الجهاز المخالف فوراً وتوجيه إنذار رسمي بعدم استخدام مواقد أو أجهزة حرارية غير مرخصة.',
     violatorSignature: violatorSignature,
@@ -14496,27 +14650,33 @@ function saveNewSafetyViolation() {
     routedTo: 'H1',
     routedToTitle: 'المشرف العام الملك خالد (H1)',
     headApprovalStatus: 'pending_head',
-    timestamp: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    timestamp: nowIso,
+    createdAt: nowIso,
+    updatedAt: nowIso,
     updatedAtMs: Date.now(),
     _isOfflinePending: true
   };
+
+  const newViol = (window.KSUDataBridge && typeof window.KSUDataBridge.stampViolationOwnership === 'function')
+    ? window.KSUDataBridge.stampViolationOwnership(rawViol, activeUser)
+    : rawViol;
 
   state.safetyViolations.unshift(newViol);
   saveSafetyViolations(newViol);
   closeNewSafetyViolationModal();
   showToast('تم اعتماد محضر مخالفة السلامة وإرساله للمشرف العام الملك خالد (H1).', 'success');
+  return newViol;
 }
 
 function deleteSafetyViolation(id) {
-  if (!confirm('هل أنت متأكد من حذف محضر مخالفة السلامة؟')) return;
-  state.safetyViolations = state.safetyViolations.filter(v => v.id !== id);
-  if (window.KSUOracleSync && typeof window.KSUOracleSync.deleteSafetyViolation === 'function') {
-    window.KSUOracleSync.deleteSafetyViolation(id);
+  if (window.KSUDataBridge && typeof window.KSUDataBridge.appendAuditLog === 'function') {
+    window.KSUDataBridge.appendAuditLog('BLOCKED_PERMANENT_DELETE', {
+      type: 'safety_violation',
+      recordId: String(id || '')
+    }, _getViolationActiveUser());
   }
-  saveSafetyViolations();
-  showToast('تم حذف محضر المخالفة بنجاح.', 'info');
+  showToast('الحذف النهائي معطل لحماية السجل الرقابي؛ الأرشفة متاحة لرئيس القسم ومسؤول النظام فقط.', 'warning');
+  return false;
 }
 
 // =============================================================
@@ -14538,11 +14698,12 @@ function renderSmokingViolations() {
   const container = document.getElementById('smoking-violations-list-container');
   if (!container) return;
 
-  const total = state.smokingViolations.length;
-  const employees = state.smokingViolations.filter(v => v.role === 'موظف').length;
-  const students = state.smokingViolations.filter(v => v.role === 'طالب').length;
-  const workers = state.smokingViolations.filter(v => v.role === 'عامل').length;
-  const others = state.smokingViolations.filter(v => ['زائر', 'مريض', 'أخرى'].includes(v.role)).length;
+  const scopedList = _getScopedSmokingViolations();
+  const total = scopedList.length;
+  const employees = scopedList.filter(v => v.role === 'موظف').length;
+  const students = scopedList.filter(v => v.role === 'طالب').length;
+  const workers = scopedList.filter(v => v.role === 'عامل').length;
+  const others = scopedList.filter(v => ['زائر', 'مريض', 'أخرى'].includes(v.role)).length;
 
   const elTotal = document.getElementById('kpi-smoking-viols-total');
   const elEmp = document.getElementById('kpi-smoking-viols-employees');
@@ -14567,7 +14728,8 @@ function filterSmokingViolationsList() {
   const roleFilter = document.getElementById('sel-filter-smoking-role')?.value || 'all';
   const period = state.smokingViolsTimeFilter || 'all';
 
-  let list = state.smokingViolations || [];
+  const scopedAll = _getScopedSmokingViolations();
+  let list = scopedAll;
 
   // Filter by timeline
   list = list.filter(v => isDateInPeriod(v.date, period));
@@ -14577,32 +14739,34 @@ function filterSmokingViolationsList() {
   }
 
   if (q) {
-    list = list.filter(v => 
-      (v.id && v.id.toLowerCase().includes(q)) ||
-      (v.violatorName && v.violatorName.toLowerCase().includes(q)) ||
-      (v.nationalId && v.nationalId.toLowerCase().includes(q)) ||
-      (v.violatorEmpId && v.violatorEmpId.toLowerCase().includes(q)) ||
-      (v.location && v.location.toLowerCase().includes(q)) ||
-      (v.dept && v.dept.toLowerCase().includes(q))
+    list = list.filter(v =>
+      (v.id && String(v.id).toLowerCase().includes(q)) ||
+      (v.violatorName && String(v.violatorName).toLowerCase().includes(q)) ||
+      (v.officerName && String(v.officerName).toLowerCase().includes(q)) ||
+      (v.nationalId && String(v.nationalId).toLowerCase().includes(q)) ||
+      (v.violatorEmpId && String(v.violatorEmpId).toLowerCase().includes(q)) ||
+      (v.location && String(v.location).toLowerCase().includes(q)) ||
+      (v.dept && String(v.dept).toLowerCase().includes(q))
     );
   }
 
-  // Update badge
+  // Update badge (using strictly scoped total)
   const badgeEl = document.getElementById('smk-filter-count-badge');
   if (badgeEl) {
-    badgeEl.textContent = `${list.length} من إجمالي ${state.smokingViolations.length} محضر`;
+    badgeEl.textContent = `${list.length} من إجمالي ${scopedAll.length} محضر`;
   }
 
   if (list.length === 0) {
     container.innerHTML = `
       <div class="p-8 text-center bg-surface-container-lowest rounded-2xl border border-outline-variant/30 text-on-surface-variant">
         <span class="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-2">smoke_free</span>
-        <p class="font-bold text-sm">لا توجد محاضر مخالفة تدخين مطابقة لشروط البحث أو الفترة المحددة</p>
+        <p class="font-bold text-sm">لا توجد محاضر مخالفة تدخين مطابقة في نطاق صلاحياتك أو الفترة المحددة</p>
       </div>
     `;
     return;
   }
 
+  const canArchive = _isHeadOrAdminViolationUser();
   container.innerHTML = list.map(v => `
     <div class="p-space-md rounded-2xl bg-surface-container-lowest border border-outline-variant/30 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-space-md transition-all hover:border-rose-400/50">
       <div class="flex items-start gap-space-md">
@@ -14611,33 +14775,36 @@ function filterSmokingViolationsList() {
         </div>
         <div class="flex flex-col">
           <div class="flex items-center gap-space-xs flex-wrap">
-            <span class="font-title-md text-primary font-bold">${v.violatorName || 'مخالف تدخين'}</span>
-            <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[11px] font-bold">صفة المخالف: ${v.role || 'موظف'}</span>
-            <span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant text-[11px] font-mono font-bold">${v.id}</span>
-            ${v.date ? `<span class="px-2 py-0.5 rounded-full bg-rose-50 text-rose-900 border border-rose-200 text-[11px] font-mono font-semibold">${v.date}</span>` : ''}
+            <span class="font-title-md text-primary font-bold">${_escapeViolationHtml(v.violatorName || 'مخالف تدخين')}</span>
+            <span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[11px] font-bold">صفة المخالف: ${_escapeViolationHtml(v.role || 'موظف')}</span>
+            <span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant text-[11px] font-mono font-bold">${_escapeViolationHtml(v.id)}</span>
+            ${v.date ? `<span class="px-2 py-0.5 rounded-full bg-rose-50 text-rose-900 border border-rose-200 text-[11px] font-mono font-semibold">${_escapeViolationHtml(v.date)}</span>` : ''}
             ${v.violatorSignature ? '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold flex items-center gap-0.5"><span class="material-symbols-outlined text-xs">draw</span> توقيع المخالف موثق</span>' : ''}
           </div>
           <span class="font-body-sm text-on-surface mt-1">
-            <strong class="text-primary">السجل المدني/الإقامة:</strong> ${v.nationalId || '-'} 
-            ${v.violatorEmpId ? `| <strong class="text-primary">الرقم الوظيفي:</strong> ${v.violatorEmpId}` : ''}
-            | <strong class="text-primary">الجوال:</strong> ${v.phone || '-'}
-            | <strong class="text-primary">الجهة/القسم:</strong> ${v.dept || '-'}
+            <strong class="text-primary">السجل المدني/الإقامة:</strong> ${_escapeViolationHtml(v.nationalId || '-')} 
+            ${v.violatorEmpId ? `| <strong class="text-primary">الرقم الوظيفي:</strong> ${_escapeViolationHtml(v.violatorEmpId)}` : ''}
+            | <strong class="text-primary">الجوال:</strong> ${_escapeViolationHtml(v.phone || '-')}
+            | <strong class="text-primary">الجهة/القسم:</strong> ${_escapeViolationHtml(v.dept || '-')}
           </span>
           <span class="font-label-sm text-on-surface-variant mt-1">
-            مكان الضبط: ${v.location} 
-            | التوقيت: ${v.day || ''} ${v.date || ''} (${v.time || ''}) 
-            | مفتش الضبط: ${v.officerName || 'أ. علي سليمان الصقري'}
+            مكان الضبط: ${_escapeViolationHtml(v.location)} 
+            | التوقيت: ${_escapeViolationHtml(v.day || '')} ${_escapeViolationHtml(v.date || '')} (${_escapeViolationHtml(v.time || '')}) 
+            | مفتش الضبط: ${_escapeViolationHtml(v.officerName || v.createdByName || 'مفتش السلامة')}
           </span>
         </div>
       </div>
       <div class="flex items-center gap-2 self-end md:self-center shrink-0">
-        <button onclick="printSmokingViolation('${v.id}')" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-200 font-bold text-xs shadow-xs transition-colors">
+        <button onclick="printSmokingViolation('${_escapeViolationJs(v.id)}')" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-200 font-bold text-xs shadow-xs transition-colors">
           <span class="material-symbols-outlined text-sm text-rose-700">print</span>
           <span>طباعة المحضر (PDF)</span>
         </button>
-        <button onclick="deleteSmokingViolation('${v.id}')" title="حذف المحضر" class="w-8 h-8 rounded-lg text-error hover:bg-error/10 flex items-center justify-center transition-colors">
-          <span class="material-symbols-outlined text-base">delete</span>
-        </button>
+        ${canArchive ? `
+          <button onclick="archiveViolationFromUI('smoking', '${_escapeViolationJs(v.id)}')" title="أرشفة المحضر ونقله للأرشيف المرجعي" class="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 border border-slate-200 font-bold text-xs transition-colors">
+            <span class="material-symbols-outlined text-sm">inventory_2</span>
+            <span>أرشفة</span>
+          </button>
+        ` : ''}
       </div>
     </div>
   `).join('');
@@ -14651,7 +14818,7 @@ function openNewSmokingViolationModal() {
 
     const noInp = document.getElementById('inp-smk-no');
     if (noInp) {
-      noInp.value = 'SMK-2026-' + String(state.smokingViolations.length + 1).padStart(3, '0');
+      noInp.value = 'SMK-2026-' + String((state.smokingViolations || []).length + 1).padStart(3, '0') + '-' + Date.now().toString().slice(-3);
     }
     const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
     const now = new Date();
@@ -14663,6 +14830,15 @@ function openNewSmokingViolationModal() {
 
     const timeInp = document.getElementById('inp-smk-time');
     if (timeInp) timeInp.value = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+
+    const activeUser = _getViolationActiveUser();
+    const officerInp = document.getElementById('inp-smk-officer-name');
+    if (officerInp) {
+      if (activeUser && activeUser.name) {
+        officerInp.value = activeUser.name;
+      }
+      officerInp.readOnly = !_isHeadOrAdminViolationUser(activeUser);
+    }
 
     initModalSignaturePads(['canvas-smk-violator', 'canvas-smk-officer']);
 
@@ -14685,7 +14861,14 @@ function closeNewSmokingViolationModal() {
 }
 
 function saveNewSmokingViolation() {
-  const id = document.getElementById('inp-smk-no')?.value || ('SMK-2026-' + String(state.smokingViolations.length + 1).padStart(3, '0') + '-' + Date.now().toString().slice(-3));
+  const activeUser = _getViolationActiveUser();
+  if (!activeUser) {
+    showToast('يرجى تسجيل الدخول أولاً قبل حفظ محضر مخالفة التدخين.', 'error');
+    if (typeof openLoginModal === 'function') openLoginModal();
+    return false;
+  }
+
+  const id = document.getElementById('inp-smk-no')?.value || ('SMK-2026-' + String((state.smokingViolations || []).length + 1).padStart(3, '0') + '-' + Date.now().toString().slice(-3));
   const day = document.getElementById('inp-smk-day')?.value || 'السبت';
   const date = document.getElementById('inp-smk-date')?.value || new Date().toISOString().substring(0, 10);
   const time = document.getElementById('inp-smk-time')?.value || '09:00';
@@ -14699,13 +14882,19 @@ function saveNewSmokingViolation() {
   const phone = document.getElementById('inp-smk-phone')?.value || '';
   const dept = document.getElementById('inp-smk-dept')?.value || '';
   const actionDescription = document.getElementById('inp-smk-action')?.value || '';
-  const officerName = document.getElementById('inp-smk-officer-name')?.value || state.currentUser?.name || 'أ. علي سليمان الصقري';
-  const currentShiftLabel = state.currentUser?.shift || (typeof getShiftLabel === 'function' ? getShiftLabel(getCurrentActiveShiftKey()) : 'الوردية 1 (صباحي)');
+  const inputOfficerName = document.getElementById('inp-smk-officer-name')?.value?.trim() || '';
+  const canOverrideOfficer = _isHeadOrAdminViolationUser(activeUser);
+  const officerName = canOverrideOfficer
+    ? (inputOfficerName || activeUser.name || 'مفتش السلامة الميداني')
+    : (activeUser.name || inputOfficerName || 'مفتش السلامة الميداني');
+  const currentShiftLabel = activeUser.shift || (typeof getShiftLabel === 'function' ? getShiftLabel(getCurrentActiveShiftKey()) : 'الوردية 1 (صباحي)');
 
   const violatorSignature = getSignatureData('canvas-smk-violator');
   const officerSignature = getSignatureData('canvas-smk-officer');
+  const nowIso = new Date().toISOString();
+  const authUid = String(activeUser.authUid || activeUser.uid || (window.ksuFirebaseSync && window.ksuFirebaseSync.currentAuthUid) || '').trim();
 
-  const newViol = {
+  const rawViol = {
     id: id,
     day: day,
     date: date,
@@ -14720,6 +14909,14 @@ function saveNewSmokingViolation() {
     dept: dept,
     action: actionDescription,
     officerName: officerName,
+    officerEmpId: String(activeUser.empId || activeUser.employeeId || activeUser.id || '').trim(),
+    createdByUid: authUid,
+    createdById: String(activeUser.id || '').trim(),
+    createdByEmpId: String(activeUser.empId || activeUser.employeeId || '').trim(),
+    createdByUsername: String(activeUser.username || '').trim(),
+    createdByName: String(activeUser.name || officerName || '').trim(),
+    archived: false,
+    isArchived: false,
     shift: currentShiftLabel,
     violatorSignature: violatorSignature,
     officerSignature: officerSignature,
@@ -14727,27 +14924,33 @@ function saveNewSmokingViolation() {
     routedTo: 'H1',
     routedToTitle: 'المشرف العام الملك خالد (H1)',
     headApprovalStatus: 'pending_head',
-    timestamp: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    timestamp: nowIso,
+    createdAt: nowIso,
+    updatedAt: nowIso,
     updatedAtMs: Date.now(),
     _isOfflinePending: true
   };
+
+  const newViol = (window.KSUDataBridge && typeof window.KSUDataBridge.stampViolationOwnership === 'function')
+    ? window.KSUDataBridge.stampViolationOwnership(rawViol, activeUser)
+    : rawViol;
 
   state.smokingViolations.unshift(newViol);
   saveSmokingViolations(newViol);
   closeNewSmokingViolationModal();
   showToast('تم حفظ محضر ضبط مخالفة التدخين وإرساله للمشرف العام الملك خالد (H1).', 'success');
+  return newViol;
 }
 
 function deleteSmokingViolation(id) {
-  if (!confirm('هل أنت متأكد من حذف محضر مخالفة التدخين؟')) return;
-  state.smokingViolations = state.smokingViolations.filter(v => v.id !== id);
-  if (window.KSUOracleSync && typeof window.KSUOracleSync.deleteSmokingViolation === 'function') {
-    window.KSUOracleSync.deleteSmokingViolation(id);
+  if (window.KSUDataBridge && typeof window.KSUDataBridge.appendAuditLog === 'function') {
+    window.KSUDataBridge.appendAuditLog('BLOCKED_PERMANENT_DELETE', {
+      type: 'smoking_violation',
+      recordId: String(id || '')
+    }, _getViolationActiveUser());
   }
-  saveSmokingViolations();
-  showToast('تم حذف محضر التدخين بنجاح.', 'info');
+  showToast('الحذف النهائي معطل لحماية السجل الرقابي؛ الأرشفة متاحة لرئيس القسم ومسؤول النظام فقط.', 'warning');
+  return false;
 }
 
 // Shift Toggle
@@ -17376,10 +17579,55 @@ function printDoorOpenRequest(doorId) {
 }
 
 function printSafetyViolation(id) {
-  const v = state.safetyViolations.find(item => item.id === id);
+  const hasScopedHelper = typeof _getScopedSafetyViolations === 'function';
+  const hasHeadCheck = typeof _isHeadOrAdminViolationUser === 'function';
+  const esc = (typeof _escapeViolationHtml === 'function')
+    ? _escapeViolationHtml
+    : (val => String(val == null ? '' : val)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;'));
+
+  const allowArchived = hasHeadCheck ? _isHeadOrAdminViolationUser() : false;
+  const rawList = (typeof state !== 'undefined' && state && Array.isArray(state.safetyViolations)) ? state.safetyViolations : [];
+
+  let scopedList;
+  if (hasScopedHelper) {
+    scopedList = _getScopedSafetyViolations({ includeArchived: allowArchived });
+  } else if (typeof window !== 'undefined' && window.KSUDataBridge && typeof window.KSUDataBridge.getScopedViolationsForUser === 'function') {
+    scopedList = window.KSUDataBridge.getScopedViolationsForUser(rawList, undefined, { includeArchived: allowArchived });
+  } else if (typeof state !== 'undefined' && state && state.currentUser) {
+    const cu = state.currentUser;
+    const roleCat = String(cu.roleCategory || cu.role || '').toLowerCase();
+    const isPriv = ['head', 'admin', 'developer', 'executive'].includes(roleCat) || cu.id === 'USR-01';
+    const cuIds = [cu.authUid, cu.uid, cu.id, cu.empId, cu.employeeId, cu.username].map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
+    scopedList = rawList.filter(item => {
+      if (!item || item.status === 'deleted') return false;
+      if (isPriv) return allowArchived ? true : !(item.archived || item.isArchived);
+      if (item.archived || item.isArchived) return false;
+      const vIds = [item.createdByUid, item.createdById, item.createdByEmpId, item.createdByUsername, item.officerEmpId].map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
+      return vIds.some(x => cuIds.includes(x));
+    });
+  } else {
+    scopedList = rawList.filter(item => item && item.status !== 'deleted');
+  }
+
+  const v = scopedList.find(item => item && String(item.id) === String(id));
   if (!v) {
-    showToast('لم يتم العثور على محضر مخالفة السلامة.', 'error');
-    return;
+    const rawExists = rawList.some(item => item && String(item.id) === String(id));
+    if (rawExists) {
+      if (typeof window !== 'undefined' && window.KSUDataBridge && typeof window.KSUDataBridge.appendAuditLog === 'function') {
+        window.KSUDataBridge.appendAuditLog('UNAUTHORIZED_VIOLATION_PRINT_ATTEMPT', { type: 'safety', recordId: String(id || '') });
+      }
+      if (typeof showToast === 'function') {
+        showToast('عفواً، لا تملك صلاحية عرض أو طباعة هذه المخالفة.', 'error');
+      }
+    } else if (typeof showToast === 'function') {
+      showToast('لم يتم العثور على محضر مخالفة السلامة.', 'error');
+    }
+    return false;
   }
 
   // إذا كانت المخالفة مصحوبة بكارت الفحص البصري المعتمد (سواء المخزن سابقاً أو المُعاد بناؤه ديناميكياً)
@@ -17420,12 +17668,16 @@ function printSafetyViolation(id) {
     'الرفع بالمخالفة لصاحب الصلاحية'
   ];
 
+  const safeViolSig = v.violatorSignature && String(v.violatorSignature).startsWith('data:image/') ? esc(v.violatorSignature) : '';
+  const safeOfficerSig = v.officerSignature && String(v.officerSignature).startsWith('data:image/') ? esc(v.officerSignature) : '';
+  const safeOfficerDisplay = esc(v.officerName || v.createdByName || 'مفتش السلامة المعتمد');
+
   const html = `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="utf-8">
-  <base href="${window.location.href}">
-  <title>مخالفة اشتراطات السلامة - ${v.id}</title>
+  <base href="${esc(window.location.href)}">
+  <title>مخالفة اشتراطات السلامة - ${esc(v.id)}</title>
   <style>
     @page { size: A4 portrait; margin: 8mm 10mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif; }
@@ -17484,7 +17736,7 @@ function printSafetyViolation(id) {
         <td style="width: 26%; text-align: left; vertical-align: top;">
           <div style="display: inline-block; text-align: left; background: #fff7ed; border: 1.5px solid #fdba74; border-radius: 6px; padding: 6px 10px; min-width: 130px;">
             <div style="font-size: 8.5px; color: #9a3412; font-weight: 700; margin-bottom: 2px;">رقم المحضر / Record No:</div>
-            <div style="font-size: 11px; font-family: monospace; font-weight: 900; color: #c2410c; direction: ltr; text-align: left;">${v.id}</div>
+            <div style="font-size: 11px; font-family: monospace; font-weight: 900; color: #c2410c; direction: ltr; text-align: left;">${esc(v.id)}</div>
           </div>
         </td>
       </tr>
@@ -17492,31 +17744,31 @@ function printSafetyViolation(id) {
 
     <div class="meta-box">
       <div class="grid-3">
-        <div class="field"><strong>رقم المخالفة:</strong> <span style="font-family: monospace; font-weight: bold; color: #c2410c;">${v.id}</span></div>
-        <div class="field"><strong>التاريخ:</strong> <span>${v.date || ''}</span></div>
-        <div class="field"><strong>الوقت:</strong> <span>${v.time || ''}</span></div>
+        <div class="field"><strong>رقم المخالفة:</strong> <span style="font-family: monospace; font-weight: bold; color: #c2410c;">${esc(v.id)}</span></div>
+        <div class="field"><strong>التاريخ:</strong> <span>${esc(v.date || '')}</span></div>
+        <div class="field"><strong>الوقت:</strong> <span>${esc(v.time || '')}</span></div>
       </div>
       <div class="grid-2" style="border-top: 1px dashed #cbd5e1; padding-top: 4px; margin-top: 4px;">
-        <div class="field"><strong>الإدارة / موقع المخالفة:</strong> <span style="font-weight: 700; color: #082B49;">${v.location}</span></div>
-        <div class="field"><strong>غرفة رقم:</strong> <span>${v.room || '-'}</span></div>
+        <div class="field"><strong>الإدارة / موقع المخالفة:</strong> <span style="font-weight: 700; color: #082B49;">${esc(v.location || '')}</span></div>
+        <div class="field"><strong>غرفة رقم:</strong> <span>${esc(v.room || '-')}</span></div>
       </div>
     </div>
 
     <div class="section-title">الأجهزة أو المخالفات المضبوطة:</div>
     <div class="dev-grid">
       ${deviceTypes.map(dev => {
-        const isChecked = (v.devices || []).some(d => d.includes(dev));
+        const isChecked = (v.devices || []).some(d => String(d).includes(dev));
         return `
           <div class="dev-item ${isChecked ? 'checked' : ''}">
             <span class="box-check">${isChecked ? '✓' : ''}</span>
-            <span>${dev}</span>
+            <span>${esc(dev)}</span>
           </div>
         `;
       }).join('')}
-      ${(v.devices || []).some(d => !deviceTypes.some(dt => d.includes(dt))) ? `
+      ${(v.devices || []).some(d => !deviceTypes.some(dt => String(d).includes(dt))) ? `
         <div class="dev-item checked" style="grid-column: span 2;">
           <span class="box-check">✓</span>
-          <span>${(v.devices || []).find(d => !deviceTypes.some(dt => d.includes(dt)))}</span>
+          <span>${esc((v.devices || []).find(d => !deviceTypes.some(dt => String(d).includes(dt))))}</span>
         </div>
       ` : `
         <div class="dev-item">
@@ -17529,11 +17781,11 @@ function printSafetyViolation(id) {
     <div class="section-title">الإجراء المتخذ:</div>
     <div style="display: flex; flex-direction: column; gap: 2px;">
       ${actions.map(act => {
-        const isChecked = v.actionTaken && v.actionTaken.includes(act);
+        const isChecked = v.actionTaken && String(v.actionTaken).includes(act);
         return `
           <div class="action-item ${isChecked ? 'checked' : ''}">
             <span class="radio-circle">${isChecked ? '●' : ''}</span>
-            <span>${act}.</span>
+            <span>${esc(act)}.</span>
           </div>
         `;
       }).join('')}
@@ -17542,26 +17794,26 @@ function printSafetyViolation(id) {
     <div class="sigs-section">
       <div class="sig-card">
         <h4>بيانات وتوقيع الشخص المخالف:</h4>
-        <div class="field">الاسم: <strong>${v.violatorName || 'منسوب بالمدينة الطبية'}</strong></div>
-        <div class="field">الرقم الوظيفي: <strong>${v.violatorEmpId || '-'}</strong></div>
-        ${v.violatorSignature ? `<img src="${v.violatorSignature}" class="sig-img" alt="توقيع المخالف">` : `<div class="sig-line"></div><div style="text-align: center; font-size: 8px; color: #94a3b8; margin-top: 2px;">توقيع الشخص المخالف</div>`}
+        <div class="field">الاسم: <strong>${esc(v.violatorName || 'منسوب بالمدينة الطبية')}</strong></div>
+        <div class="field">الرقم الوظيفي: <strong>${esc(v.violatorEmpId || '-')}</strong></div>
+        ${safeViolSig ? `<img src="${safeViolSig}" class="sig-img" alt="توقيع المخالف">` : `<div class="sig-line"></div><div style="text-align: center; font-size: 8px; color: #94a3b8; margin-top: 2px;">توقيع الشخص المخالف</div>`}
       </div>
 
       <div class="sig-card">
         <h4>محرر المخالفة (مفتش السلامة):</h4>
-        <div class="field">الاسم: <strong>${v.officerName || 'أ. مصعب عبدالله آل حماد'}</strong></div>
+        <div class="field">الاسم: <strong>${safeOfficerDisplay}</strong></div>
         <div class="field">الصفة: <strong>مفتش سلامة معتمد</strong></div>
-        ${v.officerSignature ? `<img src="${v.officerSignature}" class="sig-img" alt="توقيع المفتش">` : `<div class="sig-line"></div><div style="text-align: center; font-size: 8px; color: #94a3b8; margin-top: 2px;">توقيع محرر المخالفة</div>`}
+        ${safeOfficerSig ? `<img src="${safeOfficerSig}" class="sig-img" alt="توقيع المفتش">` : `<div class="sig-line"></div><div style="text-align: center; font-size: 8px; color: #94a3b8; margin-top: 2px;">توقيع محرر المخالفة</div>`}
       </div>
     </div>
 
     <div class="directive-card">
       <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #fdba74; padding-bottom: 3px; margin-bottom: 4px;">
         <span style="font-weight: 800; color: #9a3412; font-size: 10.5px;">توجيه مدير إدارة السلامة بالمدينة الطبية:</span>
-        <span style="font-weight: 900; color: #082B49; font-size: 10.5px;">أ. مصعب عبدالله آل حماد</span>
+        <span style="font-weight: 900; color: #082B49; font-size: 10.5px;">إدارة السلامة بالمدينة الطبية الجامعية</span>
       </div>
       <div style="font-weight: 700; color: #1e293b; font-size: 10.5px;">
-        ${v.directive || 'سحب الجهاز المخالف فوراً، وتوجيه إنذار رسمي بعدم استخدام مواقد أو أجهزة حرارية غير مطابقة.'}
+        ${esc(v.directive || 'سحب الجهاز المخالف فوراً، وتوجيه إنذار رسمي بعدم استخدام مواقد أو أجهزة حرارية غير مطابقة.')}
       </div>
     </div>
   </div>
@@ -17572,22 +17824,70 @@ function printSafetyViolation(id) {
 }
 
 function printSmokingViolation(id) {
-  const v = state.smokingViolations.find(item => item.id === id);
+  const hasScopedHelper = typeof _getScopedSmokingViolations === 'function';
+  const hasHeadCheck = typeof _isHeadOrAdminViolationUser === 'function';
+  const esc = (typeof _escapeViolationHtml === 'function')
+    ? _escapeViolationHtml
+    : (val => String(val == null ? '' : val)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;'));
+
+  const allowArchived = hasHeadCheck ? _isHeadOrAdminViolationUser() : false;
+  const rawList = (typeof state !== 'undefined' && state && Array.isArray(state.smokingViolations)) ? state.smokingViolations : [];
+
+  let scopedList;
+  if (hasScopedHelper) {
+    scopedList = _getScopedSmokingViolations({ includeArchived: allowArchived });
+  } else if (typeof window !== 'undefined' && window.KSUDataBridge && typeof window.KSUDataBridge.getScopedViolationsForUser === 'function') {
+    scopedList = window.KSUDataBridge.getScopedViolationsForUser(rawList, undefined, { includeArchived: allowArchived });
+  } else if (typeof state !== 'undefined' && state && state.currentUser) {
+    const cu = state.currentUser;
+    const roleCat = String(cu.roleCategory || cu.role || '').toLowerCase();
+    const isPriv = ['head', 'admin', 'developer', 'executive'].includes(roleCat) || cu.id === 'USR-01';
+    const cuIds = [cu.authUid, cu.uid, cu.id, cu.empId, cu.employeeId, cu.username].map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
+    scopedList = rawList.filter(item => {
+      if (!item || item.status === 'deleted') return false;
+      if (isPriv) return allowArchived ? true : !(item.archived || item.isArchived);
+      if (item.archived || item.isArchived) return false;
+      const vIds = [item.createdByUid, item.createdById, item.createdByEmpId, item.createdByUsername, item.officerEmpId].map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
+      return vIds.some(x => cuIds.includes(x));
+    });
+  } else {
+    scopedList = rawList.filter(item => item && item.status !== 'deleted');
+  }
+
+  const v = scopedList.find(item => item && String(item.id) === String(id));
   if (!v) {
-    showToast('لم يتم العثور على محضر مخالفة التدخين.', 'error');
-    return;
+    const rawExists = rawList.some(item => item && String(item.id) === String(id));
+    if (rawExists) {
+      if (typeof window !== 'undefined' && window.KSUDataBridge && typeof window.KSUDataBridge.appendAuditLog === 'function') {
+        window.KSUDataBridge.appendAuditLog('UNAUTHORIZED_VIOLATION_PRINT_ATTEMPT', { type: 'smoking', recordId: String(id || '') });
+      }
+      if (typeof showToast === 'function') {
+        showToast('عفواً، لا تملك صلاحية عرض أو طباعة محضر مخالفة التدخين.', 'error');
+      }
+    } else if (typeof showToast === 'function') {
+      showToast('لم يتم العثور على محضر مخالفة التدخين.', 'error');
+    }
+    return false;
   }
 
   const qrSvg = generateQRCodeSVG(`KSU-SMOKING-VIOLATION|${v.id}|${v.violatorName}|ID:${v.nationalId || ''}|DATE:${v.date}|ROLE:${v.role}`, 95);
 
   const roles = ['موظف', 'طالب', 'عامل', 'زائر', 'مريض', 'أخرى'];
+  const safeViolSig = v.violatorSignature && String(v.violatorSignature).startsWith('data:image/') ? esc(v.violatorSignature) : '';
+  const safeOfficerSig = v.officerSignature && String(v.officerSignature).startsWith('data:image/') ? esc(v.officerSignature) : '';
+  const safeOfficerDisplay = esc(v.officerName || v.createdByName || 'مفتش السلامة المعتمد');
 
   const html = `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="utf-8">
-  <base href="${window.location.href}">
-  <title>محضر ضبط مخالفة مكافحة التدخين - ${v.id}</title>
+  <base href="${esc(window.location.href)}">
+  <title>محضر ضبط مخالفة مكافحة التدخين - ${esc(v.id)}</title>
   <style>
     @page { size: A4 portrait; margin: 8mm 10mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif; }
@@ -17643,7 +17943,7 @@ function printSmokingViolation(id) {
         <td style="width: 26%; text-align: left; vertical-align: top;">
           <div style="display: inline-block; text-align: left; background: #fff1f2; border: 1.5px solid #fecdd3; border-radius: 6px; padding: 6px 10px; min-width: 130px;">
             <div style="font-size: 8.5px; color: #9f1239; font-weight: 700; margin-bottom: 2px;">رقم المحضر / Record No:</div>
-            <div style="font-size: 11px; font-family: monospace; font-weight: 900; color: #be123c; direction: ltr; text-align: left;">${v.id}</div>
+            <div style="font-size: 11px; font-family: monospace; font-weight: 900; color: #be123c; direction: ltr; text-align: left;">${esc(v.id)}</div>
           </div>
         </td>
       </tr>
@@ -17655,13 +17955,13 @@ function printSmokingViolation(id) {
 
     <div class="meta-box">
       <div class="grid-4" style="margin-bottom: 4px;">
-        <div class="field"><strong>رقم المحضر:</strong> <span style="font-family: monospace; font-weight: bold; color: #be123c;">${v.id}</span></div>
-        <div class="field"><strong>اليوم:</strong> <span>${v.day || '-'}</span></div>
-        <div class="field"><strong>التاريخ:</strong> <span>${v.date || '-'}</span></div>
-        <div class="field"><strong>الساعة:</strong> <span>${v.time || '-'}</span></div>
+        <div class="field"><strong>رقم المحضر:</strong> <span style="font-family: monospace; font-weight: bold; color: #be123c;">${esc(v.id)}</span></div>
+        <div class="field"><strong>اليوم:</strong> <span>${esc(v.day || '-')}</span></div>
+        <div class="field"><strong>التاريخ:</strong> <span>${esc(v.date || '-')}</span></div>
+        <div class="field"><strong>الساعة:</strong> <span>${esc(v.time || '-')}</span></div>
       </div>
       <div class="field" style="border-top: 1px dashed #cbd5e1; padding-top: 4px;">
-        <strong>مكان ضبط المخالفة:</strong> <span style="font-weight: 700; color: #082B49;">${v.location}</span>
+        <strong>مكان ضبط المخالفة:</strong> <span style="font-weight: 700; color: #082B49;">${esc(v.location || '')}</span>
       </div>
     </div>
 
@@ -17669,7 +17969,7 @@ function printSmokingViolation(id) {
     <div class="roles-grid">
       ${roles.map(r => `
         <div class="role-item ${v.role === r ? 'checked' : ''}">
-          <span>${v.role === r ? '✓ ' : ''}${r}</span>
+          <span>${v.role === r ? '✓ ' : ''}${esc(r)}</span>
         </div>
       `).join('')}
     </div>
@@ -17677,30 +17977,30 @@ function printSmokingViolation(id) {
     <div class="section-title">بيانات الشخص المخالف:</div>
     <div class="meta-box">
       <div class="grid-2" style="margin-bottom: 4px;">
-        <div class="field"><strong>اسم المخالف:</strong> <span style="font-weight: 700; color: #082B49; font-size: 11px;">${v.violatorName}</span></div>
-        <div class="field"><strong>الرقم الوظيفي (إن وجد):</strong> <span>${v.violatorEmpId || '-'}</span></div>
+        <div class="field"><strong>اسم المخالف:</strong> <span style="font-weight: 700; color: #082B49; font-size: 11px;">${esc(v.violatorName || '')}</span></div>
+        <div class="field"><strong>الرقم الوظيفي (إن وجد):</strong> <span>${esc(v.violatorEmpId || '-')}</span></div>
       </div>
       <div class="grid-3" style="border-top: 1px dashed #cbd5e1; padding-top: 4px; margin-bottom: 4px;">
-        <div class="field"><strong>السجل المدني / الإقامة:</strong> <span style="font-family: monospace; font-weight: bold;">${v.nationalId || '-'}</span></div>
-        <div class="field"><strong>تاريخ الميلاد:</strong> <span>${v.dob || '-'}</span></div>
-        <div class="field"><strong>رقم الجوال:</strong> <span>${v.phone || '-'}</span></div>
+        <div class="field"><strong>السجل المدني / الإقامة:</strong> <span style="font-family: monospace; font-weight: bold;">${esc(v.nationalId || '-')}</span></div>
+        <div class="field"><strong>تاريخ الميلاد:</strong> <span>${esc(v.dob || '-')}</span></div>
+        <div class="field"><strong>رقم الجوال:</strong> <span>${esc(v.phone || '-')}</span></div>
       </div>
       <div class="field" style="border-top: 1px dashed #cbd5e1; padding-top: 4px;">
-        <strong>جهة العمل - الإدارة - القسم:</strong> <span>${v.dept || '-'}</span>
+        <strong>جهة العمل - الإدارة - القسم:</strong> <span>${esc(v.dept || '-')}</span>
       </div>
     </div>
 
     <div class="sigs-section">
       <div class="sig-card">
         <h4>توقيع الشخص المخالف:</h4>
-        <div class="field">الاسم: <strong>${v.violatorName}</strong></div>
-        ${v.violatorSignature ? `<img src="${v.violatorSignature}" class="sig-img" alt="توقيع المخالف">` : `<div class="sig-line"></div><div style="text-align: center; font-size: 8px; color: #94a3b8; margin-top: 2px;">توقيع الشخص المخالف</div>`}
+        <div class="field">الاسم: <strong>${esc(v.violatorName || '')}</strong></div>
+        ${safeViolSig ? `<img src="${safeViolSig}" class="sig-img" alt="توقيع المخالف">` : `<div class="sig-line"></div><div style="text-align: center; font-size: 8px; color: #94a3b8; margin-top: 2px;">توقيع الشخص المخالف</div>`}
       </div>
 
       <div class="sig-card">
         <h4>محرر المحضر (مفتش الأمن والسلامة):</h4>
-        <div class="field">الاسم: <strong>${v.officerName || 'أ. علي سليمان الصقري'}</strong></div>
-        ${v.officerSignature ? `<img src="${v.officerSignature}" class="sig-img" alt="توقيع مفتش السلامة">` : `<div class="sig-line"></div><div style="text-align: center; font-size: 8px; color: #94a3b8; margin-top: 2px;">توقيع مفتش السلامة المعتمد</div>`}
+        <div class="field">الاسم: <strong>${safeOfficerDisplay}</strong></div>
+        ${safeOfficerSig ? `<img src="${safeOfficerSig}" class="sig-img" alt="توقيع مفتش السلامة">` : `<div class="sig-line"></div><div style="text-align: center; font-size: 8px; color: #94a3b8; margin-top: 2px;">توقيع مفتش السلامة المعتمد</div>`}
       </div>
     </div>
 
@@ -23096,19 +23396,20 @@ function getUserRoleCategory(user) {
     return 'admin';
   }
   const role = (user.role || '').toLowerCase();
+  const explicitCat = String(user.roleCategory || '').trim().toLowerCase();
   const id = user.id || '';
   const p = user.permissions || {};
 
-  if (id === 'USR-01' || role.includes('admin') || role.includes('مسؤول ومطور') || p.manageUsers) {
+  if (id === 'USR-01' || explicitCat === 'admin' || explicitCat === 'developer' || role.includes('admin') || role.includes('مسؤول ومطور') || p.manageUsers) {
     return 'admin';
   }
-  if (id === 'USR-02' || id === 'USR-04' || role.includes('رئيس') || role.includes('مدير')) {
+  if (id === 'USR-02' || id === 'USR-04' || explicitCat === 'head' || explicitCat === 'executive' || explicitCat === 'general_supervisor' || p.headOfDepartment || p.generalSupervisor || p.directorGeneral || role.includes('مشرف عام') || role.includes('المشرف العام') || role.includes('رئيس') || role.includes('مدير')) {
     return 'executive';
   }
-  if (id === 'USR-03' || role.includes('أخصائي') || role.includes('جودة') || role.includes('سباهي')) {
+  if (id === 'USR-03' || explicitCat === 'quality' || role.includes('أخصائي') || role.includes('جودة') || role.includes('سباهي')) {
     return 'quality';
   }
-  if (id === 'USR-05' || id === 'USR-12' || id === 'USR-17' || role.includes('مشرف') || p.approveReports) {
+  if (id === 'USR-05' || id === 'USR-12' || id === 'USR-17' || explicitCat === 'shift_supervisor' || explicitCat === 'supervisor' || role.includes('مشرف') || p.approveReports) {
     return 'shift_supervisor';
   }
   return 'field_inspector';
@@ -23117,10 +23418,11 @@ function getUserRoleCategory(user) {
 function getAllowedTabsForUser(user, portalKey) {
   const isDev = typeof isSystemDeveloper === 'function' ? isSystemDeveloper(user) : (user && (user.id === 'USR-01' || user.role === 'admin' || (user.role && user.role.includes('مسؤول ومطور'))));
 
-  // System Developer & Admin has UNRESTRICTED full access to ALL 14 tabs across ALL portals!
+  // System Developer & Admin has UNRESTRICTED full access to ALL tabs across ALL portals!
   if (isDev) {
     return [
       'system-admin-panel',
+      'master-archive',
       'shift-supervisor-dashboard',
       'operations-dashboard',
       'campus-interactive-map',
@@ -23142,8 +23444,9 @@ function getAllowedTabsForUser(user, portalKey) {
 
   const roleCat = getUserRoleCategory(user);
   const portal = portalKey || state.activePortal || 'field';
+  const isHeadExecOrAdmin = (typeof _isHeadOrAdminViolationUser === 'function' && _isHeadOrAdminViolationUser(user)) || roleCat === 'admin' || roleCat === 'executive';
 
-  // Field Portal (بوابة المفتشين والمشرفين الميدانيين) - Strict Scope: No Assets Registry or System Admin Panel
+  // Field Portal (بوابة المفتشين والمشرفين الميدانيين) - Strict Scope: No Assets Registry, System Admin Panel, or Master Archive
   if (portal === 'field') {
     if (roleCat === 'shift_supervisor' || roleCat === 'executive' || roleCat === 'admin') {
       return [
@@ -23176,6 +23479,7 @@ function getAllowedTabsForUser(user, portalKey) {
   if (roleCat === 'admin') {
     return [
       'system-admin-panel',
+      'master-archive',
       'shift-supervisor-dashboard',
       'operations-dashboard',
       'campus-interactive-map',
@@ -23210,18 +23514,22 @@ function getAllowedTabsForUser(user, portalKey) {
 
   // Executive Portal (بوابة الإدارة العامة والقيادة)
   if (portal === 'executive') {
-    return [
+    const execTabs = [
       'operations-dashboard',
       'campus-interactive-map',
       'compliance-reports-logs',
       'monthly-quality-schedule',
       'emergency-alarms'
     ];
+    if (isHeadExecOrAdmin) {
+      execTabs.push('master-archive');
+    }
+    return execTabs;
   }
 
   // Admin Portal (بوابة مسؤول النظام والإشراف)
   if (portal === 'admin') {
-    if (roleCat === 'shift_supervisor') {
+    if (roleCat === 'shift_supervisor' || roleCat === 'field_inspector' || !isHeadExecOrAdmin) {
       return [
         'shift-supervisor-dashboard',
         'shift-handover-log',
@@ -23238,6 +23546,7 @@ function getAllowedTabsForUser(user, portalKey) {
     }
     return [
       'system-admin-panel',
+      'master-archive',
       'shift-supervisor-dashboard',
       'operations-dashboard',
       'monthly-quality-schedule',
@@ -26688,6 +26997,8 @@ function renderHeadOperationalCenter() {
   const container = document.getElementById('h1-operational-inbox-container');
   if (!container) return;
 
+  const isNonArchivedViol = (v) => v && typeof v === 'object' && v.status !== 'deleted' && !_isViolationArchivedFallback(v);
+
   const safetyReports = (state.safetyDeptReports && state.safetyDeptReports.length > 0)
     ? state.safetyDeptReports
     : JSON.parse(localStorage.getItem(STORAGE_KEY_SAFETY_DEPT_REPORTS) || '[]');
@@ -26697,12 +27008,12 @@ function renderHeadOperationalCenter() {
   const shiftIncidents = (state.shiftIncidents && state.shiftIncidents.length > 0)
     ? state.shiftIncidents
     : JSON.parse(localStorage.getItem(STORAGE_KEY_SHIFT_INCIDENTS) || '[]');
-  const safetyViols = (state.safetyViolations && state.safetyViolations.length > 0)
+  const safetyViols = ((state.safetyViolations && state.safetyViolations.length > 0)
     ? state.safetyViolations
-    : JSON.parse(localStorage.getItem(STORAGE_KEY_SAFETY_VIOLATIONS) || '[]');
-  const smokingViols = (state.smokingViolations && state.smokingViolations.length > 0)
+    : JSON.parse(localStorage.getItem(STORAGE_KEY_SAFETY_VIOLATIONS) || '[]')).filter(isNonArchivedViol);
+  const smokingViols = ((state.smokingViolations && state.smokingViolations.length > 0)
     ? state.smokingViolations
-    : JSON.parse(localStorage.getItem(STORAGE_KEY_SMOKING_VIOLATIONS) || '[]');
+    : JSON.parse(localStorage.getItem(STORAGE_KEY_SMOKING_VIOLATIONS) || '[]')).filter(isNonArchivedViol);
 
   // Merge alarms + shiftIncidents into emergency/code reports stream
   const codeItemsMap = new Map();
@@ -26789,7 +27100,7 @@ function renderHeadOperationalCenter() {
       title: `مخالفة سلامة (${(v.devices || []).join('، ') || 'أجهزة مخالفة'}) — المخالف: ${v.violatorName || '-'}`,
       details: `الإجراء: ${v.actionTaken || 'مصادرة'} | التوجيه: ${v.directive || '-'}`,
       location: `${v.location || 'المستشفى'} ${v.room ? '- غرفة ' + v.room : ''}`,
-      reporter: v.officerName || 'مفتش السلامة',
+      reporter: v.officerName || v.createdByName || 'مفتش السلامة',
       shift: v.shift || 'الوردية 1 (صباحي)',
       date: v.date || '',
       time: v.time || '',
@@ -26806,7 +27117,7 @@ function renderHeadOperationalCenter() {
       title: `ضبط مخالفة تدخين — ${s.violatorName || 'مخالف'} (${s.role || 'موظف'})`,
       details: `القسم/الجهة: ${s.dept || '-'} | الهوية/الرقم الوظيفي: ${s.nationalId || s.violatorEmpId || '-'}`,
       location: s.location || 'المستشفى',
-      reporter: s.officerName || 'مفتش السلامة',
+      reporter: s.officerName || s.createdByName || 'مفتش السلامة',
       shift: s.shift || 'الوردية 1 (صباحي)',
       date: s.date || '',
       time: s.time || '',
@@ -26840,22 +27151,22 @@ function renderHeadOperationalCenter() {
       <div class="p-4 rounded-2xl bg-white border ${isApproved ? 'border-emerald-200 bg-emerald-50/10' : 'border-gray-200'} shadow-2xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div class="space-y-1">
           <div class="flex items-center gap-2 flex-wrap">
-            <span class="px-2.5 py-0.5 rounded-md border text-[10px] font-black ${item.badgeClass}">${item.streamLabel}</span>
-            <span class="font-mono text-xs font-black px-2 py-0.5 rounded bg-gray-100 text-[#082B49]">${item.id}</span>
-            <span class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-bold">${item.shift}</span>
-            <span class="text-[11px] font-mono text-gray-500">${item.date} ${item.time}</span>
+            <span class="px-2.5 py-0.5 rounded-md border text-[10px] font-black ${item.badgeClass}">${_escapeViolationHtml(item.streamLabel)}</span>
+            <span class="font-mono text-xs font-black px-2 py-0.5 rounded bg-gray-100 text-[#082B49]">${_escapeViolationHtml(item.id)}</span>
+            <span class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-bold">${_escapeViolationHtml(item.shift)}</span>
+            <span class="text-[11px] font-mono text-gray-500">${_escapeViolationHtml(item.date)} ${_escapeViolationHtml(item.time)}</span>
             ${isApproved
               ? '<span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black">✓ تم الاطلاع والاعتماد من المشرف العام (H1)</span>'
               : '<span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black">🔔 وارد للمشرف العام الملك خالد (H1)</span>'}
           </div>
-          <h4 class="font-black text-sm text-[#082B49]">${item.title}</h4>
-          <p class="text-xs text-gray-600">${item.details}</p>
-          <p class="text-[11px] text-gray-500">الموقع: <strong class="text-gray-800">${item.location}</strong> • رافع التقرير: <strong class="text-[#004B87]">${item.reporter}</strong></p>
-          ${item.headNotes ? `<p class="text-[11px] text-emerald-950 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200 font-bold">🏅 توجيه المشرف العام الملك خالد (H1): ${item.headNotes}</p>` : ''}
+          <h4 class="font-black text-sm text-[#082B49]">${_escapeViolationHtml(item.title)}</h4>
+          <p class="text-xs text-gray-600">${_escapeViolationHtml(item.details)}</p>
+          <p class="text-[11px] text-gray-500">الموقع: <strong class="text-gray-800">${_escapeViolationHtml(item.location)}</strong> • رافع التقرير: <strong class="text-[#004B87]">${_escapeViolationHtml(item.reporter)}</strong></p>
+          ${item.headNotes ? `<p class="text-[11px] text-emerald-950 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200 font-bold">🏅 توجيه المشرف العام الملك خالد (H1): ${_escapeViolationHtml(item.headNotes)}</p>` : ''}
         </div>
         <div class="flex items-center gap-2 flex-wrap shrink-0">
           ${!isApproved ? `
-            <button type="button" onclick="approveHeadOperationalItem('${item._stream}', '${item.id}')" class="px-3.5 py-2 rounded-xl bg-[#004B87] hover:bg-[#082B49] text-white font-black text-xs flex items-center gap-1 shadow-xs">
+            <button type="button" onclick="approveHeadOperationalItem('${_escapeViolationJs(item._stream)}', '${_escapeViolationJs(item.id)}')" class="px-3.5 py-2 rounded-xl bg-[#004B87] hover:bg-[#082B49] text-white font-black text-xs flex items-center gap-1 shadow-xs">
               <span class="material-symbols-outlined text-sm">verified</span>
               <span>اعتماد وتوجيه المشرف العام (H1)</span>
             </button>
@@ -26932,6 +27243,80 @@ function approveHeadOperationalItem(stream, itemId) {
   showToast('🏅 تم اعتماد البلاغ/التقرير من المشرف العام الملك خالد (H1) بنجاح.', 'success');
 }
 
+function archiveViolationFromUI(type, id, optionalReason) {
+  const activeUser = _getViolationActiveUser();
+  const normType = String(type || '').toLowerCase().includes('smok') ? 'smoking' : 'safety';
+  if (!_isHeadOrAdminViolationUser(activeUser)) {
+    if (window.KSUDataBridge && typeof window.KSUDataBridge.appendAuditLog === 'function') {
+      window.KSUDataBridge.appendAuditLog('UNAUTHORIZED_ARCHIVE_ATTEMPT', {
+        type: normType,
+        recordId: String(id || '')
+      }, activeUser);
+    }
+    showToast('عفواً، الأرشفة صلاحية حصرية لرئيس القسم ومسؤول النظام فقط.', 'error');
+    return { ok: false, reason: 'unauthorized' };
+  }
+
+  const reason = (optionalReason !== undefined)
+    ? String(optionalReason || '').trim()
+    : (typeof window.prompt === 'function'
+      ? (window.prompt('سبب الأرشفة المرجعية (اختياري):', 'مؤرشف بالأرشيف المرجعي الشامل') ?? 'مؤرشف بالأرشيف المرجعي الشامل')
+      : 'مؤرشف بالأرشيف المرجعي الشامل');
+
+  let res = null;
+  if (window.KSUDataBridge && typeof window.KSUDataBridge.archiveViolationRecord === 'function') {
+    res = window.KSUDataBridge.archiveViolationRecord(normType, id, reason, activeUser);
+  }
+  if (!res || !res.ok) {
+    showToast((res && res.message) || 'لم يتم العثور على المخالفة المطلوبة للأرشفة.', 'error');
+    return res || { ok: false, reason: 'not_found' };
+  }
+
+  renderSafetyViolations();
+  renderSmokingViolations();
+  updateViolationBadges();
+  renderHeadOperationalCenter();
+  if (window.KSUMasterArchive && typeof window.KSUMasterArchive.render === 'function') {
+    window.KSUMasterArchive.render();
+  }
+  showToast('تم نقل المخالفة إلى الأرشيف المرجعي الشامل بنجاح.', 'success');
+  return res;
+}
+
+function restoreViolationFromUI(type, id) {
+  const activeUser = _getViolationActiveUser();
+  const normType = String(type || '').toLowerCase().includes('smok') ? 'smoking' : 'safety';
+  if (!_isHeadOrAdminViolationUser(activeUser)) {
+    if (window.KSUDataBridge && typeof window.KSUDataBridge.appendAuditLog === 'function') {
+      window.KSUDataBridge.appendAuditLog('UNAUTHORIZED_RESTORE_ATTEMPT', {
+        type: normType,
+        recordId: String(id || '')
+      }, activeUser);
+    }
+    showToast('عفواً، الاسترجاع من الأرشيف صلاحية حصرية لرئيس القسم ومسؤول النظام فقط.', 'error');
+    return { ok: false, reason: 'unauthorized' };
+  }
+
+  let res = null;
+  if (window.KSUDataBridge && typeof window.KSUDataBridge.restoreViolationRecord === 'function') {
+    res = window.KSUDataBridge.restoreViolationRecord(normType, id, activeUser);
+  }
+  if (!res || !res.ok) {
+    showToast((res && res.message) || 'تعذر استرجاع المخالفة من الأرشيف.', 'error');
+    return res || { ok: false, reason: 'not_found' };
+  }
+
+  renderSafetyViolations();
+  renderSmokingViolations();
+  updateViolationBadges();
+  renderHeadOperationalCenter();
+  if (window.KSUMasterArchive && typeof window.KSUMasterArchive.render === 'function') {
+    window.KSUMasterArchive.render();
+  }
+  showToast('تم استرجاع المخالفة إلى السجل النشط بنجاح.', 'success');
+  return res;
+}
+
 
 // ============================================================================
 // SAFE & COMPLETE GLOBAL WINDOW EXPORTS (ضمان الربط التام لكافة الأزرار والنوافذ)
@@ -26939,6 +27324,8 @@ function approveHeadOperationalItem(stream, itemId) {
 const SAFE_EXPORTS = {
   // Authentication & Developer
   isSystemDeveloper: typeof isSystemDeveloper !== 'undefined' ? isSystemDeveloper : null,
+  getUserRoleCategory: typeof getUserRoleCategory !== 'undefined' ? getUserRoleCategory : null,
+  getAllowedTabsForUser: typeof getAllowedTabsForUser !== 'undefined' ? getAllowedTabsForUser : null,
   
   // Navigation & Tabs
   switchTab: typeof switchTab !== 'undefined' ? switchTab : null,
@@ -26989,6 +27376,7 @@ const SAFE_EXPORTS = {
   closeNewSafetyViolationModal: typeof closeNewSafetyViolationModal !== 'undefined' ? closeNewSafetyViolationModal : null,
   saveNewSafetyViolation: typeof saveNewSafetyViolation !== 'undefined' ? saveNewSafetyViolation : null,
   deleteSafetyViolation: typeof deleteSafetyViolation !== 'undefined' ? deleteSafetyViolation : null,
+  printSafetyViolation: typeof printSafetyViolation !== 'undefined' ? printSafetyViolation : null,
   
   // Smoking Violations (مخالفات لائحة منع التدخين)
   renderSmokingViolations: typeof renderSmokingViolations !== 'undefined' ? renderSmokingViolations : null,
@@ -26999,6 +27387,9 @@ const SAFE_EXPORTS = {
   closeNewSmokingViolationModal: typeof closeNewSmokingViolationModal !== 'undefined' ? closeNewSmokingViolationModal : null,
   saveNewSmokingViolation: typeof saveNewSmokingViolation !== 'undefined' ? saveNewSmokingViolation : null,
   deleteSmokingViolation: typeof deleteSmokingViolation !== 'undefined' ? deleteSmokingViolation : null,
+  printSmokingViolation: typeof printSmokingViolation !== 'undefined' ? printSmokingViolation : null,
+  archiveViolationFromUI: typeof archiveViolationFromUI !== 'undefined' ? archiveViolationFromUI : null,
+  restoreViolationFromUI: typeof restoreViolationFromUI !== 'undefined' ? restoreViolationFromUI : null,
   
   // CAPA Registry (الإجراءات التصحيحية)
   loadCAPA: typeof loadCAPA !== 'undefined' ? loadCAPA : null,

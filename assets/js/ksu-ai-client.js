@@ -4145,13 +4145,19 @@
 
     let currentUser = null;
     try {
-      currentUser = (window.KSUAuth && window.KSUAuth.currentUser) || JSON.parse(localStorage.getItem('ksu_user') || '{}');
+      currentUser =
+        (window.KSUAuth && typeof window.KSUAuth.getUser === 'function' && window.KSUAuth.getUser()) ||
+        (window.KSUAuth && window.KSUAuth.currentUser) ||
+        (window.state && window.state.currentUser) ||
+        JSON.parse(localStorage.getItem('ksu_active_user') || 'null') ||
+        JSON.parse(localStorage.getItem('ksu_user') || '{}') ||
+        {};
     } catch (e) {
       currentUser = {};
     }
 
     const officerName = currentUser.name || 'مفتش السلامة الميداني';
-    const officerEmpId = currentUser.emp_id || currentUser.empId || '10842';
+    const officerEmpId = currentUser.emp_id || currentUser.empId || currentUser.employeeId || currentUser.id || currentUser.username || '';
     const shift = currentUser.shift || 'الوردية الأولى (صباحية)';
     const today = (KSUAI && typeof KSUAI.getRiyadhDate === 'function') ? KSUAI.getRiyadhDate() : new Date().toISOString().split('T')[0];
     const nowTime = (KSUAI && typeof KSUAI.getRiyadhTime === 'function') ? KSUAI.getRiyadhTime() : new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
@@ -4207,7 +4213,7 @@
       ? d.detected_devices 
       : [(d.detected_element || 'صناديق كرتونية تعيق مسار الخروج ومخرج الطوارئ')];
 
-    const newViol = {
+    let newViol = {
       id: cardRes.cardId,
       cardId: cardRes.cardId,
       date: today,
@@ -4225,6 +4231,13 @@
       violatorEmpId: '-',
       officerName: officerName,
       officerEmpId: officerEmpId,
+      createdByUid: currentUser.authUid || currentUser.uid || (window.ksuFirebaseSync && window.ksuFirebaseSync.currentAuthUid) || '',
+      createdById: currentUser.id || '',
+      createdByEmpId: officerEmpId,
+      createdByUsername: currentUser.username || '',
+      createdByName: currentUser.name || officerName,
+      archived: false,
+      isArchived: false,
       shift: shift,
       directive: d.suggested_directive || (d.corrective_actions && d.corrective_actions[0]) || 'إصدار تعميم إداري مشدد والالتزام التام باشتراطات السلامة واللوائح المعتمدة.',
       status: 'معتمد ومرفوع للأرشيف',
@@ -4246,6 +4259,9 @@
       updatedAtMs: Date.now(),
       _isOfflinePending: true
     };
+    if (window.KSUDataBridge && typeof window.KSUDataBridge.stampViolationOwnership === 'function') {
+      newViol = window.KSUDataBridge.stampViolationOwnership(newViol, currentUser);
+    }
 
     // 1. حفظ في التخزين المحلي لسجل المخالفات
     try {

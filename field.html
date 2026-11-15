@@ -3444,7 +3444,7 @@
           <!-- 2. Officer info and Signature -->
           <div class="flex flex-col gap-2 p-3 rounded-xl bg-surface-container-low border border-outline-variant/40">
             <span class="font-bold text-primary text-xs">محرر المخالفة (مفتش السلامة):</span>
-            <input id="inp-sv-officer-name" type="text" value="أ. مصعب عبدالله آل حماد" class="px-2.5 py-1.5 rounded-lg bg-white border border-outline-variant/50 text-xs outline-none font-bold">
+            <input id="inp-sv-officer-name" type="text" value="" placeholder="اسم مفتش السلامة المعتمد" class="px-2.5 py-1.5 rounded-lg bg-white border border-outline-variant/50 text-xs outline-none font-bold">
             <div class="flex items-center justify-between mt-1">
               <label class="font-bold text-primary text-[11px]">توقيع محرر المخالفة:</label>
               <button type="button" onclick="clearSignaturePad('canvas-sv-officer')" class="text-[10px] text-error font-bold hover:underline">مسح التوقيع</button>
@@ -3623,7 +3623,7 @@
               </label>
               <button type="button" onclick="clearSignaturePad('canvas-smk-officer')" class="text-[10px] text-error font-bold hover:underline">مسح التوقيع</button>
             </div>
-            <input id="inp-smk-officer-name" type="text" value="أ. علي سليمان الصقري" class="px-2.5 py-1.5 rounded-lg bg-white border border-outline-variant/50 text-xs outline-none font-bold mb-1">
+            <input id="inp-smk-officer-name" type="text" value="" placeholder="اسم مفتش السلامة المعتمد" class="px-2.5 py-1.5 rounded-lg bg-white border border-outline-variant/50 text-xs outline-none font-bold mb-1">
             <div class="sig-pad-box" id="box-smk-officer">
               <canvas id="canvas-smk-officer" class="sig-canvas" style="height: 95px;"></canvas>
               <span class="sig-watermark">توقيع المفتش المعتمد</span>
@@ -5693,6 +5693,22 @@
 
         const inpReporter = document.getElementById('inp-shift-inc-reporter');
         if (inpReporter) inpReporter.value = giverFormatted;
+
+        const isPrivilegedOfficer = window.KSUDataBridge && typeof window.KSUDataBridge.isHeadOrAdminUser === 'function'
+          ? window.KSUDataBridge.isHeadOrAdminUser(userObj)
+          : (window.KSUAuth && typeof window.KSUAuth.getRoleCategory === 'function' && ['head', 'admin', 'developer'].includes(window.KSUAuth.getRoleCategory(userObj)));
+
+        ['inp-sv-officer-name', 'inp-smk-officer-name'].forEach(fieldId => {
+          const el = document.getElementById(fieldId);
+          if (!el) return;
+          el.value = userObj.name || '';
+          el.readOnly = !isPrivilegedOfficer;
+          if (!isPrivilegedOfficer) {
+            el.classList.add('bg-slate-100', 'text-slate-700', 'cursor-not-allowed');
+          } else {
+            el.classList.remove('bg-slate-100', 'text-slate-700', 'cursor-not-allowed');
+          }
+        });
 
         // Auto-suggest next shift receiver
         const inpNext = document.getElementById('inp-handover-nextsup');

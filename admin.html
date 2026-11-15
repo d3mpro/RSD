@@ -84,6 +84,27 @@
   <script>
     KSUAuth.protect('admin', ['admin', 'developer', 'executive', 'head']);
   </script>
+  <style>
+    @media print {
+      body.printing-single-round {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        font-family: 'Cairo', sans-serif !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      body.printing-single-round > *:not(#printable-round-sheet) {
+        display: none !important;
+      }
+      body.printing-single-round #printable-round-sheet {
+        display: block !important;
+        position: static !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+    }
+  </style>
 </head>
 <body class="bg-background font-cairo text-on-surface antialiased selection:bg-secondary-fixed selection:text-primary">
   <header id="ksu-global-header" class="ksu-top-header no-print fixed top-0 left-0 right-0 w-full min-h-[58px] bg-white/95 backdrop-blur-md border-b border-slate-200/90 z-50 px-3.5 sm:px-6 flex items-center justify-between shadow-xs"></header>
@@ -101,6 +122,11 @@
         <button id="btn-admin-manage-users-tab" onclick="switchTab('system-admin-panel')" data-path="system-admin-panel" class="hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-on-surface-variant hover:bg-surface-container shrink-0 whitespace-nowrap">
           <span class="material-symbols-outlined text-base text-purple-700">admin_panel_settings</span>
           <span>إدارة المستخدمين والإعدادات</span>
+        </button>
+        <button id="btn-admin-master-archive-tab" onclick="switchTab('master-archive')" data-path="master-archive" class="hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-on-surface-variant hover:bg-surface-container shrink-0 whitespace-nowrap">
+          <span class="material-symbols-outlined text-base text-amber-600">inventory_2</span>
+          <span>الأرشيف والسجل المرجعي الشامل</span>
+          <span id="admin-tab-archive-count" class="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">0</span>
         </button>
         <button onclick="switchTab('shift-handover-log')" data-path="shift-handover-log" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-on-surface-variant hover:bg-surface-container shrink-0 whitespace-nowrap">
           <span class="material-symbols-outlined text-base text-blue-700">assignment</span>
@@ -537,6 +563,9 @@
               <!-- Populated dynamically by app.js?v=6.0 -->
             </div>
           </div>
+
+          <!-- Automatic Master Archive Spotlight (visible automatically for head and admin) -->
+          <section id="admin-auto-archive-spotlight" class="hidden"></section>
 
         </div>
       </div>
@@ -2665,6 +2694,164 @@
         </div>
       </div>
 
+      <!-- ========================================== -->
+      <!-- TAB: MASTER REFERENCE ARCHIVE (HEAD/ADMIN) -->
+      <!-- ========================================== -->
+      <div id="tab-master-archive" class="tab-pane">
+        <div class="w-full px-gutter-mobile md:px-margin-desktop py-space-md flex flex-col gap-space-lg max-w-7xl mx-auto">
+
+          <section class="bg-white rounded-3xl p-6 sm:p-7 border-2 border-[#082B49]/15 shadow-sm space-y-5">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-[#082B49] text-amber-300 flex items-center justify-center shadow-sm shrink-0">
+                  <span class="material-symbols-outlined text-2xl">inventory_2</span>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h2 class="text-base sm:text-lg font-black text-[#082B49]">الأرشيف والسجل المرجعي الشامل (رئيس القسم ومسؤول النظام)</h2>
+                    <span id="admin-arch-total-badge" class="px-3 py-0.5 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-200 text-xs font-black">0 سجل مرجعي محفوظ</span>
+                  </div>
+                  <p class="text-xs text-slate-500 mt-0.5">يظهر تلقائياً لرئيس القسم ومسؤول النظام للوصول الدائم إلى السجلات النشطة والمؤرشفة دون حذف نهائي.</p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2.5 py-1 rounded-xl bg-amber-50 text-amber-900 border border-amber-200 text-xs font-black">
+                  مخالفات نشطة: <span id="admin-arch-violations-active-count" class="font-mono">0</span>
+                </span>
+                <span class="px-2.5 py-1 rounded-xl bg-slate-100 text-slate-800 border border-slate-300 text-xs font-black">
+                  مخالفات مؤرشفة: <span id="admin-arch-violations-archived-count" class="font-mono">0</span>
+                </span>
+                <button type="button" onclick="KSUMasterArchive.printFilteredTable()" class="px-3.5 py-2 rounded-xl bg-[#082B49] hover:bg-[#004B87] text-white font-black text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer">
+                  <span class="material-symbols-outlined text-sm text-amber-300">print</span>
+                  <span>طباعة كشف الأرشيف</span>
+                </button>
+                <button type="button" onclick="KSUMasterArchive.render()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer">
+                  <span class="material-symbols-outlined text-sm">sync</span>
+                  <span>تحديث</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Category Filter Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              <button type="button" onclick="KSUMasterArchive.switchTab('all')" id="admin-arch-tab-all" class="p-3 rounded-2xl border text-right transition-all cursor-pointer bg-[#082B49] text-white border-[#082B49] shadow-sm">
+                <div class="flex items-center justify-between">
+                  <span class="material-symbols-outlined text-amber-300 text-lg">folder_special</span>
+                  <span id="admin-arch-count-all" class="text-lg font-black font-mono">0</span>
+                </div>
+                <div class="text-xs font-black mt-1">كافة السجلات (شامل)</div>
+                <div class="text-[10px] opacity-80">الوثائق النشطة والمؤرشفة</div>
+              </button>
+
+              <button type="button" onclick="KSUMasterArchive.switchTab('rounds')" id="admin-arch-tab-rounds" class="p-3 rounded-2xl border text-right transition-all cursor-pointer bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200">
+                <div class="flex items-center justify-between">
+                  <span class="material-symbols-outlined text-blue-700 text-lg">checklist_rtl</span>
+                  <span id="admin-arch-count-rounds" class="text-lg font-black font-mono text-[#082B49]">0</span>
+                </div>
+                <div class="text-xs font-black mt-1">سجل الجولات التفتيشية</div>
+                <div class="text-[10px] text-slate-500">نماذج سباهي الـ 14</div>
+              </button>
+
+              <button type="button" onclick="KSUMasterArchive.switchTab('reports')" id="admin-arch-tab-reports" class="p-3 rounded-2xl border text-right transition-all cursor-pointer bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200">
+                <div class="flex items-center justify-between">
+                  <span class="material-symbols-outlined text-sky-700 text-lg">description</span>
+                  <span id="admin-arch-count-reports" class="text-lg font-black font-mono text-[#004B87]">0</span>
+                </div>
+                <div class="text-xs font-black mt-1">التقارير والبلاغات</div>
+                <div class="text-[10px] text-slate-500">تقارير السلامة وأكواد الطوارئ</div>
+              </button>
+
+              <button type="button" onclick="KSUMasterArchive.switchTab('violations')" id="admin-arch-tab-violations" class="p-3 rounded-2xl border text-right transition-all cursor-pointer bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200">
+                <div class="flex items-center justify-between">
+                  <span class="material-symbols-outlined text-rose-700 text-lg">gavel</span>
+                  <span id="admin-arch-count-violations" class="text-lg font-black font-mono text-rose-900">0</span>
+                </div>
+                <div class="text-xs font-black mt-1">سجل المخالفات</div>
+                <div class="text-[10px] text-slate-500">سلامة وتدخين (نشط + مؤرشف)</div>
+              </button>
+
+              <button type="button" onclick="KSUMasterArchive.switchTab('permits')" id="admin-arch-tab-permits" class="p-3 rounded-2xl border text-right transition-all cursor-pointer bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200 col-span-2 sm:col-span-1">
+                <div class="flex items-center justify-between">
+                  <span class="material-symbols-outlined text-emerald-700 text-lg">badge</span>
+                  <span id="admin-arch-count-permits" class="text-lg font-black font-mono text-emerald-900">0</span>
+                </div>
+                <div class="text-xs font-black mt-1">التصاريح والأبواب</div>
+                <div class="text-[10px] text-slate-500">تصاريح العمل وطلبات الأبواب</div>
+              </button>
+            </div>
+
+            <!-- Search & Filters -->
+            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+              <div class="md:col-span-3">
+                <label class="block text-[11px] font-black text-slate-700 mb-1">بحث مرجعي سريع:</label>
+                <div class="relative">
+                  <span class="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-base">search</span>
+                  <input type="text" id="admin-arch-search-input" oninput="KSUMasterArchive.render()" placeholder="ابحث بالرقم المرجعي، المفتش، الموقع، أو المخالف..." class="w-full pr-9 pl-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-primary focus:outline-none" />
+                </div>
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="block text-[11px] font-black text-slate-700 mb-1">حالة الأرشيف:</label>
+                <select id="admin-arch-status-filter" onchange="KSUMasterArchive.switchStatusFilter(this.value)" class="w-full py-2 px-2.5 rounded-xl bg-white border border-slate-300 text-xs font-bold focus:outline-none">
+                  <option value="all" selected>الكل (نشط + مؤرشف)</option>
+                  <option value="active">النشطة فقط</option>
+                  <option value="archived">المؤرشفة فقط</option>
+                </select>
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="block text-[11px] font-black text-slate-700 mb-1">الوردية:</label>
+                <select id="admin-arch-shift-filter" onchange="KSUMasterArchive.render()" class="w-full py-2 px-2.5 rounded-xl bg-white border border-slate-300 text-xs font-bold focus:outline-none">
+                  <option value="all">جميع الورديات</option>
+                  <option value="1">الوردية 1 (صباحي)</option>
+                  <option value="2">الوردية 2 (مسائي)</option>
+                  <option value="3">الوردية 3 (ليلي)</option>
+                </select>
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="block text-[11px] font-black text-slate-700 mb-1">من تاريخ:</label>
+                <input type="date" id="admin-arch-date-from" onchange="KSUMasterArchive.render()" class="w-full py-1.5 px-2.5 rounded-xl bg-white border border-slate-300 text-xs font-mono font-bold focus:outline-none" />
+              </div>
+
+              <div class="md:col-span-2">
+                <label class="block text-[11px] font-black text-slate-700 mb-1">إلى تاريخ:</label>
+                <input type="date" id="admin-arch-date-to" onchange="KSUMasterArchive.render()" class="w-full py-1.5 px-2.5 rounded-xl bg-white border border-slate-300 text-xs font-mono font-bold focus:outline-none" />
+              </div>
+
+              <div class="md:col-span-1">
+                <button type="button" onclick="KSUMasterArchive.resetFilters()" title="إعادة ضبط الفلاتر" class="w-full py-2 px-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer">
+                  <span class="material-symbols-outlined text-sm">restart_alt</span>
+                  <span>الكل</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Master Archive Table -->
+            <div class="overflow-x-auto rounded-2xl border border-slate-200 shadow-2xs">
+              <table class="w-full text-right text-xs">
+                <thead class="bg-[#082B49] text-white font-black border-b border-slate-200">
+                  <tr>
+                    <th class="p-3">الرقم المرجعي والتاريخ</th>
+                    <th class="p-3">التصنيف والحالة</th>
+                    <th class="p-3">العنوان والتفاصيل</th>
+                    <th class="p-3">الموقع والمنشأة</th>
+                    <th class="p-3">المسؤول / المفتش</th>
+                    <th class="p-3 text-center">الاعتماد</th>
+                    <th class="p-3 text-center">الإجراءات (معاينة • طباعة • أرشفة/استرجاع)</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-master-archive-tbody" class="divide-y divide-slate-100 font-semibold text-slate-800 bg-white">
+                  <!-- Populated dynamically via KSUMasterArchive.render() -->
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+        </div>
+      </div>
+
     </main>
 
   <!-- ========================================== -->
@@ -3795,6 +3982,106 @@
     </div>
   </div>
 
+  <!-- MODAL: ADMIN MASTER ARCHIVE RECORD PREVIEW -->
+  <div id="modal-admin-archive-record-preview" class="fixed inset-0 z-50 hidden bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl bg-[#082B49] text-amber-300 flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-2xl">inventory_2</span>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h3 id="admin-arch-preview-title" class="text-base font-black text-[#082B49]">وثيقة مرجعية معتمدة</h3>
+              <span id="admin-arch-preview-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-900">سجل مرجعي</span>
+            </div>
+            <p id="admin-arch-preview-ref" class="text-xs font-mono font-bold text-slate-500 mt-0.5">REF-0000</p>
+          </div>
+        </div>
+        <button type="button" onclick="KSUMasterArchive.closePreviewModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer">
+          <span class="material-symbols-outlined text-base">close</span>
+        </button>
+      </div>
+
+      <div id="admin-arch-preview-body" class="space-y-3 text-xs">
+        <!-- Populated dynamically via KSUMasterArchive.previewRecord() -->
+      </div>
+
+      <div class="flex items-center justify-between gap-2 pt-3 border-t border-slate-100 flex-wrap">
+        <div class="flex items-center gap-2 flex-wrap">
+          <button type="button" onclick="KSUMasterArchive.printRecord()" class="px-4 py-2 rounded-xl bg-[#082B49] hover:bg-[#004B87] text-white font-black text-xs flex items-center gap-1.5 shadow-sm cursor-pointer">
+            <span class="material-symbols-outlined text-sm text-amber-300">print</span>
+            <span>طباعة الوثيقة (A4 / PDF)</span>
+          </button>
+          <button type="button" onclick="KSUMasterArchive.closePreviewModal(); KSUMasterArchive.openEmailModal()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm cursor-pointer">
+            <span class="material-symbols-outlined text-sm">mail</span>
+            <span>مشاركة عبر البريد الإلكتروني</span>
+          </button>
+        </div>
+        <button type="button" onclick="KSUMasterArchive.closePreviewModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADMIN MASTER ARCHIVE EMAIL SHARE -->
+  <div id="modal-admin-archive-email-share" class="fixed inset-0 z-50 hidden bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-2xl">forward_to_inbox</span>
+          </div>
+          <div>
+            <h3 class="text-base font-black text-[#082B49]">مشاركة وإرسال التقرير الرسمي عبر البريد الإلكتروني</h3>
+            <p class="text-xs text-slate-500">إرسال نسخة مرجعية من الأرشيف أو نسخها للحافظة</p>
+          </div>
+        </div>
+        <button type="button" onclick="KSUMasterArchive.closeEmailModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer">
+          <span class="material-symbols-outlined text-base">close</span>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block font-black text-slate-700 mb-1">البريد الإلكتروني للمستلم:</label>
+          <div class="flex items-center gap-2">
+            <input type="email" id="admin-arch-email-recipient" value="aalsaqri@ksu.edu.sa" placeholder="example@ksu.edu.sa" class="flex-1 p-2.5 rounded-xl border border-slate-300 font-mono font-bold text-slate-800 focus:ring-2 focus:ring-primary focus:outline-none" dir="ltr" />
+            <button type="button" onclick="document.getElementById('admin-arch-email-recipient').value='aalsaqri@ksu.edu.sa'" class="px-3 py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#004B87] border border-blue-200 font-bold text-[11px] shrink-0 cursor-pointer">
+              بريد الإدارة
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-black text-slate-700 mb-1">عنوان الرسالة (Subject):</label>
+          <input type="text" id="admin-arch-email-subject" class="w-full p-2.5 rounded-xl border border-slate-300 font-bold text-slate-800 focus:ring-2 focus:ring-primary focus:outline-none" />
+        </div>
+
+        <div>
+          <label class="block font-black text-slate-700 mb-1">نص الوثيقة المرجعية:</label>
+          <textarea id="admin-arch-email-body" rows="8" class="w-full p-3 rounded-xl border border-slate-300 font-semibold text-slate-800 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-primary focus:outline-none leading-relaxed"></textarea>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between gap-2 pt-3 border-t border-slate-100 flex-wrap">
+        <div class="flex items-center gap-2 flex-wrap">
+          <button type="button" onclick="KSUMasterArchive.sendEmailNow()" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer">
+            <span class="material-symbols-outlined text-sm">send</span>
+            <span>إرسال التقرير بالبريد</span>
+          </button>
+          <button type="button" onclick="KSUMasterArchive.copyEmailBody()" class="px-3.5 py-2.5 rounded-xl bg-[#082B49] hover:bg-[#004B87] text-white font-bold text-xs flex items-center gap-1.5 cursor-pointer">
+            <span class="material-symbols-outlined text-sm text-amber-300">content_copy</span>
+            <span>نسخ النص للحافظة</span>
+          </button>
+        </div>
+        <button type="button" onclick="KSUMasterArchive.closeEmailModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs cursor-pointer">إلغاء</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Printable sheet for isolated single/table archive printouts -->
+  <div id="printable-round-sheet" class="hidden"></div>
+
   <!-- Scripts -->
   <script src="assets/js/qrcode.min.js"></script>
   <script src="assets/js/ksu-cloud-sync.js?v=6.0"></script>
@@ -3806,8 +4093,16 @@
   <script src="assets/js/ksu-facp-assets.js?v=2.0" charset="UTF-8"></script>
   <script src="assets/js/app.js?v=8.2.0"></script>
   <script src="assets/js/production-reset.js?v=6.0"></script>
+  <script src="assets/js/ksu-master-archive.js?v=1.0"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
+      if (window.state) {
+        window.state.activePortal = 'admin';
+      }
+      try {
+        localStorage.setItem('ksu_active_portal', 'admin');
+      } catch (_) {}
+
       if (window.KSUNav) {
         KSUNav.init({ activePortal: 'admin' });
       }
@@ -3857,6 +4152,23 @@
             adminTabBtn.classList.add('hidden');
           }
         }
+
+        // Automatic Master Archive visibility for head & admin only (hidden for shift_supervisor)
+        const canSeeMasterArchive = (window.KSUDataBridge && typeof window.KSUDataBridge.isHeadOrAdminUser === 'function')
+          ? window.KSUDataBridge.isHeadOrAdminUser(user)
+          : isDev;
+        const archiveTabBtn = document.getElementById('btn-admin-master-archive-tab');
+        const archiveSpotlight = document.getElementById('admin-auto-archive-spotlight');
+        if (archiveTabBtn) {
+          archiveTabBtn.classList.toggle('hidden', !canSeeMasterArchive);
+        }
+        if (archiveSpotlight) {
+          archiveSpotlight.classList.toggle('hidden', !canSeeMasterArchive);
+        }
+      }
+
+      if (window.KSUMasterArchive && typeof window.KSUMasterArchive.init === 'function') {
+        window.KSUMasterArchive.init();
       }
 
       const dateEl = document.getElementById('sup-live-date');

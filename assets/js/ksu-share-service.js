@@ -93,19 +93,58 @@
   }
 
   /**
+   * التحقق من صلاحية الوصول لسجل مخالفة محدد قبل عرضه أو طباعته أو مشاركته
+   */
+  function canAccessViolationRecord(rec) {
+    if (!rec || typeof rec !== 'object') return false;
+    if (window.KSUDataBridge && typeof window.KSUDataBridge.getScopedViolationsForUser === 'function') {
+      const privileged = typeof window.KSUDataBridge.isHeadOrAdminUser === 'function' && window.KSUDataBridge.isHeadOrAdminUser();
+      const scoped = window.KSUDataBridge.getScopedViolationsForUser([rec], undefined, { includeArchived: privileged });
+      return scoped.length > 0;
+    }
+    let user = null;
+    try {
+      user = (window.KSUAuth && typeof window.KSUAuth.getUser === 'function' ? window.KSUAuth.getUser() : null) ||
+        (window.state && window.state.currentUser) ||
+        JSON.parse(localStorage.getItem('ksu_active_user') || 'null');
+    } catch (_) {}
+    if (!user || typeof user !== 'object') return false;
+    const isArchived = rec.archived === true || rec.isArchived === true || rec.status === 'archived' || rec.status === 'مؤرشف';
+    const roleCat = (window.KSUAuth && typeof window.KSUAuth.getRoleCategory === 'function') ? window.KSUAuth.getRoleCategory(user) : String(user.roleCategory || '').toLowerCase();
+    if (['head', 'admin', 'developer', 'executive'].includes(roleCat)) return true;
+    if (isArchived) return false;
+    if (roleCat === 'quality') return true;
+    const userIds = [user.authUid, user.uid, user.id, user.empId, user.employeeId, user.username].map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
+    const recIds = [rec.createdByUid, rec.createdById, rec.createdByEmpId, rec.createdByUsername, rec.officerEmpId, rec.officerId].map(x => String(x || '').trim().toLowerCase()).filter(Boolean);
+    if (recIds.length > 0) return recIds.some(eid => userIds.includes(eid));
+    const uName = String(user.name || '').trim().toLowerCase();
+    const rName = String(rec.createdByName || rec.officerName || '').trim().toLowerCase();
+    return Boolean(uName && rName && uName === rName);
+  }
+
+  /**
    * استخراج بيانات أي قيد من قواعد البيانات المحلية والسحابية
    */
   function fetchRecord(rawType, id) {
     if (!id && !rawType) return null;
     if (typeof id === 'object' && id !== null) {
-      return { ...id, _type: id._type || normalizeRecordType(rawType || id._stream || id.type) };
+      const inferredType = id._type || normalizeRecordType(rawType || id._stream || id.type);
+      if ((inferredType === 'safety_violation' || inferredType === 'smoking_violation') && !canAccessViolationRecord(id)) {
+        return null;
+      }
+      return { ...id, _type: inferredType };
     }
     if (typeof rawType === 'object' && rawType !== null && !id) {
-      return { ...rawType, _type: rawType._type || normalizeRecordType(rawType._stream || rawType.type) };
+      const inferredType = rawType._type || normalizeRecordType(rawType._stream || rawType.type);
+      if ((inferredType === 'safety_violation' || inferredType === 'smoking_violation') && !canAccessViolationRecord(rawType)) {
+        return null;
+      }
+      return { ...rawType, _type: inferredType };
     }
     const strId = String(id).trim();
     const strIdLower = strId.toLowerCase();
     const type = normalizeRecordType(rawType);
+    const isViolationType = type === 'safety_violation' || type === 'smoking_violation';
 
     const findInList = (list) => {
       if (!Array.isArray(list)) return null;
@@ -116,11 +155,11 @@
     if (window.state) {
       if (type === 'smoking_violation' && Array.isArray(window.state.smokingViolations)) {
         const found = findInList(window.state.smokingViolations);
-        if (found) return { ...found, _type: 'smoking_violation' };
+        if (found) return canAccessViolationRecord(found) ? { ...found, _type: 'smoking_violation' } : null;
       }
       if (type === 'safety_violation' && Array.isArray(window.state.safetyViolations)) {
         const found = findInList(window.state.safetyViolations);
-        if (found) return { ...found, _type: 'safety_violation' };
+        if (found) return canAccessViolationRecord(found) ? { ...found, _type: 'safety_violation' } : null;
       }
       if (type === 'round' && Array.isArray(window.state.rounds)) {
         const found = findInList(window.state.rounds);
@@ -139,12 +178,13 @@
     // 2. فحص KSUDataBridge
     if (window.KSUDataBridge) {
       try {
+        const includeArch = typeof window.KSUDataBridge.isHeadOrAdminUser === 'function' && window.KSUDataBridge.isHeadOrAdminUser();
         if (type === 'smoking_violation') {
-          const v = findInList(window.KSUDataBridge.getViolations().smoking);
+          const v = findInList(window.KSUDataBridge.getViolations({ includeArchived: includeArch }).smoking);
           if (v) return { ...v, _type: 'smoking_violation' };
         }
         if (type === 'safety_violation') {
-          const v = findInList(window.KSUDataBridge.getViolations().safety);
+          const v = findInList(window.KSUDataBridge.getViolations({ includeArchived: includeArch }).safety);
           if (v) return { ...v, _type: 'safety_violation' };
         }
         if (type === 'round') {
@@ -178,6 +218,9 @@
           const list = JSON.parse(raw);
           const found = findInList(list);
           if (found) {
+            if (isViolationType && !canAccessViolationRecord(found)) {
+              return null;
+            }
             return {
               ...found,
               _type: type
@@ -195,11 +238,16 @@
       } catch (e) {}
     }
 
-    // Fallback: إنشاء كائن افتراضي إذا لم يتم العثور عليه
+    // المخالفات يجب ألا تُصنّع كائناً افتراضياً عند فقدان السجل أو عدم الصلاحية
+    if (isViolationType) {
+      return null;
+    }
+
+    // Fallback للسجلات غير المقيدة: إنشاء كائن افتراضي إذا لم يتم العثور عليه
     return {
       id: strId,
       _type: type,
-      title: type === 'smoking_violation' ? 'محضر مخالفة تدخين' : (type === 'safety_violation' ? 'محضر مخالفة سلامة' : 'تقرير ميداني'),
+      title: 'تقرير ميداني',
       location: 'المدينة الطبية بجامعة الملك سعود',
       date: new Date().toISOString().split('T')[0],
       time: new Date().toLocaleTimeString('ar-SA'),

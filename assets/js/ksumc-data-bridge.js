@@ -27,7 +27,8 @@
     METRICS: 'ksumc_admin_metrics',
     TASKS: 'ksumc_safety_live_tasks',
     CAPA: 'ksumc_capa_records',
-    INSPECTION_EVENTS: 'ksumc_inspection_events'
+    INSPECTION_EVENTS: 'ksumc_inspection_events',
+    AUDIT_LOGS: 'ksumc_audit_logs'
   };
 
   // إعدادات التكامل الآلي مع موقع شيربوينت الرسمي لقسم السلامة - جامعة الملك سعود
@@ -142,12 +143,248 @@
   function setToStorage(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
-      window.dispatchEvent(new CustomEvent('ksumc_data_updated', { detail: { key, value } }));
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof window.CustomEvent === 'function') {
+        window.dispatchEvent(new window.CustomEvent('ksumc_data_updated', { detail: { key, value } }));
+      }
       return true;
     } catch (e) {
       console.error(`Error writing ${key} to storage:`, e);
       return false;
     }
+  }
+
+  const GENERIC_INSPECTOR_NAMES = new Set([
+    'مفتش السلامة الميداني',
+    'مفتش السلامة',
+    'غير محدد',
+    'مفتش',
+    'مفتش سلامة',
+    '-'
+  ]);
+
+  function escapeHtml(val) {
+    return String(val == null ? '' : val)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function getCurrentActiveUser() {
+    try {
+      if (localStorage.getItem('ksu_logged_out') === 'true') {
+        return null;
+      }
+    } catch (_) {}
+    try {
+      if (window.KSUAuth && typeof window.KSUAuth.getUser === 'function') {
+        const authUser = window.KSUAuth.getUser();
+        if (authUser && typeof authUser === 'object' && !Array.isArray(authUser)) {
+          return authUser;
+        }
+      }
+    } catch (_) {}
+    if (window.state && window.state.currentUser && typeof window.state.currentUser === 'object' && !Array.isArray(window.state.currentUser)) {
+      const su = window.state.currentUser;
+      if (su.id || su.username || su.empId || su.employeeId) return su;
+    }
+    try {
+      const raw = localStorage.getItem('ksu_active_user');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.id || parsed.username || parsed.empId || parsed.employeeId)) {
+          return parsed;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  function getNormalizedUserRole(user) {
+    if (!user || typeof user !== 'object' || Array.isArray(user)) return 'guest';
+    const uid = String(user.id || '').trim();
+    const emp = String(user.empId || user.employeeId || user.emp_id || '').trim().toLowerCase();
+    const uname = String(user.username || '').trim().toLowerCase();
+    const email = String(user.email || '').trim().toLowerCase();
+    const role = String(user.role || '').trim().toLowerCase();
+    const explicitCat = String(user.roleCategory || '').trim().toLowerCase();
+    const p = (user.permissions && typeof user.permissions === 'object') ? user.permissions : {};
+
+    if (!uid && !emp && !uname && !explicitCat && !role && Object.keys(p).length === 0) {
+      return 'guest';
+    }
+    if (explicitCat === 'guest') return 'guest';
+
+    if (typeof window.isSystemDeveloper === 'function') {
+      try {
+        if (window.isSystemDeveloper(user)) return 'developer';
+      } catch (_) {}
+    }
+
+    if (explicitCat === 'executive') return 'executive';
+
+    if (window.KSUAuth && typeof window.KSUAuth.getRoleCategory === 'function') {
+      try {
+        const cat = String(window.KSUAuth.getRoleCategory(user) || '').trim().toLowerCase();
+        if (cat && cat !== 'field_inspector') return cat;
+        if (cat === 'field_inspector' && (!explicitCat || explicitCat === 'field_inspector')) {
+          return 'field_inspector';
+        }
+      } catch (_) {}
+    }
+
+    if (uid === 'USR-01' || emp === '95972' || emp === 'dev' || uname === 'dev' || uname === 'alsaqri' || email === 'aalsaqri@ksu.edu.sa' || explicitCat === 'developer' || p.developer || role.includes('مطور')) {
+      return 'developer';
+    }
+    if (explicitCat && ['head', 'admin', 'quality', 'shift_supervisor', 'field_inspector', 'executive', 'developer'].includes(explicitCat)) {
+      return explicitCat;
+    }
+    if (explicitCat === 'general_supervisor') return 'head';
+    if (uid === 'USR-Q1' || uid === 'USR-03' || emp === 'q1' || uname === 'q1' || role.includes('جودة') || role.includes('سباهي') || role.includes('cbahi')) {
+      return 'quality';
+    }
+    if (uid === 'USR-02' || uid === 'USR-7453' || uid === 'USR-DIR-01' || uid === 'USR-HEAD-02' || emp === 'h1' || emp === 'h2' || emp === 'd1' || emp === 'saf1' || uname === 'h1' || uname === 'h2' || uname === 'd1' || uname === 'saf1' || p.headOfDepartment || p.generalSupervisor || p.directorGeneral || role.includes('مشرف عام') || role.includes('المشرف العام') || role.includes('رئيس') || role.includes('مدير')) {
+      return 'head';
+    }
+    if (role.includes('admin') || role.includes('مسؤول إدارة') || p.manageUsers === true || p.canManageUsers === true) {
+      return 'admin';
+    }
+    if (['s1', 's2', 's3'].includes(emp) || ['s1', 's2', 's3'].includes(uname) || role.includes('مشرف وردية') || role.includes('مشرف') || p.approveReports) {
+      return 'shift_supervisor';
+    }
+    return 'field_inspector';
+  }
+
+  function isHeadOrAdminUser(user) {
+    const u = user === undefined ? getCurrentActiveUser() : user;
+    const role = getNormalizedUserRole(u);
+    return role === 'head' || role === 'admin' || role === 'developer' || role === 'executive';
+  }
+
+  function isViolationArchived(v) {
+    return Boolean(v && typeof v === 'object' && (v.archived === true || v.isArchived === true || v.status === 'archived' || v.status === 'مؤرشف'));
+  }
+
+  function isViolationDeleted(v) {
+    return Boolean(v && typeof v === 'object' && (v.status === 'deleted' || v._deleted === true || v.isPurged === true));
+  }
+
+  function normalizeShiftTag(val) {
+    const s = String(val || '').trim().toLowerCase();
+    if (!s) return '';
+    if (s.includes('1') || s.includes('أولى') || s.includes('اولى') || s.includes('صباح') || s === 's1' || s === 'm1') return 'shift1';
+    if (s.includes('2') || s.includes('ثانية') || s.includes('ثانيه') || s.includes('مساء') || s.includes('مسائ') || s === 's2' || s === 'm2') return 'shift2';
+    if (s.includes('3') || s.includes('ثالثة') || s.includes('ثالثه') || s.includes('ليل') || s === 's3' || s === 'm3') return 'shift3';
+    return '';
+  }
+
+  function isViolationOwner(v, user) {
+    const u = user === undefined ? getCurrentActiveUser() : user;
+    if (!v || typeof v !== 'object' || !u || typeof u !== 'object') return false;
+    if (getNormalizedUserRole(u) === 'guest') return false;
+
+    const userIds = [u.authUid, u.uid, u.id, u.empId, u.employeeId, u.emp_id, u.username]
+      .map(x => String(x || '').trim().toLowerCase())
+      .filter(Boolean);
+
+    const explicitIds = [v.createdByUid, v.createdById, v.createdByEmpId, v.createdByUsername, v.officerEmpId, v.officerId, v.inspectorId]
+      .map(x => String(x || '').trim().toLowerCase())
+      .filter(Boolean);
+
+    if (explicitIds.length > 0) {
+      return userIds.length > 0 && explicitIds.some(eid => userIds.includes(eid));
+    }
+
+    const uName = String(u.name || '').trim().toLowerCase();
+    if (!uName || GENERIC_INSPECTOR_NAMES.has(uName)) return false;
+
+    const creatorNames = [v.createdByName, v.officerName, v.inspector, v.inspectorName]
+      .map(x => String(x || '').trim().toLowerCase())
+      .filter(n => n && !GENERIC_INSPECTOR_NAMES.has(n));
+
+    return creatorNames.some(cn => cn === uName);
+  }
+
+  function stampViolationOwnership(violation, user) {
+    const u = user === undefined ? getCurrentActiveUser() : user;
+    const item = Object.assign({}, violation || {});
+    if (u && typeof u === 'object' && getNormalizedUserRole(u) !== 'guest') {
+      const authUid = String(u.authUid || u.uid || (window.ksuFirebaseSync && window.ksuFirebaseSync.currentAuthUid) || '').trim();
+      const uId = String(u.id || '').trim();
+      const uEmpId = String(u.empId || u.employeeId || u.emp_id || '').trim();
+      const uUsername = String(u.username || '').trim();
+      const uName = String(u.name || '').trim();
+      const privileged = isHeadOrAdminUser(u);
+
+      if (!privileged) {
+        if (authUid) item.createdByUid = authUid;
+        if (uId) item.createdById = uId;
+        if (uEmpId) item.createdByEmpId = uEmpId;
+        if (uUsername) item.createdByUsername = uUsername;
+        if (uName) {
+          item.createdByName = uName;
+          item.officerName = uName;
+        }
+        if (uEmpId || uId) item.officerEmpId = uEmpId || uId;
+      } else {
+        if (!item.createdByUid && authUid) item.createdByUid = authUid;
+        if (!item.createdById && uId) item.createdById = uId;
+        if (!item.createdByEmpId && uEmpId) item.createdByEmpId = uEmpId;
+        if (!item.createdByUsername && uUsername) item.createdByUsername = uUsername;
+        if (!item.createdByName && (item.officerName || uName)) item.createdByName = item.officerName || uName;
+        if (!item.officerEmpId && (uEmpId || uId)) item.officerEmpId = uEmpId || uId;
+        if (!item.officerName && uName) item.officerName = uName;
+      }
+      if (!item.shift && u.shift) item.shift = u.shift;
+    }
+
+    const archived = isViolationArchived(item);
+    item.archived = archived;
+    item.isArchived = archived;
+    if (item.status === 'deleted') {
+      item.status = item.preArchiveStatus || 'قيد المتابعة';
+    }
+    return item;
+  }
+
+  function getScopedViolationsForUser(list, user, options = {}) {
+    const arr = Array.isArray(list) ? list : [];
+    const opts = (options && typeof options === 'object') ? options : {};
+    const valid = arr.filter(v => v && typeof v === 'object' && !isViolationDeleted(v));
+
+    if (opts.bypassScope === true) {
+      if (opts.onlyArchived === true) return valid.filter(v => isViolationArchived(v));
+      if (opts.includeArchived === true) return valid;
+      return valid.filter(v => !isViolationArchived(v));
+    }
+
+    const u = user === undefined ? getCurrentActiveUser() : user;
+    const role = getNormalizedUserRole(u);
+    if (!u || role === 'guest') return [];
+
+    if (isHeadOrAdminUser(u)) {
+      if (opts.onlyArchived === true) return valid.filter(v => isViolationArchived(v));
+      if (opts.includeArchived === true) return valid;
+      return valid.filter(v => !isViolationArchived(v));
+    }
+
+    if (role === 'quality') {
+      return valid.filter(v => !isViolationArchived(v));
+    }
+
+    if (role === 'shift_supervisor') {
+      const userShiftTag = normalizeShiftTag(u.shift || u.empId || u.username);
+      return valid.filter(v => {
+        if (isViolationArchived(v)) return false;
+        if (isViolationOwner(v, u)) return true;
+        if (!userShiftTag) return false;
+        return normalizeShiftTag(v.shift || v.shiftName) === userShiftTag;
+      });
+    }
+
+    // field_inspector & all other non-privileged roles: strictly own non-archived violations
+    return valid.filter(v => !isViolationArchived(v) && isViolationOwner(v, u));
   }
 
   const KSUDataBridge = {
@@ -357,69 +594,235 @@
     },
 
     /**
-     * المخالفات والملاحظات الميدانية (تُوجّه للمشرف العام الملك خالد H1 من جميع الورديات)
+     * المخالفات والملاحظات الميدانية (تُصفّى تلقائياً حسب صلاحية المستخدم وهويته)
      */
-    getViolations: function() {
-      const safety = getFromStorage(KEYS.SAFETY_VIOLATIONS, []);
-      const smoking = getFromStorage(KEYS.SMOKING_VIOLATIONS, []);
+    escapeHtml: escapeHtml,
+    getCurrentActiveUser: getCurrentActiveUser,
+    getNormalizedUserRole: getNormalizedUserRole,
+    isHeadOrAdminUser: isHeadOrAdminUser,
+    isViolationArchived: isViolationArchived,
+    isViolationDeleted: isViolationDeleted,
+    isViolationOwner: isViolationOwner,
+    stampViolationOwnership: stampViolationOwnership,
+    getScopedViolationsForUser: getScopedViolationsForUser,
+
+    getViolations: function(options = {}) {
+      const opts = (options && typeof options === 'object') ? options : {};
+      const targetUser = ('user' in opts) ? opts.user : undefined;
+      const rawSafety = getFromStorage(KEYS.SAFETY_VIOLATIONS, []);
+      const rawSmoking = getFromStorage(KEYS.SMOKING_VIOLATIONS, []);
+      const safety = getScopedViolationsForUser(rawSafety, targetUser, opts);
+      const smoking = getScopedViolationsForUser(rawSmoking, targetUser, opts);
       return { safety, smoking, total: safety.length + smoking.length };
+    },
+
+    getAuditLogs: function() {
+      return getFromStorage(KEYS.AUDIT_LOGS, []);
+    },
+
+    appendAuditLog: function(action, details = {}, user) {
+      const u = user === undefined ? getCurrentActiveUser() : user;
+      const logs = this.getAuditLogs();
+      const entry = {
+        id: 'AUD-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
+        action: String(action || 'EVENT'),
+        actorId: (u && u.id) ? String(u.id) : 'anonymous',
+        actorEmpId: (u && (u.empId || u.employeeId || u.username)) ? String(u.empId || u.employeeId || u.username) : '',
+        actorName: (u && u.name) ? String(u.name) : 'مستخدم غير مصرح',
+        actorRole: getNormalizedUserRole(u),
+        timestamp: new Date().toISOString(),
+        createdAtMs: Date.now(),
+        details: (details && typeof details === 'object') ? details : { note: String(details || '') }
+      };
+      const updated = [entry, ...(Array.isArray(logs) ? logs : [])].slice(0, 500);
+      setToStorage(KEYS.AUDIT_LOGS, updated);
+      if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.recordAuditLog === 'function') {
+        try { window.ksuFirebaseSync.recordAuditLog(entry.action, entry); } catch (_) {}
+      }
+      return entry;
     },
 
     saveSafetyViolation: function(violation) {
       const list = getFromStorage(KEYS.SAFETY_VIOLATIONS, []);
-      const userObj = window.KSUAuth ? window.KSUAuth.getUser() : null;
+      const userObj = getCurrentActiveUser();
       const nowIso = new Date().toISOString();
-      const item = {
-        id: violation.id || 'VIO-' + Date.now(),
-        date: violation.date || nowIso.split('T')[0],
-        status: violation.status || 'قيد المتابعة',
-        severity: violation.severity || 'high',
-        facility: violation.facility || 'مستشفى الملك خالد الجامعي (KKUH)',
-        shift: violation.shift || (userObj && userObj.shift) || 'الوردية 1 (صباحي)',
+      const base = {
+        id: (violation && violation.id) || 'VIO-' + Date.now(),
+        date: (violation && violation.date) || nowIso.split('T')[0],
+        status: (violation && violation.status) || 'قيد المتابعة',
+        severity: (violation && violation.severity) || 'high',
+        facility: (violation && violation.facility) || 'مستشفى الملك خالد الجامعي (KKUH)',
+        shift: (violation && violation.shift) || (userObj && userObj.shift) || 'الوردية 1 (صباحي)',
         routedTo: 'H1',
         routedToTitle: 'المشرف العام الملك خالد (H1)',
-        timestamp: violation.timestamp || nowIso,
-        createdAt: violation.createdAt || nowIso,
+        timestamp: (violation && violation.timestamp) || nowIso,
+        createdAt: (violation && violation.createdAt) || nowIso,
         updatedAt: nowIso,
         updatedAtMs: Date.now(),
         _isOfflinePending: true,
-        ...violation
+        ...(violation || {})
       };
-      if (!item.timestamp) item.timestamp = nowIso;
-      list.unshift(item);
-      setToStorage(KEYS.SAFETY_VIOLATIONS, list);
+      if (!base.timestamp) base.timestamp = nowIso;
+      const item = stampViolationOwnership(base, userObj);
+      const deduped = (Array.isArray(list) ? list : []).filter(x => x && String(x.id) !== String(item.id));
+      deduped.unshift(item);
+      setToStorage(KEYS.SAFETY_VIOLATIONS, deduped);
+      if (window.state && Array.isArray(window.state.safetyViolations)) {
+        window.state.safetyViolations = deduped;
+      }
       if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncSafetyViolation === 'function') {
-        window.ksuFirebaseSync.syncSafetyViolation(item);
+        try { window.ksuFirebaseSync.syncSafetyViolation(item); } catch (_) {}
       }
       return item;
     },
 
     saveSmokingViolation: function(violation) {
       const list = getFromStorage(KEYS.SMOKING_VIOLATIONS, []);
-      const userObj = window.KSUAuth ? window.KSUAuth.getUser() : null;
+      const userObj = getCurrentActiveUser();
       const nowIso = new Date().toISOString();
-      const item = {
-        id: violation.id || 'SMK-' + Date.now(),
-        date: violation.date || nowIso.split('T')[0],
-        status: violation.status || 'تم الضبط',
-        facility: violation.facility || 'مستشفى الملك خالد الجامعي (KKUH)',
-        shift: violation.shift || (userObj && userObj.shift) || 'الوردية 1 (صباحي)',
+      const base = {
+        id: (violation && violation.id) || 'SMK-' + Date.now(),
+        date: (violation && violation.date) || nowIso.split('T')[0],
+        status: (violation && violation.status) || 'تم الضبط',
+        facility: (violation && violation.facility) || 'مستشفى الملك خالد الجامعي (KKUH)',
+        shift: (violation && violation.shift) || (userObj && userObj.shift) || 'الوردية 1 (صباحي)',
         routedTo: 'H1',
         routedToTitle: 'المشرف العام الملك خالد (H1)',
-        timestamp: violation.timestamp || nowIso,
-        createdAt: violation.createdAt || nowIso,
+        timestamp: (violation && violation.timestamp) || nowIso,
+        createdAt: (violation && violation.createdAt) || nowIso,
         updatedAt: nowIso,
         updatedAtMs: Date.now(),
         _isOfflinePending: true,
-        ...violation
+        ...(violation || {})
       };
-      if (!item.timestamp) item.timestamp = nowIso;
-      list.unshift(item);
-      setToStorage(KEYS.SMOKING_VIOLATIONS, list);
+      if (!base.timestamp) base.timestamp = nowIso;
+      const item = stampViolationOwnership(base, userObj);
+      const deduped = (Array.isArray(list) ? list : []).filter(x => x && String(x.id) !== String(item.id));
+      deduped.unshift(item);
+      setToStorage(KEYS.SMOKING_VIOLATIONS, deduped);
+      if (window.state && Array.isArray(window.state.smokingViolations)) {
+        window.state.smokingViolations = deduped;
+      }
       if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncSmokingViolation === 'function') {
-        window.ksuFirebaseSync.syncSmokingViolation(item);
+        try { window.ksuFirebaseSync.syncSmokingViolation(item); } catch (_) {}
       }
       return item;
+    },
+
+    archiveViolationRecord: function(type, id, reason = '', user) {
+      const u = user === undefined ? getCurrentActiveUser() : user;
+      const isSmoking = String(type || '').toLowerCase().includes('smok');
+      if (!isHeadOrAdminUser(u)) {
+        this.appendAuditLog('UNAUTHORIZED_ARCHIVE_ATTEMPT', { type: isSmoking ? 'smoking' : 'safety', recordId: String(id || ''), reason: String(reason || '') }, u);
+        return { ok: false, reason: 'unauthorized', message: 'عفواً، الأرشفة صلاحية حصرية لرئيس القسم ومسؤول النظام.' };
+      }
+
+      const storageKey = isSmoking ? KEYS.SMOKING_VIOLATIONS : KEYS.SAFETY_VIOLATIONS;
+      const stateProp = isSmoking ? 'smokingViolations' : 'safetyViolations';
+      let list = getFromStorage(storageKey, []);
+      if ((!Array.isArray(list) || list.length === 0) && window.state && Array.isArray(window.state[stateProp])) {
+        list = window.state[stateProp].slice();
+      }
+      const idx = (Array.isArray(list) ? list : []).findIndex(v => v && String(v.id) === String(id));
+      if (idx === -1) {
+        return { ok: false, reason: 'not_found', message: 'لم يتم العثور على المخالفة المطلوبة للأرشفة.' };
+      }
+
+      const nowIso = new Date().toISOString();
+      const current = Object.assign({}, list[idx]);
+      if (!isViolationArchived(current)) {
+        current.preArchiveStatus = current.preArchiveStatus || current.status || (isSmoking ? 'تم الضبط' : 'قيد المتابعة');
+      }
+      current.archived = true;
+      current.isArchived = true;
+      current.status = 'archived';
+      current.archivedAt = nowIso;
+      current.archivedBy = (u && (u.id || u.empId || u.username)) || 'HEAD_ADMIN';
+      current.archivedByName = (u && u.name) || 'رئيس القسم / مسؤول النظام';
+      current.archivedByEmpId = (u && (u.empId || u.employeeId || u.username)) || '';
+      current.archiveReason = String(reason || '').trim() || 'مؤرشف بالأرشيف المرجعي';
+      current.updatedAt = nowIso;
+      current.updatedAtMs = Date.now();
+      current._isOfflinePending = true;
+
+      list[idx] = current;
+      setToStorage(storageKey, list);
+      if (window.state && Array.isArray(window.state[stateProp])) {
+        window.state[stateProp] = list;
+      }
+
+      if (window.ksuFirebaseSync) {
+        try {
+          if (isSmoking && typeof window.ksuFirebaseSync.syncSmokingViolation === 'function') {
+            window.ksuFirebaseSync.syncSmokingViolation(current);
+          } else if (!isSmoking && typeof window.ksuFirebaseSync.syncSafetyViolation === 'function') {
+            window.ksuFirebaseSync.syncSafetyViolation(current);
+          }
+        } catch (_) {}
+      }
+
+      this.appendAuditLog('ARCHIVE_VIOLATION', {
+        type: isSmoking ? 'smoking' : 'safety',
+        recordId: String(current.id),
+        reason: current.archiveReason
+      }, u);
+
+      return { ok: true, record: current };
+    },
+
+    restoreViolationRecord: function(type, id, user) {
+      const u = user === undefined ? getCurrentActiveUser() : user;
+      const isSmoking = String(type || '').toLowerCase().includes('smok');
+      if (!isHeadOrAdminUser(u)) {
+        this.appendAuditLog('UNAUTHORIZED_RESTORE_ATTEMPT', { type: isSmoking ? 'smoking' : 'safety', recordId: String(id || '') }, u);
+        return { ok: false, reason: 'unauthorized', message: 'عفواً، الاسترجاع من الأرشيف صلاحية حصرية لرئيس القسم ومسؤول النظام.' };
+      }
+
+      const storageKey = isSmoking ? KEYS.SMOKING_VIOLATIONS : KEYS.SAFETY_VIOLATIONS;
+      const stateProp = isSmoking ? 'smokingViolations' : 'safetyViolations';
+      let list = getFromStorage(storageKey, []);
+      if ((!Array.isArray(list) || list.length === 0) && window.state && Array.isArray(window.state[stateProp])) {
+        list = window.state[stateProp].slice();
+      }
+      const idx = (Array.isArray(list) ? list : []).findIndex(v => v && String(v.id) === String(id));
+      if (idx === -1) {
+        return { ok: false, reason: 'not_found', message: 'لم يتم العثور على المخالفة المطلوبة للاسترجاع.' };
+      }
+
+      const nowIso = new Date().toISOString();
+      const current = Object.assign({}, list[idx]);
+      current.archived = false;
+      current.isArchived = false;
+      current.status = current.preArchiveStatus || (isSmoking ? 'معتمد رسمياً' : 'قيد المتابعة');
+      current.restoredAt = nowIso;
+      current.restoredBy = (u && (u.id || u.empId || u.username)) || 'HEAD_ADMIN';
+      current.restoredByName = (u && u.name) || 'رئيس القسم / مسؤول النظام';
+      current.updatedAt = nowIso;
+      current.updatedAtMs = Date.now();
+      current._isOfflinePending = true;
+
+      list[idx] = current;
+      setToStorage(storageKey, list);
+      if (window.state && Array.isArray(window.state[stateProp])) {
+        window.state[stateProp] = list;
+      }
+
+      if (window.ksuFirebaseSync) {
+        try {
+          if (isSmoking && typeof window.ksuFirebaseSync.syncSmokingViolation === 'function') {
+            window.ksuFirebaseSync.syncSmokingViolation(current);
+          } else if (!isSmoking && typeof window.ksuFirebaseSync.syncSafetyViolation === 'function') {
+            window.ksuFirebaseSync.syncSafetyViolation(current);
+          }
+        } catch (_) {}
+      }
+
+      this.appendAuditLog('RESTORE_VIOLATION', {
+        type: isSmoking ? 'smoking' : 'safety',
+        recordId: String(current.id)
+      }, u);
+
+      return { ok: true, record: current };
     },
 
     /**
@@ -1428,5 +1831,20 @@
   };
 
   window.KSUDataBridge = KSUDataBridge;
+  window.KSUViolationPolicy = {
+    escapeHtml: escapeHtml,
+    getCurrentActiveUser: getCurrentActiveUser,
+    getNormalizedUserRole: getNormalizedUserRole,
+    isHeadOrAdminUser: isHeadOrAdminUser,
+    isViolationArchived: isViolationArchived,
+    isViolationDeleted: isViolationDeleted,
+    isViolationOwner: isViolationOwner,
+    stampViolationOwnership: stampViolationOwnership,
+    getScopedViolationsForUser: getScopedViolationsForUser,
+    archiveViolationRecord: KSUDataBridge.archiveViolationRecord.bind(KSUDataBridge),
+    restoreViolationRecord: KSUDataBridge.restoreViolationRecord.bind(KSUDataBridge),
+    appendAuditLog: KSUDataBridge.appendAuditLog.bind(KSUDataBridge),
+    getAuditLogs: KSUDataBridge.getAuditLogs.bind(KSUDataBridge)
+  };
 
 })(window);

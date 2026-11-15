@@ -480,6 +480,35 @@
       </div>
 
     </section>
+
+      <!-- الأرشيف التلقائي ومستجدات المخالفات (يظهر تلقائياً لرئيس القسم ومسؤول النظام) -->
+      <section id="head-overview-auto-archive-card" class="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 rounded-2xl bg-[#082B49] text-amber-300 flex items-center justify-center shadow-xs shrink-0">
+              <span class="material-symbols-outlined text-2xl">inventory_2</span>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 class="text-base font-black text-[#082B49]">الأرشيف المرجعي التلقائي وسجل المخالفات</h3>
+                <span id="head-overview-archive-badge" class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black">0 سجل محفوظ</span>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">ظهور تلقائي مستمر لكافة السجلات والمخالفات النشطة والمؤرشفة دون حذف نهائي للرجوع إليها في أي وقت</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span id="head-overview-active-viols-chip" class="px-3 py-1 rounded-xl bg-amber-50 text-amber-900 border border-amber-200 text-xs font-black">مخالفات نشطة: 0</span>
+            <span id="head-overview-archived-viols-chip" class="px-3 py-1 rounded-xl bg-slate-100 text-slate-800 border border-slate-300 text-xs font-black">مخالفات مؤرشفة: 0</span>
+            <button type="button" onclick="switchHeadPortalTab('archive')" class="px-4 py-2 rounded-xl bg-[#082B49] hover:bg-[#004B87] text-white font-black text-xs flex items-center gap-1.5 shadow-xs transition-all cursor-pointer">
+              <span class="material-symbols-outlined text-sm text-amber-300">open_in_new</span>
+              <span>فتح الأرشيف المرجعي الشامل</span>
+            </button>
+          </div>
+        </div>
+        <div id="head-overview-auto-archive-list" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <!-- Populated dynamically via renderHeadOverviewAutoArchive() -->
+        </div>
+      </section>
     </div>
 
 
@@ -982,12 +1011,21 @@
 
       <!-- Advanced Search & Date/Shift Filter Bar -->
       <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-        <div class="md:col-span-5">
-          <label class="block text-[11px] font-black text-slate-700 mb-1">بحث مرجعي سريع (برقم السجل، العنوان، الموقع، المفتش، المقاول، أو المخالف):</label>
+        <div class="md:col-span-3">
+          <label class="block text-[11px] font-black text-slate-700 mb-1">بحث مرجعي سريع (برقم السجل، العنوان، الموقع، المفتش، أو المخالف):</label>
           <div class="relative">
             <span class="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-base">search</span>
-            <input type="text" id="arch-search-input" oninput="renderHeadMasterArchive()" placeholder="ابحث عن أي تقرير أو جولة أو مخالفة أو تصريح..." class="w-full pr-9 pl-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-primary focus:outline-none" />
+            <input type="text" id="arch-search-input" oninput="renderHeadMasterArchive()" placeholder="ابحث عن أي تقرير أو جولة أو مخالفة..." class="w-full pr-9 pl-3 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold focus:ring-2 focus:ring-primary focus:outline-none" />
           </div>
+        </div>
+
+        <div class="md:col-span-2">
+          <label class="block text-[11px] font-black text-slate-700 mb-1">حالة الأرشيف:</label>
+          <select id="arch-archive-status-filter" onchange="switchArchiveStatusFilter(this.value)" class="w-full py-2 px-2.5 rounded-xl bg-white border border-slate-300 text-xs font-bold focus:outline-none">
+            <option value="all" selected>الكل (نشط + مؤرشف — تلقائي)</option>
+            <option value="active">السجلات النشطة فقط</option>
+            <option value="archived">المؤرشفة فقط</option>
+          </select>
         </div>
 
         <div class="md:col-span-2">
@@ -1937,16 +1975,17 @@
         const pendingWorkflow = allRounds.filter(r => r.workflowStatus === 'forwarded_to_head').length;
         let pendingOp = 0;
         try {
+          const isActiveViol = (x) => x && x.status !== 'deleted' && !(window.KSUDataBridge && typeof window.KSUDataBridge.isViolationArchived === 'function' ? window.KSUDataBridge.isViolationArchived(x) : (x.archived === true || x.isArchived === true || x.status === 'archived' || x.status === 'مؤرشف'));
           const sRep = JSON.parse(localStorage.getItem('ksumc_safety_dept_reports') || '[]');
           const alarms = JSON.parse(localStorage.getItem('ksumc_safety_alarms') || '[]');
           const incidents = JSON.parse(localStorage.getItem('ksumc_shift_incidents') || '[]');
           const sViol = JSON.parse(localStorage.getItem('ksumc_safety_violations') || '[]');
           const smk = JSON.parse(localStorage.getItem('ksumc_smoking_violations') || '[]');
-          pendingOp += sRep.filter(x => x.headApprovalStatus !== 'approved_by_head').length;
-          pendingOp += alarms.filter(x => x.headApprovalStatus !== 'approved_by_head').length;
-          pendingOp += incidents.filter(x => x.headApprovalStatus !== 'approved_by_head').length;
-          pendingOp += sViol.filter(x => x.headApprovalStatus !== 'approved_by_head').length;
-          pendingOp += smk.filter(x => x.headApprovalStatus !== 'approved_by_head').length;
+          pendingOp += sRep.filter(x => x && x.headApprovalStatus !== 'approved_by_head').length;
+          pendingOp += alarms.filter(x => x && x.headApprovalStatus !== 'approved_by_head').length;
+          pendingOp += incidents.filter(x => x && x.headApprovalStatus !== 'approved_by_head').length;
+          pendingOp += sViol.filter(x => isActiveViol(x) && x.headApprovalStatus !== 'approved_by_head').length;
+          pendingOp += smk.filter(x => isActiveViol(x) && x.headApprovalStatus !== 'approved_by_head').length;
         } catch(e) {}
         const totalPendingApprovals = pendingWorkflow + pendingOp;
         const appBadge = document.getElementById('tab-badge-approvals-count');
@@ -1964,10 +2003,13 @@
         const heroCapaBadge = document.getElementById('hero-capa-count');
         if (heroCapaBadge) heroCapaBadge.textContent = openCapa;
 
+        const totalArchiveCount = (typeof getUnifiedArchiveRecords === 'function')
+          ? getUnifiedArchiveRecords().length
+          : allRounds.length;
         const archiveBadge = document.getElementById('tab-badge-archive-count');
-        if (archiveBadge) archiveBadge.textContent = allRounds.length;
+        if (archiveBadge) archiveBadge.textContent = totalArchiveCount;
         const heroArchiveBadge = document.getElementById('hero-archive-count');
-        if (heroArchiveBadge) heroArchiveBadge.textContent = allRounds.length;
+        if (heroArchiveBadge) heroArchiveBadge.textContent = totalArchiveCount;
       } catch(e) {}
 
       renderFullRoundsLog();
@@ -1975,6 +2017,9 @@
       renderHeadOperationalCenter();
       renderHeadSentDirectives();
       renderCAPARegistry();
+      if (typeof renderHeadOverviewAutoArchive === 'function') {
+        renderHeadOverviewAutoArchive();
+      }
       if (typeof renderHeadMasterArchive === 'function') {
         renderHeadMasterArchive();
       }
@@ -2772,11 +2817,24 @@
       let safetyViols = [];
       let smokingViols = [];
 
+      const isNonArchivedViol = (v) => v && v.status !== 'deleted' && !(window.KSUDataBridge && typeof window.KSUDataBridge.isViolationArchived === 'function' ? window.KSUDataBridge.isViolationArchived(v) : (v.archived === true || v.isArchived === true || v.status === 'archived' || v.status === 'مؤرشف'));
+      const esc = (typeof _escHead === 'function')
+        ? _escHead
+        : (val => String(val == null ? '' : val)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;'));
+      const escJs = (typeof _escHeadJs === 'function')
+        ? _escHeadJs
+        : (val => esc(String(val == null ? '' : val).replace(/\\/g, '\\\\').replace(/'/g, "\\'")));
+
       try { safetyReports = JSON.parse(localStorage.getItem('ksumc_safety_dept_reports') || '[]') || []; } catch (e) {}
       try { alarms = JSON.parse(localStorage.getItem('ksumc_safety_alarms') || '[]') || []; } catch (e) {}
       try { shiftIncidents = JSON.parse(localStorage.getItem('ksumc_shift_incidents') || '[]') || []; } catch (e) {}
-      try { safetyViols = JSON.parse(localStorage.getItem('ksumc_safety_violations') || '[]') || []; } catch (e) {}
-      try { smokingViols = JSON.parse(localStorage.getItem('ksumc_smoking_violations') || '[]') || []; } catch (e) {}
+      try { safetyViols = (JSON.parse(localStorage.getItem('ksumc_safety_violations') || '[]') || []).filter(isNonArchivedViol); } catch (e) {}
+      try { smokingViols = (JSON.parse(localStorage.getItem('ksumc_smoking_violations') || '[]') || []).filter(isNonArchivedViol); } catch (e) {}
 
       const codeItemsMap = new Map();
       alarms.forEach(a => {
@@ -2857,7 +2915,7 @@
           title: `مخالفة سلامة (${(v.devices || []).join('، ') || 'أجهزة مخالفة'}) — المخالف: ${v.violatorName || '-'}`,
           details: `الإجراء: ${v.actionTaken || 'مصادرة'} | التوجيه: ${v.directive || '-'}`,
           location: `${v.location || 'المستشفى'} ${v.room ? '- غرفة ' + v.room : ''}`,
-          reporter: v.officerName || 'مفتش السلامة',
+          reporter: v.officerName || v.createdByName || 'مفتش السلامة',
           shift: v.shift || 'الوردية 1 (صباحي)',
           date: v.date || '',
           time: v.time || '',
@@ -2871,9 +2929,9 @@
           streamLabel: 'محضر مخالفة تدخين',
           badgeClass: 'bg-purple-100 text-purple-900 border-purple-300',
           title: `ضبط مخالفة تدخين — ${s.violatorName || 'مخالف'} (${s.role || 'موظف'})`,
-          details: `القسم/الجهة: ${s.dept || '-'} | الهوية/الرقم الوظيفي: ${s.nationalId || s.violatorEmpId || '-'}`,
+          details: `القسم/الجهة: ${s.dept || '-'} | الهوية/الوظيفي: ${s.nationalId || s.violatorEmpId || '-'}`,
           location: s.location || 'المستشفى',
-          reporter: s.officerName || 'مفتش السلامة',
+          reporter: s.officerName || s.createdByName || 'مفتش السلامة',
           shift: s.shift || 'الوردية 1 (صباحي)',
           date: s.date || '',
           time: s.time || '',
@@ -2907,19 +2965,19 @@
           <div class="p-4 rounded-2xl bg-white border ${isApproved ? 'border-emerald-200 bg-emerald-50/10' : 'border-slate-200'} shadow-2xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
             <div class="space-y-1">
               <div class="flex items-center gap-2 flex-wrap">
-                <span class="px-2.5 py-0.5 rounded-md border text-[10px] font-black ${item.badgeClass}">${item.streamLabel}</span>
-                <span class="font-mono text-xs font-black px-2 py-0.5 rounded bg-slate-100 text-[#082B49]">${item.id}</span>
-                <span class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-bold">${item.shift}</span>
-                <span class="text-[11px] font-mono text-slate-500">${item.date} ${item.time}</span>
+                <span class="px-2.5 py-0.5 rounded-md border text-[10px] font-black ${item.badgeClass}">${esc(item.streamLabel)}</span>
+                <span class="font-mono text-xs font-black px-2 py-0.5 rounded bg-slate-100 text-[#082B49]">${esc(item.id)}</span>
+                <span class="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-bold">${esc(item.shift)}</span>
+                <span class="text-[11px] font-mono text-slate-500">${esc(item.date)} ${esc(item.time)}</span>
               </div>
-              <h4 class="font-black text-sm text-[#082B49]">${item.title}</h4>
-              <p class="text-xs text-slate-600">${item.details}</p>
-              <p class="text-[11px] text-slate-500">الموقع: <strong class="text-slate-800">${item.location}</strong> • رافع التقرير: <strong class="text-[#004B87]">${item.reporter}</strong></p>
-              ${item.headNotes ? `<p class="text-[11px] text-emerald-950 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200 font-bold">🏅 توجيه رئيس القسم: ${item.headNotes}</p>` : ''}
+              <h4 class="font-black text-sm text-[#082B49]">${esc(item.title)}</h4>
+              <p class="text-xs text-slate-600">${esc(item.details)}</p>
+              <p class="text-[11px] text-slate-500">الموقع: <strong class="text-slate-800">${esc(item.location)}</strong> • رافع التقرير: <strong class="text-[#004B87]">${esc(item.reporter)}</strong></p>
+              ${item.headNotes ? `<p class="text-[11px] text-emerald-950 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200 font-bold">🏅 توجيه رئيس القسم: ${esc(item.headNotes)}</p>` : ''}
             </div>
             <div class="flex items-center gap-2 flex-wrap shrink-0">
               ${!isApproved ? `
-                <button type="button" onclick="approveHeadOperationalItem('${item._stream}', '${item.id}')" class="px-3.5 py-2 rounded-xl bg-[#004B87] hover:bg-[#082B49] text-white font-black text-xs flex items-center gap-1 shadow-xs">
+                <button type="button" onclick="approveHeadOperationalItem('${escJs(item._stream)}', '${escJs(item.id)}')" class="px-3.5 py-2 rounded-xl bg-[#004B87] hover:bg-[#082B49] text-white font-black text-xs flex items-center gap-1 shadow-xs">
                   <span class="material-symbols-outlined text-sm">verified</span>
                   <span>اعتماد وتوجيه رئيس القسم</span>
                 </button>
@@ -3915,9 +3973,86 @@
     // MASTER REFERENCE ARCHIVE ENGINE (الأرشيف والسجل المرجعي الشامل)
     // =========================================================================
     let currentArchiveTab = 'all';
+    let currentArchiveStatusFilter = 'all';
     window._activeArchiveRecordUid = null;
 
+    function _escHead(val) {
+      if (window.KSUDataBridge && typeof window.KSUDataBridge.escapeHtml === 'function') {
+        return window.KSUDataBridge.escapeHtml(val);
+      }
+      return String(val == null ? '' : val)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function _escHeadJs(val) {
+      return _escHead(String(val == null ? '' : val).replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+    }
+
+    function _isHeadArchivedRecord(v) {
+      if (window.KSUDataBridge && typeof window.KSUDataBridge.isViolationArchived === 'function') {
+        return window.KSUDataBridge.isViolationArchived(v);
+      }
+      return Boolean(v && typeof v === 'object' && (v.archived === true || v.isArchived === true || v.status === 'archived' || v.status === 'مؤرشف'));
+    }
+
+    function _isHeadDeletedRecord(v) {
+      if (!v || typeof v !== 'object') return true;
+      if (window.KSUDataBridge && typeof window.KSUDataBridge.isViolationDeleted === 'function') {
+        return window.KSUDataBridge.isViolationDeleted(v);
+      }
+      return v.status === 'deleted' || v._deleted === true || v.isPurged === true;
+    }
+
+    function _getHeadActiveUser() {
+      if (window.KSUDataBridge && typeof window.KSUDataBridge.getCurrentActiveUser === 'function') {
+        return window.KSUDataBridge.getCurrentActiveUser();
+      }
+      try {
+        if (window.KSUAuth && typeof window.KSUAuth.getUser === 'function') {
+          return window.KSUAuth.getUser();
+        }
+      } catch (_) {}
+      return null;
+    }
+
+    function _isHeadPrivilegedArchiveUser() {
+      const user = _getHeadActiveUser();
+      if (!user) return false;
+      if (window.KSUDataBridge && typeof window.KSUDataBridge.isHeadOrAdminUser === 'function') {
+        return window.KSUDataBridge.isHeadOrAdminUser(user);
+      }
+      const cat = String(user.roleCategory || '').trim().toLowerCase();
+      return ['head', 'admin', 'developer', 'executive'].includes(cat) || user.id === 'USR-01';
+    }
+
+    function _mergeRecordsById(primary, secondary) {
+      const map = new Map();
+      [secondary || [], primary || []].forEach(arr => {
+        (Array.isArray(arr) ? arr : []).forEach(item => {
+          if (!item || !item.id || _isHeadDeletedRecord(item)) return;
+          const k = String(item.id);
+          const existing = map.get(k);
+          if (!existing) {
+            map.set(k, item);
+          } else {
+            const tsOld = Number(existing.updatedAtMs || new Date(existing.updatedAt || existing.timestamp || 0).getTime() || 0);
+            const tsNew = Number(item.updatedAtMs || new Date(item.updatedAt || item.timestamp || 0).getTime() || 0);
+            map.set(k, tsNew >= tsOld ? Object.assign({}, existing, item) : Object.assign({}, item, existing));
+          }
+        });
+      });
+      return Array.from(map.values());
+    }
+
     function getUnifiedArchiveRecords() {
+      if (!_isHeadPrivilegedArchiveUser()) {
+        return [];
+      }
+
       const readList = (key) => {
         try { return JSON.parse(localStorage.getItem(key) || '[]') || []; } catch (e) { return []; }
       };
@@ -3926,8 +4061,21 @@
       const safetyReports = readList('ksumc_safety_dept_reports');
       const shiftIncidents = readList('ksumc_shift_incidents');
       const alarms = readList('ksumc_safety_alarms');
-      const safetyViolations = readList('ksumc_safety_violations');
-      const smokingViolations = readList('ksumc_smoking_violations');
+      const localSafetyViolations = readList('ksumc_safety_violations');
+      const localSmokingViolations = readList('ksumc_smoking_violations');
+      let bridgeSafety = [];
+      let bridgeSmoking = [];
+      if (window.KSUDataBridge && typeof window.KSUDataBridge.getViolations === 'function') {
+        const res = window.KSUDataBridge.getViolations({
+          user: _getHeadActiveUser(),
+          bypassScope: true,
+          includeArchived: true
+        });
+        bridgeSafety = Array.isArray(res && res.safety) ? res.safety : [];
+        bridgeSmoking = Array.isArray(res && res.smoking) ? res.smoking : [];
+      }
+      const safetyViolations = _mergeRecordsById(bridgeSafety, localSafetyViolations);
+      const smokingViolations = _mergeRecordsById(bridgeSmoking, localSmokingViolations);
       const permits = readList('ksumc_safety_permits');
       const doors = readList('ksumc_safety_doors');
 
@@ -3935,8 +4083,8 @@
 
       // 1. Rounds (الجولات التفتيشية)
       rounds.forEach(r => {
-        if (!r || !r.id) return;
-        const dateStr = (r.date || (r.createdAt ? r.createdAt.split('T')[0] : '') || '').slice(0, 10);
+        if (!r || !r.id || _isHeadDeletedRecord(r)) return;
+        const dateStr = String(r.date || (r.createdAt ? String(r.createdAt).split('T')[0] : '') || '').slice(0, 10);
         records.push({
           uid: `round::${r.id}`,
           id: String(r.id),
@@ -3955,6 +4103,8 @@
           time: r.time || '',
           statusLabel: r.workflowStatus === 'approved_by_head' ? 'معتمد رسمياً' : (r.workflowStatus === 'forwarded_to_head' ? 'محال لرئيس القسم' : 'مكتمل ومرفوع'),
           isApproved: r.workflowStatus === 'approved_by_head',
+          isViolation: false,
+          isArchived: false,
           headNotes: r.headNotes || '',
           qualityNotes: r.qualityNotes || '',
           sortTime: r.updatedAtMs || new Date(`${dateStr || '2026-01-01'}T${r.time || '00:00'}`).getTime() || 0,
@@ -3964,8 +4114,8 @@
 
       // 2. Reports & Emergency Codes (التقارير والبلاغات)
       safetyReports.forEach(rep => {
-        if (!rep || !rep.id) return;
-        const dateStr = (rep.date || (rep.submittedAt ? rep.submittedAt.split('T')[0] : '') || '').slice(0, 10);
+        if (!rep || !rep.id || _isHeadDeletedRecord(rep)) return;
+        const dateStr = String(rep.date || (rep.submittedAt ? String(rep.submittedAt).split('T')[0] : '') || '').slice(0, 10);
         records.push({
           uid: `report::${rep.id}`,
           id: String(rep.id),
@@ -3984,6 +4134,8 @@
           time: rep.time || '',
           statusLabel: rep.headApprovalStatus === 'approved_by_head' || rep.workflowStatus === 'approved_by_head' ? 'معتمد رسمياً' : 'موثق بالسجل',
           isApproved: rep.headApprovalStatus === 'approved_by_head' || rep.workflowStatus === 'approved_by_head',
+          isViolation: false,
+          isArchived: false,
           headNotes: rep.headNotes || '',
           qualityNotes: rep.qualityNotes || '',
           sortTime: rep.updatedAtMs || new Date(rep.submittedAt || dateStr || Date.now()).getTime() || 0,
@@ -3992,8 +4144,8 @@
       });
 
       shiftIncidents.forEach(inc => {
-        if (!inc || !inc.id) return;
-        const dateStr = (inc.date || '').slice(0, 10);
+        if (!inc || !inc.id || _isHeadDeletedRecord(inc)) return;
+        const dateStr = String(inc.date || '').slice(0, 10);
         records.push({
           uid: `incident::${inc.id}`,
           id: String(inc.id),
@@ -4012,6 +4164,8 @@
           time: inc.time || '',
           statusLabel: inc.headApprovalStatus === 'approved_by_head' ? 'معتمد رسمياً' : 'تمت المباشرة',
           isApproved: inc.headApprovalStatus === 'approved_by_head',
+          isViolation: false,
+          isArchived: false,
           headNotes: inc.headNotes || '',
           qualityNotes: '',
           sortTime: inc.updatedAtMs || Date.now(),
@@ -4020,8 +4174,8 @@
       });
 
       alarms.forEach(a => {
-        if (!a || !a.id || a.type === 'executive_directive') return;
-        const dateStr = (a.date || '').slice(0, 10);
+        if (!a || !a.id || a.type === 'executive_directive' || _isHeadDeletedRecord(a)) return;
+        const dateStr = String(a.date || '').slice(0, 10);
         records.push({
           uid: `alarm::${a.id}`,
           id: String(a.id),
@@ -4040,6 +4194,8 @@
           time: a.time || '',
           statusLabel: a.headApprovalStatus === 'approved_by_head' ? 'معتمد رسمياً' : (a.status || 'مغلق'),
           isApproved: a.headApprovalStatus === 'approved_by_head',
+          isViolation: false,
+          isArchived: false,
           headNotes: a.headNotes || '',
           qualityNotes: '',
           sortTime: a.updatedAtMs || Date.now(),
@@ -4047,16 +4203,23 @@
         });
       });
 
-      // 3. Violations (سجل المخالفات: سلامة + تدخين)
+      // 3. Violations (سجل المخالفات: سلامة + تدخين — النشطة والمؤرشفة تلقائياً)
       safetyViolations.forEach(v => {
-        if (!v || !v.id) return;
-        const dateStr = (v.date || '').slice(0, 10);
+        if (!v || !v.id || _isHeadDeletedRecord(v)) return;
+        const dateStr = String(v.date || '').slice(0, 10);
         const devStr = Array.isArray(v.devices) ? v.devices.join('، ') : (v.devices || 'مخالفة اشتراطات سلامة');
+        const archived = _isHeadArchivedRecord(v);
         records.push({
           uid: `safety_viol::${v.id}`,
           id: String(v.id),
           category: 'violations',
           categoryLabel: 'محضر مخالفة سلامة',
+          violationType: 'safety',
+          isViolation: true,
+          isArchived: archived,
+          archivedAt: v.archivedAt || '',
+          archivedByName: v.archivedByName || '',
+          archiveReason: v.archiveReason || '',
           badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
           title: `مخالفة سلامة (${devStr})`,
           subtitle: `المخالف / الجهة: ${v.violatorName || v.department || '-'}`,
@@ -4064,27 +4227,34 @@
           actionTaken: v.actionTaken || 'تم تحرير محضر مخالفة سلامة ومصادرة الأجهزة المخالفة.',
           facility: v.facility || 'مستشفى الملك خالد الجامعي',
           location: `${v.location || 'المستشفى'}${v.room ? ' - غرفة ' + v.room : ''}`,
-          officer: v.officerName || v.inspector || 'مفتش السلامة',
+          officer: v.officerName || v.createdByName || v.inspector || 'مفتش السلامة',
           shift: v.shift || 'الوردية 1 (صباحي)',
           date: dateStr,
           time: v.time || '',
-          statusLabel: v.headApprovalStatus === 'approved_by_head' ? 'معتمد رسمياً' : 'محضر مسجل',
+          statusLabel: archived ? 'مؤرشف بالأرشيف' : (v.headApprovalStatus === 'approved_by_head' ? 'معتمد رسمياً' : 'محضر مسجل'),
           isApproved: v.headApprovalStatus === 'approved_by_head',
           headNotes: v.headNotes || '',
           qualityNotes: '',
-          sortTime: v.updatedAtMs || Date.now(),
+          sortTime: v.updatedAtMs || new Date(v.createdAt || v.date || Date.now()).getTime() || 0,
           raw: v
         });
       });
 
       smokingViolations.forEach(s => {
-        if (!s || !s.id) return;
-        const dateStr = (s.date || '').slice(0, 10);
+        if (!s || !s.id || _isHeadDeletedRecord(s)) return;
+        const dateStr = String(s.date || '').slice(0, 10);
+        const archived = _isHeadArchivedRecord(s);
         records.push({
           uid: `smoking_viol::${s.id}`,
           id: String(s.id),
           category: 'violations',
           categoryLabel: 'محضر مخالفة تدخين',
+          violationType: 'smoking',
+          isViolation: true,
+          isArchived: archived,
+          archivedAt: s.archivedAt || '',
+          archivedByName: s.archivedByName || '',
+          archiveReason: s.archiveReason || '',
           badgeClass: 'bg-purple-100 text-purple-900 border-purple-300',
           title: `ضبط مخالفة تدخين — ${s.violatorName || 'مخالف'}`,
           subtitle: `الصفة: ${s.role || 'موظف/مراجع'} | الهوية/الوظيفي: ${s.nationalId || s.violatorEmpId || '-'}`,
@@ -4092,23 +4262,23 @@
           actionTaken: 'تم تحرير محضر ضبط مخالفة تدخين داخل المنشأة الصحية وفق نظام مكافحة التدخين.',
           facility: s.facility || 'مستشفى الملك خالد الجامعي',
           location: s.location || 'المستشفى',
-          officer: s.officerName || s.inspector || 'مفتش السلامة',
+          officer: s.officerName || s.createdByName || s.inspector || 'مفتش السلامة',
           shift: s.shift || 'الوردية 1 (صباحي)',
           date: dateStr,
           time: s.time || '',
-          statusLabel: s.headApprovalStatus === 'approved_by_head' ? 'معتمد رسمياً' : 'محضر مضبوط',
+          statusLabel: archived ? 'مؤرشف بالأرشيف' : (s.headApprovalStatus === 'approved_by_head' ? 'معتمد رسمياً' : 'محضر مضبوط'),
           isApproved: s.headApprovalStatus === 'approved_by_head',
           headNotes: s.headNotes || '',
           qualityNotes: '',
-          sortTime: s.updatedAtMs || Date.now(),
+          sortTime: s.updatedAtMs || new Date(s.createdAt || s.date || Date.now()).getTime() || 0,
           raw: s
         });
       });
 
       // 4. Permits & Doors (سجل التصاريح وطلبات الأبواب)
       permits.forEach(p => {
-        if (!p || !p.id) return;
-        const dateStr = (p.date || p.startDate || '').slice(0, 10);
+        if (!p || !p.id || _isHeadDeletedRecord(p)) return;
+        const dateStr = String(p.date || p.startDate || '').slice(0, 10);
         records.push({
           uid: `permit::${p.id}`,
           id: String(p.id),
@@ -4127,6 +4297,8 @@
           time: p.time || '',
           statusLabel: p.status || 'ساري المفعول',
           isApproved: true,
+          isViolation: false,
+          isArchived: false,
           headNotes: p.headNotes || '',
           qualityNotes: '',
           sortTime: p.updatedAtMs || Date.now(),
@@ -4135,8 +4307,8 @@
       });
 
       doors.forEach(d => {
-        if (!d || !d.id) return;
-        const dateStr = (d.date || '').slice(0, 10);
+        if (!d || !d.id || _isHeadDeletedRecord(d)) return;
+        const dateStr = String(d.date || '').slice(0, 10);
         records.push({
           uid: `door::${d.id}`,
           id: String(d.id),
@@ -4155,6 +4327,8 @@
           time: d.time || '',
           statusLabel: d.status || 'مسجل',
           isApproved: true,
+          isViolation: false,
+          isArchived: false,
           headNotes: d.headNotes || '',
           qualityNotes: '',
           sortTime: d.updatedAtMs || Date.now(),
@@ -4192,16 +4366,127 @@
       renderHeadMasterArchive();
     }
 
+    function switchArchiveStatusFilter(status) {
+      currentArchiveStatusFilter = status || 'all';
+      const sel = document.getElementById('arch-archive-status-filter');
+      if (sel) sel.value = currentArchiveStatusFilter;
+      renderHeadMasterArchive();
+    }
+
     function resetArchiveFilters() {
       const sInput = document.getElementById('arch-search-input');
+      const stSel = document.getElementById('arch-archive-status-filter');
       const shSel = document.getElementById('arch-shift-filter');
       const dFrom = document.getElementById('arch-date-from');
       const dTo = document.getElementById('arch-date-to');
       if (sInput) sInput.value = '';
+      if (stSel) stSel.value = 'all';
       if (shSel) shSel.value = 'all';
       if (dFrom) dFrom.value = '';
       if (dTo) dTo.value = '';
+      currentArchiveStatusFilter = 'all';
       switchArchiveTab('all');
+    }
+
+    function renderHeadOverviewAutoArchive() {
+      const hostCard = document.getElementById('head-overview-auto-archive-card');
+      const listEl = document.getElementById('head-overview-auto-archive-list');
+      if (!hostCard || !listEl) return;
+
+      if (!_isHeadPrivilegedArchiveUser()) {
+        hostCard.classList.add('hidden');
+        listEl.innerHTML = '';
+        return;
+      }
+      hostCard.classList.remove('hidden');
+
+      const all = getUnifiedArchiveRecords();
+      const viols = all.filter(x => x.category === 'violations');
+      const activeViols = viols.filter(x => !x.isArchived).length;
+      const archivedViols = viols.filter(x => x.isArchived).length;
+
+      const totalBadge = document.getElementById('head-overview-archive-badge');
+      const activeChip = document.getElementById('head-overview-active-viols-chip');
+      const archivedChip = document.getElementById('head-overview-archived-viols-chip');
+      if (totalBadge) totalBadge.textContent = `${all.length} سجل محفوظ`;
+      if (activeChip) activeChip.textContent = `مخالفات نشطة: ${activeViols}`;
+      if (archivedChip) archivedChip.textContent = `مخالفات مؤرشفة: ${archivedViols}`;
+
+      const latest = all.slice(0, 4);
+      if (latest.length === 0) {
+        listEl.innerHTML = `
+          <div class="col-span-full p-4 rounded-2xl bg-slate-50 border border-dashed border-slate-200 text-center text-xs font-bold text-slate-500">
+            الأرشيف المرجعي التلقائي متصل وجاهز — ستظهر كافة المخالفات والتقارير والجولات هنا تلقائياً فور تسجيلها.
+          </div>
+        `;
+        return;
+      }
+
+      listEl.innerHTML = latest.map(item => `
+        <div class="p-3.5 rounded-2xl border ${item.isArchived ? 'border-amber-300 bg-amber-50/40' : 'border-slate-200 bg-slate-50/60'} flex flex-col justify-between gap-2">
+          <div class="space-y-1">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <span class="px-2 py-0.5 rounded-md border text-[10px] font-black ${item.badgeClass}">${_escHead(item.categoryLabel)}</span>
+              <div class="flex items-center gap-1.5">
+                ${item.isArchived
+                  ? '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black">مؤرشف</span>'
+                  : '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black">نشط</span>'}
+                <span class="font-mono text-[11px] font-black text-[#082B49]">${_escHead(item.id)}</span>
+              </div>
+            </div>
+            <div class="font-black text-xs text-[#082B49] line-clamp-1">${_escHead(item.title)}</div>
+            <div class="text-[11px] text-slate-600 flex items-center justify-between gap-2">
+              <span>المفتش: <strong>${_escHead(item.officer)}</strong></span>
+              <span class="font-mono">${_escHead(item.date || '-')}</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-200/80">
+            <button type="button" onclick="previewArchiveRecord('${_escHeadJs(item.uid)}')" class="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#004B87] border border-blue-200 font-bold text-[11px] cursor-pointer">معاينة</button>
+            <button type="button" onclick="printArchiveRecord('${_escHeadJs(item.uid)}')" class="px-2.5 py-1 rounded-lg bg-[#082B49] hover:bg-[#004B87] text-white font-bold text-[11px] cursor-pointer">طباعة</button>
+            ${item.isViolation ? (item.isArchived
+              ? `<button type="button" onclick="restoreHeadViolationRecord('${_escHeadJs(item.violationType)}', '${_escHeadJs(item.id)}')" class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] cursor-pointer">استرجاع</button>`
+              : `<button type="button" onclick="archiveHeadViolationRecord('${_escHeadJs(item.violationType)}', '${_escHeadJs(item.id)}')" class="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] cursor-pointer">أرشفة</button>`
+            ) : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function archiveHeadViolationRecord(type, id) {
+      if (!_isHeadPrivilegedArchiveUser()) {
+        alert('عفواً، الأرشفة صلاحية حصرية لرئيس القسم ومسؤول النظام.');
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (!window.KSUDataBridge || typeof window.KSUDataBridge.archiveViolationRecord !== 'function') {
+        return { ok: false, reason: 'unavailable' };
+      }
+      const reason = typeof window.prompt === 'function'
+        ? (window.prompt('سبب الأرشفة المرجعية (اختياري):', 'مؤرشف بالأرشيف المرجعي الشامل') ?? '')
+        : 'مؤرشف بالأرشيف المرجعي الشامل';
+      const res = window.KSUDataBridge.archiveViolationRecord(type, id, reason, _getHeadActiveUser());
+      if (res && res.ok) {
+        updateDashboardData();
+      } else if (res && res.message) {
+        alert(res.message);
+      }
+      return res;
+    }
+
+    function restoreHeadViolationRecord(type, id) {
+      if (!_isHeadPrivilegedArchiveUser()) {
+        alert('عفواً، الاسترجاع من الأرشيف صلاحية حصرية لرئيس القسم ومسؤول النظام.');
+        return { ok: false, reason: 'unauthorized' };
+      }
+      if (!window.KSUDataBridge || typeof window.KSUDataBridge.restoreViolationRecord !== 'function') {
+        return { ok: false, reason: 'unavailable' };
+      }
+      const res = window.KSUDataBridge.restoreViolationRecord(type, id, _getHeadActiveUser());
+      if (res && res.ok) {
+        updateDashboardData();
+      } else if (res && res.message) {
+        alert(res.message);
+      }
+      return res;
     }
 
     function getFilteredArchiveRecords() {
@@ -4225,6 +4510,14 @@
       let list = all;
       if (currentArchiveTab !== 'all') {
         list = list.filter(x => x.category === currentArchiveTab);
+      }
+
+      const stSel = document.getElementById('arch-archive-status-filter');
+      const stFilter = stSel ? stSel.value : currentArchiveStatusFilter;
+      if (stFilter === 'archived') {
+        list = list.filter(x => x.isArchived === true);
+      } else if (stFilter === 'active') {
+        list = list.filter(x => !x.isArchived);
       }
 
       const q = (document.getElementById('arch-search-input')?.value || '').trim().toLowerCase();
@@ -4262,6 +4555,17 @@
       const tbody = document.getElementById('head-master-archive-tbody');
       if (!tbody) return;
 
+      if (!_isHeadPrivilegedArchiveUser()) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" class="p-8 text-center bg-rose-50 text-rose-900 font-bold text-xs">
+              عفواً، الأرشيف والسجل المرجعي الشامل مخصص لرئيس القسم ومسؤول النظام فقط.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
       const list = getFilteredArchiveRecords();
 
       if (list.length === 0) {
@@ -4271,7 +4575,7 @@
               <div class="flex flex-col items-center justify-center gap-2 text-slate-400">
                 <span class="material-symbols-outlined text-4xl text-slate-300">inventory_2</span>
                 <p class="text-xs font-black text-slate-600">لا توجد سجلات مرجعية مطابقة لمعايير البحث الحالية في الأرشيف</p>
-                <p class="text-[11px] text-slate-400">يتم حفظ وأرشفة كافة الجولات، التقارير، المخالفات، والتصاريح تلقائياً في قاعدة بيانات أوراكل الرياض فور تسجيلها</p>
+                <p class="text-[11px] text-slate-400">يتم حفظ وأرشفة كافة الجولات، التقارير، المخالفات، والتصاريح تلقائياً للرجوع إليها في أي وقت</p>
               </div>
             </td>
           </tr>
@@ -4280,46 +4584,53 @@
       }
 
       tbody.innerHTML = list.map(item => `
-        <tr class="hover:bg-blue-50/40 transition-colors">
+        <tr class="hover:bg-blue-50/40 transition-colors ${item.isArchived ? 'bg-amber-50/25' : ''}">
           <td class="p-3 align-top">
-            <span class="font-mono text-xs font-black text-[#082B49] block">${item.id}</span>
-            <span class="text-[10px] font-mono text-slate-500 block mt-0.5">${item.date || '-'} ${item.time || ''}</span>
+            <span class="font-mono text-xs font-black text-[#082B49] block">${_escHead(item.id)}</span>
+            <span class="text-[10px] font-mono text-slate-500 block mt-0.5">${_escHead(item.date || '-')} ${_escHead(item.time || '')}</span>
           </td>
           <td class="p-3 align-top">
-            <span class="inline-block px-2.5 py-0.5 rounded-md border text-[10px] font-black ${item.badgeClass}">${item.categoryLabel}</span>
+            <span class="inline-block px-2.5 py-0.5 rounded-md border text-[10px] font-black ${item.badgeClass}">${_escHead(item.categoryLabel)}</span>
+            ${item.isArchived
+              ? '<span class="block mt-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black w-fit">مؤرشف</span>'
+              : '<span class="block mt-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold w-fit">نشط</span>'}
           </td>
           <td class="p-3 align-top max-w-xs">
-            <div class="font-black text-slate-900 text-xs">${item.title}</div>
-            <div class="text-[11px] text-[#004B87] font-bold mt-0.5">${item.subtitle}</div>
-            <p class="text-[11px] text-slate-500 line-clamp-1 mt-0.5">${item.details}</p>
+            <div class="font-black text-slate-900 text-xs">${_escHead(item.title)}</div>
+            <div class="text-[11px] text-[#004B87] font-bold mt-0.5">${_escHead(item.subtitle)}</div>
+            <p class="text-[11px] text-slate-500 line-clamp-1 mt-0.5">${_escHead(item.details)}</p>
           </td>
           <td class="p-3 align-top">
-            <div class="font-bold text-[#082B49] text-xs">${item.location}</div>
-            <div class="text-[10px] text-slate-500 mt-0.5">${item.facility}</div>
+            <div class="font-bold text-[#082B49] text-xs">${_escHead(item.location)}</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">${_escHead(item.facility)}</div>
           </td>
           <td class="p-3 align-top">
-            <div class="font-bold text-[#004B87] text-xs">${item.officer}</div>
-            <div class="text-[10px] text-slate-500 mt-0.5">${item.shift}</div>
+            <div class="font-bold text-[#004B87] text-xs">${_escHead(item.officer)}</div>
+            <div class="text-[10px] text-slate-500 mt-0.5">${_escHead(item.shift)}</div>
           </td>
           <td class="p-3 align-top text-center">
-            <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black ${item.isApproved ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-slate-100 text-slate-700 border border-slate-200'}">
-              ${item.statusLabel}
+            <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black ${item.isArchived ? 'bg-amber-100 text-amber-900 border border-amber-300' : (item.isApproved ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-slate-100 text-slate-700 border border-slate-200')}">
+              ${_escHead(item.statusLabel)}
             </span>
           </td>
           <td class="p-3 align-top text-center">
             <div class="flex items-center justify-center gap-1.5 flex-wrap">
-              <button type="button" onclick="previewArchiveRecord('${item.uid}')" title="معاينة الوثيقة المرجعية" class="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#004B87] border border-blue-200 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all">
+              <button type="button" onclick="previewArchiveRecord('${_escHeadJs(item.uid)}')" title="معاينة الوثيقة المرجعية" class="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-[#004B87] border border-blue-200 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all">
                 <span class="material-symbols-outlined text-sm">visibility</span>
                 <span>معاينة</span>
               </button>
-              <button type="button" onclick="printArchiveRecord('${item.uid}')" title="طباعة رسمية A4 / PDF" class="px-2.5 py-1.5 rounded-xl bg-[#082B49] hover:bg-[#004B87] text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all shadow-2xs">
+              <button type="button" onclick="printArchiveRecord('${_escHeadJs(item.uid)}')" title="طباعة رسمية A4 / PDF" class="px-2.5 py-1.5 rounded-xl bg-[#082B49] hover:bg-[#004B87] text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all shadow-2xs">
                 <span class="material-symbols-outlined text-sm text-amber-300">print</span>
                 <span>طباعة</span>
               </button>
-              <button type="button" onclick="openArchiveEmailModal('${item.uid}')" title="مشاركة وإرسال للبريد الإلكتروني" class="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all shadow-2xs">
+              <button type="button" onclick="openArchiveEmailModal('${_escHeadJs(item.uid)}')" title="مشاركة وإرسال للبريد الإلكتروني" class="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all shadow-2xs">
                 <span class="material-symbols-outlined text-sm">mail</span>
                 <span>بريد إلكتروني</span>
               </button>
+              ${item.isViolation ? (item.isArchived
+                ? `<button type="button" onclick="restoreHeadViolationRecord('${_escHeadJs(item.violationType)}', '${_escHeadJs(item.id)}')" title="استرجاع المخالفة إلى السجل النشط" class="px-2.5 py-1.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all"><span class="material-symbols-outlined text-sm">unarchive</span><span>استرجاع</span></button>`
+                : `<button type="button" onclick="archiveHeadViolationRecord('${_escHeadJs(item.violationType)}', '${_escHeadJs(item.id)}')" title="أرشفة المخالفة ونقلها للسجل المؤرشف" class="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 font-bold text-[11px] flex items-center gap-1 cursor-pointer transition-all"><span class="material-symbols-outlined text-sm">archive</span><span>أرشفة</span></button>`
+              ) : ''}
             </div>
           </td>
         </tr>
@@ -4364,14 +4675,14 @@
                   <span class="material-symbols-outlined text-sm">verified</span>
                   <span>كارت فحص ومعاينة بصرية معتمد (PDF)</span>
                 </span>
-                <span class="text-xs font-mono font-bold text-slate-600">${rec.id}</span>
+                <span class="text-xs font-mono font-bold text-slate-600">${_escHead(rec.id)}</span>
               </div>
               <div class="flex items-center gap-2">
-                <button type="button" onclick="openArchiveRecordCardInWindow('${rec.uid}')" class="px-3.5 py-1.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-95">
+                <button type="button" onclick="openArchiveRecordCardInWindow('${_escHeadJs(rec.uid)}')" class="px-3.5 py-1.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-95">
                   <span class="material-symbols-outlined text-base text-[#004B87]">open_in_new</span>
                   <span>فتح كنافذة / تصدير PDF</span>
                 </button>
-                <button type="button" onclick="printArchiveRecord('${rec.uid}')" class="px-3.5 py-1.5 rounded-xl bg-[#082B49] hover:bg-[#004B87] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-95">
+                <button type="button" onclick="printArchiveRecord('${_escHeadJs(rec.uid)}')" class="px-3.5 py-1.5 rounded-xl bg-[#082B49] hover:bg-[#004B87] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition-all active:scale-95">
                   <span class="material-symbols-outlined text-base text-amber-300">print</span>
                   <span>طباعة كارت الفحص (A4 / PDF)</span>
                 </button>
@@ -4396,44 +4707,51 @@
           <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
             <div>
               <span class="text-[10px] text-slate-500 block">تصنيف الوثيقة:</span>
-              <span class="font-black text-[#082B49] text-xs">${rec.categoryLabel}</span>
+              <span class="font-black text-[#082B49] text-xs">${_escHead(rec.categoryLabel)}</span>
             </div>
             <div>
               <span class="text-[10px] text-slate-500 block">المنشأة والموقع:</span>
-              <span class="font-bold text-slate-800 text-xs">${rec.location}</span>
+              <span class="font-bold text-slate-800 text-xs">${_escHead(rec.location)}</span>
             </div>
             <div>
               <span class="text-[10px] text-slate-500 block">الحالة المرجعية:</span>
-              <span class="font-black text-emerald-700 text-xs">${rec.statusLabel}</span>
+              <span class="font-black ${rec.isArchived ? 'text-amber-700' : 'text-emerald-700'} text-xs">${_escHead(rec.statusLabel)}</span>
             </div>
             <div>
               <span class="text-[10px] text-slate-500 block">المسؤول / المفتش:</span>
-              <span class="font-bold text-[#004B87] text-xs">${rec.officer}</span>
+              <span class="font-bold text-[#004B87] text-xs">${_escHead(rec.officer)}</span>
             </div>
             <div>
               <span class="text-[10px] text-slate-500 block">الوردية:</span>
-              <span class="font-bold text-slate-800 text-xs">${rec.shift}</span>
+              <span class="font-bold text-slate-800 text-xs">${_escHead(rec.shift)}</span>
             </div>
             <div>
               <span class="text-[10px] text-slate-500 block">البيان الإضافي:</span>
-              <span class="font-bold text-slate-800 text-xs">${rec.subtitle}</span>
+              <span class="font-bold text-slate-800 text-xs">${_escHead(rec.subtitle)}</span>
             </div>
           </div>
 
           <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
             <span class="text-[11px] font-black text-[#082B49] block">التفاصيل والملاحظات الميدانية الموثقة:</span>
-            <p class="text-slate-700 leading-relaxed font-semibold">${rec.details}</p>
+            <p class="text-slate-700 leading-relaxed font-semibold">${_escHead(rec.details)}</p>
           </div>
 
           <div class="p-3.5 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-1">
             <span class="text-[11px] font-black text-[#004B87] block">الإجراء المتخذ / التوصيات المعتمدة:</span>
-            <p class="text-slate-800 leading-relaxed font-semibold">${rec.actionTaken}</p>
+            <p class="text-slate-800 leading-relaxed font-semibold">${_escHead(rec.actionTaken)}</p>
           </div>
+
+          ${rec.isArchived ? `
+            <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 space-y-1">
+              <span class="text-[11px] font-black text-amber-900 block">بيانات الأرشفة المرجعية:</span>
+              <p class="text-amber-950 font-bold">مؤرشف بواسطة: ${_escHead(rec.archivedByName || 'الإدارة')} • السبب: ${_escHead(rec.archiveReason || 'أرشفة مرجعية')}</p>
+            </div>
+          ` : ''}
 
           ${rec.headNotes ? `
             <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 space-y-1">
               <span class="text-[11px] font-black text-amber-900 block">🏅 قرار وتوجيه رئيس القسم / المشرف العام:</span>
-              <p class="text-amber-950 font-bold">${rec.headNotes}</p>
+              <p class="text-amber-950 font-bold">${_escHead(rec.headNotes)}</p>
             </div>
           ` : ''}
         `;
@@ -4464,7 +4782,7 @@
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="utf-8">
-  <title>كرت فحص ومعاينة بصرية ذكي - ${rec.id}</title>
+  <title>كرت فحص ومعاينة بصرية ذكي - ${_escHead(rec.id)}</title>
   <style>
     @page { size: A4 portrait; margin: 6mm 8mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -4567,67 +4885,67 @@
             <div style="width: 36%; text-align: center;">
               <img src="assets/images/ksu_official_logo.png" style="height: 50px; width: auto; max-width: 165px; object-fit: contain; margin-bottom: 4px; display: inline-block;" alt="KSUMC" />
               <div style="font-size: 13px; font-weight: 900; color: #082B49;">وثيقة رسمية من الأرشيف المرجعي</div>
-              <div style="font-size: 10px; font-weight: 800; color: #004B87;">${rec.categoryLabel}</div>
+              <div style="font-size: 10px; font-weight: 800; color: #004B87;">${_escHead(rec.categoryLabel)}</div>
             </div>
             <div style="width: 30%; text-align: left; font-size: 10px; font-family: monospace;">
               <div style="display: inline-block; background: #f8fafc; border: 1.5px solid #004B87; border-radius: 8px; padding: 7px 11px; min-width: 140px; text-align: left;">
                 <div style="font-size: 8.5px; color: #004B87; font-weight: 700;">الرقم المرجعي بالأرشيف:</div>
-                <div style="font-size: 11.5px; font-family: monospace; font-weight: 900; color: #082B49;">${rec.id}</div>
-                <div style="font-size: 9px; color: #475569; margin-top: 3px;"><strong>التاريخ:</strong> ${dateStr}</div>
-                <div style="font-size: 9px; color: #475569;"><strong>الوقت:</strong> ${timeStr}</div>
+                <div style="font-size: 11.5px; font-family: monospace; font-weight: 900; color: #082B49;">${_escHead(rec.id)}</div>
+                <div style="font-size: 9px; color: #475569; margin-top: 3px;"><strong>التاريخ:</strong> ${_escHead(dateStr)}</div>
+                <div style="font-size: 9px; color: #475569;"><strong>الوقت:</strong> ${_escHead(timeStr)}</div>
                 <div style="color: #059669; font-weight: bold; margin-top: 3px; font-size: 8.5px;">ARCHIVE VERIFIED • KSUMC</div>
               </div>
             </div>
           </div>
 
           <div style="background: linear-gradient(135deg, #082B49 0%, #004B87 100%); color: white; padding: 10px 16px; border-radius: 10px; text-align: center; margin-bottom: 16px;">
-            <h1 style="margin: 0; font-size: 15px; font-weight: 900;">${rec.title}</h1>
-            <p style="margin: 3px 0 0; font-size: 10.5px; color: #d1e4ff;">${rec.subtitle} — ${rec.statusLabel}</p>
+            <h1 style="margin: 0; font-size: 15px; font-weight: 900;">${_escHead(rec.title)}</h1>
+            <p style="margin: 3px 0 0; font-size: 10.5px; color: #d1e4ff;">${_escHead(rec.subtitle)} — ${_escHead(rec.statusLabel)}</p>
           </div>
 
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 11px;">
             <tbody>
               <tr>
                 <td style="border: 1px solid #cbd5e1; padding: 8px 10px; background: #f8fafc; font-weight: bold; width: 22%;">تصنيف السجل المرجعي:</td>
-                <td style="border: 1px solid #cbd5e1; padding: 8px 10px; width: 28%; font-weight: bold; color: #082B49;">${rec.categoryLabel}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px 10px; width: 28%; font-weight: bold; color: #082B49;">${_escHead(rec.categoryLabel)}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 8px 10px; background: #f8fafc; font-weight: bold; width: 22%;">الوردية الميدانية:</td>
-                <td style="border: 1px solid #cbd5e1; padding: 8px 10px; width: 28%; font-weight: bold; color: #004B87;">${rec.shift}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px 10px; width: 28%; font-weight: bold; color: #004B87;">${_escHead(rec.shift)}</td>
               </tr>
               <tr>
                 <td style="border: 1px solid #cbd5e1; padding: 8px 10px; background: #f8fafc; font-weight: bold;">المنشأة والموقع:</td>
-                <td style="border: 1px solid #cbd5e1; padding: 8px 10px;">${rec.location} (${rec.facility})</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px 10px;">${_escHead(rec.location)} (${_escHead(rec.facility)})</td>
                 <td style="border: 1px solid #cbd5e1; padding: 8px 10px; background: #f8fafc; font-weight: bold;">المسؤول / المفتش المختص:</td>
-                <td style="border: 1px solid #cbd5e1; padding: 8px 10px; font-weight: bold;">${rec.officer}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px 10px; font-weight: bold;">${_escHead(rec.officer)}</td>
               </tr>
               <tr>
                 <td style="border: 1px solid #cbd5e1; padding: 8px 10px; background: #f8fafc; font-weight: bold;">البيان التفصيلي:</td>
-                <td style="border: 1px solid #cbd5e1; padding: 8px 10px;">${rec.subtitle}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px 10px;">${_escHead(rec.subtitle)}</td>
                 <td style="border: 1px solid #cbd5e1; padding: 8px 10px; background: #f8fafc; font-weight: bold;">حالة الاعتماد:</td>
-                <td style="border: 1px solid #cbd5e1; padding: 8px 10px; font-weight: 900; color: #059669;">${rec.statusLabel}</td>
+                <td style="border: 1px solid #cbd5e1; padding: 8px 10px; font-weight: 900; color: #059669;">${_escHead(rec.statusLabel)}</td>
               </tr>
             </tbody>
           </table>
 
           <div style="border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: #f8fafc;">
             <div style="font-weight: 900; font-size: 11.5px; color: #082B49; margin-bottom: 5px;">التفاصيل والملاحظات الميدانية المرصودة:</div>
-            <div style="font-size: 11px; line-height: 1.6; color: #1e293b;">${rec.details}</div>
+            <div style="font-size: 11px; line-height: 1.6; color: #1e293b;">${_escHead(rec.details)}</div>
           </div>
 
           <div style="border: 1px solid #bae6fd; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: #f0f9ff;">
             <div style="font-weight: 900; font-size: 11.5px; color: #0369a1; margin-bottom: 5px;">الإجراءات المتخذة والتوصيات المعتمدة:</div>
-            <div style="font-size: 11px; line-height: 1.6; color: #0c4a6e;">${rec.actionTaken}</div>
+            <div style="font-size: 11px; line-height: 1.6; color: #0c4a6e;">${_escHead(rec.actionTaken)}</div>
           </div>
 
           ${rec.headNotes ? `
             <div style="border: 1px solid #fde68a; border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; background: #fffbeb; font-size: 11px;">
-              <strong>🏅 توجيه واعتماد رئيس القسم / المشرف العام (H1):</strong> ${rec.headNotes}
+              <strong>🏅 توجيه واعتماد رئيس القسم / المشرف العام (H1):</strong> ${_escHead(rec.headNotes)}
             </div>
           ` : ''}
 
           <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; text-align: center; font-size: 10.5px; margin-top: 26px; border-top: 1.5px solid #cbd5e1; padding-top: 16px;">
             <div>
               <div style="font-weight: bold; color: #475569;">المسؤول / مفتش السلامة</div>
-              <div style="margin-top: 6px; font-weight: 900; color: #082B49;">${rec.officer}</div>
+              <div style="margin-top: 6px; font-weight: 900; color: #082B49;">${_escHead(rec.officer)}</div>
               <div style="font-size: 9px; color: #10b981; margin-top: 4px;">✓ موثق إلكترونياً</div>
             </div>
             <div>
@@ -4644,7 +4962,7 @@
 
           <div style="margin-top: 22px; padding-top: 8px; border-top: 1px dashed #cbd5e1; display: flex; align-items: center; justify-content: space-between; font-size: 9px; color: #64748b;">
             <span>مستخرج من الأرشيف المرجعي الشامل — منصة سلامة المدينة الطبية بجامعة الملك سعود (KSUMC)</span>
-            <span style="font-family: monospace;">REF: ${rec.id} | FIREBASE-CLOUD-SYNC</span>
+            <span style="font-family: monospace;">REF: ${_escHead(rec.id)} | FIREBASE-CLOUD-SYNC</span>
           </div>
         </div>
       `;
@@ -4742,12 +5060,12 @@
       const rowsHtml = list.map((item, idx) => `
         <tr>
           <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center;">${idx + 1}</td>
-          <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold;">${item.id}<br/><span style="font-size:9px;color:#64748b;">${item.date || ''}</span></td>
-          <td style="border: 1px solid #cbd5e1; padding: 6px; font-weight: bold;">${item.categoryLabel}</td>
-          <td style="border: 1px solid #cbd5e1; padding: 6px;"><strong>${item.title}</strong><br/><span style="font-size:9.5px;color:#475569;">${item.details}</span></td>
-          <td style="border: 1px solid #cbd5e1; padding: 6px;">${item.location}</td>
-          <td style="border: 1px solid #cbd5e1; padding: 6px;">${item.officer}<br/><span style="font-size:9px;color:#64748b;">${item.shift}</span></td>
-          <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center; font-weight: bold;">${item.statusLabel}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px; font-family: monospace; font-weight: bold;">${_escHead(item.id)}<br/><span style="font-size:9px;color:#64748b;">${_escHead(item.date || '')}</span></td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px; font-weight: bold;">${_escHead(item.categoryLabel)}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px;"><strong>${_escHead(item.title)}</strong><br/><span style="font-size:9.5px;color:#475569;">${_escHead(item.details)}</span></td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px;">${_escHead(item.location)}</td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px;">${_escHead(item.officer)}<br/><span style="font-size:9px;color:#64748b;">${_escHead(item.shift)}</span></td>
+          <td style="border: 1px solid #cbd5e1; padding: 6px; text-align: center; font-weight: bold;">${_escHead(item.statusLabel)}</td>
         </tr>
       `).join('');
 
@@ -4793,7 +5111,11 @@
     }
 
     window.switchArchiveTab = switchArchiveTab;
+    window.switchArchiveStatusFilter = switchArchiveStatusFilter;
     window.resetArchiveFilters = resetArchiveFilters;
+    window.renderHeadOverviewAutoArchive = renderHeadOverviewAutoArchive;
+    window.archiveHeadViolationRecord = archiveHeadViolationRecord;
+    window.restoreHeadViolationRecord = restoreHeadViolationRecord;
     window.renderHeadMasterArchive = renderHeadMasterArchive;
     window.previewArchiveRecord = previewArchiveRecord;
     window.closeArchivePreviewModal = closeArchivePreviewModal;
