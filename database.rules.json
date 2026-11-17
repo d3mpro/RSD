@@ -103,19 +103,28 @@
 
     "safety_violations": {
       ".read": true,
-      ".indexOn": ["timestamp", "severity", "status", "building"],
+      ".indexOn": ["timestamp", "severity", "status", "building", "createdByUid", "createdByEmpId", "archived", "shift"],
       "$violId": {
         ".write": "newData.exists()",
-        ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+        ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100 && (!newData.child('status').exists() || newData.child('status').val() != 'deleted')"
       }
     },
 
     "smoking_violations": {
       ".read": true,
-      ".indexOn": ["timestamp", "status", "building"],
+      ".indexOn": ["timestamp", "status", "building", "createdByUid", "createdByEmpId", "archived", "shift"],
       "$violId": {
         ".write": "newData.exists()",
-        ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+        ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100 && (!newData.child('status').exists() || newData.child('status').val() != 'deleted')"
+      }
+    },
+
+    "audit_logs": {
+      ".read": true,
+      ".indexOn": ["timestamp", "action", "actorEmpId", "actorRole"],
+      "$logId": {
+        ".write": "newData.exists() && !data.exists()",
+        ".validate": "newData.hasChildren(['id', 'action', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },
 

@@ -54,6 +54,9 @@
             this.isConnected = false;
             this.isUpdatingFromRemote = false;
             this._lastRetryPushAt = {};
+            this.currentAuthUid = null;
+            this.currentUserClaims = null;
+            this.isAnonymousAuth = true;
             this.deviceId = this.getOrCreateDeviceId();
             this.lastResetTimestamp = parseInt(localStorage.getItem('ksumc_shift_log_reset_at') || '0', 10);
             this.ensureCleanProductionStorage();
@@ -152,18 +155,38 @@
                     firebase.initializeApp(FIREBASE_CONFIG);
                 }
 
-                // تفعيل جلسة المصادقة الموثقة لـ Firebase Realtime Database
+                // تفعيل جلسة المصادقة الموثقة لـ Firebase Realtime Database وتتبع Custom Claims
                 if (typeof firebase.auth === 'function') {
                     try {
                         const auth = firebase.auth();
                         auth.onAuthStateChanged((user) => {
+                            this.currentAuthUid = user ? user.uid : null;
+                            this.isAnonymousAuth = user ? Boolean(user.isAnonymous) : true;
                             if (user) {
                                 console.log('🛡️ [KSU-Firebase-Security] جلسة مصادقة سحابية موثقة (UID):', user.uid);
+                                if (typeof user.getIdTokenResult === 'function') {
+                                    user.getIdTokenResult().then((tokenResult) => {
+                                        this.currentUserClaims = (tokenResult && tokenResult.claims) ? tokenResult.claims : {};
+                                        try {
+                                            window.dispatchEvent(new CustomEvent('ksumc_firebase_claims_updated', {
+                                                detail: {
+                                                    uid: user.uid,
+                                                    isAnonymous: Boolean(user.isAnonymous),
+                                                    claims: this.currentUserClaims
+                                                }
+                                            }));
+                                        } catch (_) {}
+                                    }).catch(() => {});
+                                }
+                            } else {
+                                this.currentUserClaims = null;
                             }
                         });
-                        auth.signInAnonymously().catch((authErr) => {
-                            console.log('ℹ️ [KSU-Firebase-Security] نمط مصادقة القواعد:', authErr.code || authErr.message);
-                        });
+                        if (!auth.currentUser && typeof auth.signInAnonymously === 'function') {
+                            auth.signInAnonymously().catch((authErr) => {
+                                console.log('ℹ️ [KSU-Firebase-Security] نمط مصادقة القواعد:', authErr.code || authErr.message);
+                            });
+                        }
                     } catch (e) {
                         console.warn('[KSU-Firebase-Security] تنبيه تهيئة المصادقة:', e);
                     }
@@ -190,6 +213,28 @@
             } catch (err) {
                 console.error('[KSU-Firebase] خطأ في الاتصال بقاعدة البيانات:', err);
             }
+        }
+
+        getAuthClaims() {
+            return {
+                uid: this.currentAuthUid,
+                isAnonymous: this.isAnonymousAuth,
+                claims: this.currentUserClaims || {}
+            };
+        }
+
+        refreshAuthClaims() {
+            if (typeof firebase === 'undefined' || typeof firebase.auth !== 'function') {
+                return Promise.resolve(null);
+            }
+            const user = firebase.auth().currentUser;
+            if (!user || typeof user.getIdTokenResult !== 'function') {
+                return Promise.resolve(null);
+            }
+            return user.getIdTokenResult(true).then((tokenResult) => {
+                this.currentUserClaims = (tokenResult && tokenResult.claims) ? tokenResult.claims : {};
+                return this.currentUserClaims;
+            }).catch(() => null);
         }
 
         checkAndExecuteCloudTrialPurge() {
@@ -734,6 +779,21 @@
             if (nodeName === 'safety_violations' && (item.visionData || item.hasVisualInspectionCard)) {
                 delete item.cardInnerHtml;
                 delete item.fullPageHtml;
+            }
+            if (nodeName === 'safety_violations' || nodeName === 'smoking_violations') {
+                const archived = Boolean(
+                    item.archived === true ||
+                    item.isArchived === true ||
+                    item.status === 'archived' ||
+                    item.status === 'مؤرشف'
+                );
+                item.archived = archived;
+                item.isArchived = archived;
+                if (item.status === 'deleted') {
+                    item.status = item.preArchiveStatus || 'قيد المتابعة';
+                }
+                delete item._deleted;
+                delete item.isPurged;
             }
 
             return item;
@@ -1307,6 +1367,65 @@
             return this.pushCollectionToFirebase('smoking_violations', violArray, 'id');
         }
 
+        recordAuditLog(action, details = {}) {
+            const activeUser = (window.KSUDataBridge && typeof window.KSUDataBridge.getCurrentActiveUser === 'function')
+                ? window.KSUDataBridge.getCurrentActiveUser()
+                : ((window.state && window.state.currentUser) || null);
+            const entry = {
+                id: 'AUD-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+                action: String(action || 'UNKNOWN_ACTION'),
+                details: (details && typeof details === 'object') ? details : { note: String(details || '') },
+                actorId: String((activeUser && (activeUser.id || activeUser.empId || activeUser.username)) || 'anonymous'),
+                actorName: String((activeUser && activeUser.name) || 'مستخدم النظام'),
+                actorRole: (window.KSUDataBridge && typeof window.KSUDataBridge.getNormalizedUserRole === 'function')
+                    ? window.KSUDataBridge.getNormalizedUserRole(activeUser)
+                    : String((activeUser && (activeUser.roleCategory || activeUser.role)) || 'guest'),
+                actorUid: this.currentAuthUid || '',
+                timestamp: new Date().toISOString()
+            };
+            if (!this.db) return Promise.resolve(false);
+            const key = this.sanitizeFirebaseKey(entry.id);
+            return this.db.ref('audit_logs/' + key).set(entry).then(() => true).catch(() => false);
+        }
+
+        archiveViolationInCloud(type, id, reason = '') {
+            const isSmoking = String(type || '').toLowerCase().includes('smok');
+            const activeUser = (window.KSUDataBridge && typeof window.KSUDataBridge.getCurrentActiveUser === 'function')
+                ? window.KSUDataBridge.getCurrentActiveUser()
+                : ((window.state && window.state.currentUser) || null);
+            const allowed = (window.KSUDataBridge && typeof window.KSUDataBridge.isHeadOrAdminUser === 'function')
+                ? window.KSUDataBridge.isHeadOrAdminUser(activeUser)
+                : false;
+            if (!allowed) {
+                this.recordAuditLog('UNAUTHORIZED_CLOUD_ARCHIVE_ATTEMPT', {
+                    type: isSmoking ? 'smoking' : 'safety',
+                    id: String(id || '')
+                });
+                return Promise.resolve(false);
+            }
+            if (!this.db || !id) return Promise.resolve(false);
+            const node = isSmoking ? 'smoking_violations' : 'safety_violations';
+            const key = this.sanitizeFirebaseKey(id);
+            const nowIso = new Date().toISOString();
+            return this.db.ref(node + '/' + key).update({
+                archived: true,
+                isArchived: true,
+                archivedAt: nowIso,
+                archivedBy: String((activeUser && (activeUser.id || activeUser.empId || activeUser.username)) || ''),
+                archivedByName: String((activeUser && activeUser.name) || ''),
+                archiveReason: String(reason || 'أرشفة مرجعية'),
+                updatedAt: nowIso,
+                updatedAtMs: Date.now()
+            }).then(() => {
+                this.recordAuditLog('CLOUD_ARCHIVE_VIOLATION', {
+                    type: isSmoking ? 'smoking' : 'safety',
+                    id: String(id),
+                    reason: String(reason || 'أرشفة مرجعية')
+                });
+                return true;
+            }).catch(() => false);
+        }
+
         syncCAPARecord(capaObj) {
             if (!capaObj) return Promise.resolve(false);
             const capaKeys = ['ksumc_capa_registry', 'ksumc_capa_records'];
@@ -1369,6 +1488,25 @@
 
         // 13. حذف وتصفير جميع الجولات والسجلات التجريبية استعداداً للعمل الحقيقي المعتمد
         purgeAllTrialOperationalData(isManual = false) {
+            if (isManual) {
+                const activeUser = (window.KSUDataBridge && typeof window.KSUDataBridge.getCurrentActiveUser === 'function')
+                    ? window.KSUDataBridge.getCurrentActiveUser()
+                    : ((window.state && window.state.currentUser) || null);
+                const isAuthorized = (window.KSUDataBridge && typeof window.KSUDataBridge.isHeadOrAdminUser === 'function')
+                    ? window.KSUDataBridge.isHeadOrAdminUser(activeUser)
+                    : Boolean(activeUser && ['head', 'admin', 'developer', 'executive'].includes(String(activeUser.roleCategory || '').toLowerCase()));
+                if (!isAuthorized) {
+                    this.recordAuditLog('UNAUTHORIZED_MANUAL_PURGE', { isManual: true });
+                    if (window.KSUDataBridge && typeof window.KSUDataBridge.appendAuditLog === 'function') {
+                        window.KSUDataBridge.appendAuditLog('UNAUTHORIZED_MANUAL_PURGE', { isManual: true }, activeUser);
+                    }
+                    return Promise.resolve(false);
+                }
+                this.recordAuditLog('AUTHORIZED_MANUAL_PURGE', { isManual: true });
+                if (window.KSUDataBridge && typeof window.KSUDataBridge.appendAuditLog === 'function') {
+                    window.KSUDataBridge.appendAuditLog('AUTHORIZED_MANUAL_PURGE', { isManual: true }, activeUser);
+                }
+            }
             const nowTs = Date.now();
             const todayKey = new Date().toISOString().split('T')[0];
             this.lastResetTimestamp = nowTs;
