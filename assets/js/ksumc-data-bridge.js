@@ -1821,10 +1821,23 @@
             : (record.status || 'مفتوحة'))
           : (record.status || 'مكتملة');
 
+        const baseUrl = (typeof window !== 'undefined' && window.location && window.location.origin && /^https?:/i.test(window.location.origin))
+          ? window.location.origin
+          : 'https://rsd-ksu.web.app';
+        const recordKey = record.code || record.id || record.roundId || '';
+        let reportUrl = `${baseUrl}/field.html`;
+        if (type === 'inspection' && (record.id || record.roundId)) {
+          reportUrl = `${baseUrl}/field.html?printRound=${encodeURIComponent(record.id || record.roundId)}`;
+        } else if (type === 'capa') {
+          reportUrl = `${baseUrl}/field.html?tab=capa&capaId=${encodeURIComponent(recordKey)}`;
+        } else if (type === 'asset') {
+          reportUrl = `${baseUrl}/admin.html?assetId=${encodeURIComponent(recordKey)}`;
+        }
+
         const payload = {
           Title: title,
           type: type,
-          recordId: record.code || record.id || record.roundId || '',
+          recordId: recordKey,
           inspectionType: record.formTitle || record.formType || record.roundTitle || record.category || '',
           inspector: inspectorName,
           inspectorSignature: record.signature || record.inspectorSignature || inspectorName,
@@ -1846,6 +1859,7 @@
           date: record.date || new Date().toISOString().split('T')[0],
           time: timeStr,
           timestamp: record.timestamp || new Date().toISOString(),
+          reportUrl: reportUrl,
           notes: record.notes || record.description || record.itemDescription || record.findingsSummary || autoSummary || (record.findings ? `عدد الملاحظات: ${record.findings.length}` : 'تم التوثيق عبر منصة رصد')
         };
 

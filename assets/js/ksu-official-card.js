@@ -1298,4 +1298,57 @@
     window.selectFacpPanelCard(panelId);
   };
 
+  /**
+   * فتح البطاقة الرسمية للطباعة تلقائياً عند الدخول عبر رابط مباشر من شيربوينت (?printRound=ID)
+   */
+  (function initOfficialCardDeepLink() {
+    if (typeof window === 'undefined' || !window.location || !window.location.search) return;
+    const params = new URLSearchParams(window.location.search);
+    const targetRoundId = params.get('printRound');
+    if (!targetRoundId) return;
+    const autoPrint = params.get('autoPrint') === '1' || params.get('autoPrint') === 'true';
+
+    let attempts = 0;
+    const maxAttempts = 30; // up to ~15s while Firebase Realtime sync hydrates rounds
+    const findRound = () => {
+      if (window.state && Array.isArray(window.state.rounds)) {
+        const hit = window.state.rounds.find(r => r && String(r.id) === String(targetRoundId));
+        if (hit) return hit;
+      }
+      try {
+        const stored = JSON.parse(localStorage.getItem('ksumc_safety_rounds') || '[]');
+        if (Array.isArray(stored)) {
+          const hit = stored.find(r => r && String(r.id) === String(targetRoundId));
+          if (hit) {
+            if (window.state && Array.isArray(window.state.rounds) && !window.state.rounds.some(r => r && String(r.id) === String(targetRoundId))) {
+              window.state.rounds.unshift(hit);
+            }
+            return hit;
+          }
+        }
+      } catch (_) {}
+      return null;
+    };
+
+    const tryOpen = () => {
+      attempts++;
+      const found = findRound();
+      if (found) {
+        if (typeof window.openOfficialInspectionCardModal === 'function') {
+          window.openOfficialInspectionCardModal(found.id, autoPrint);
+        }
+        return;
+      }
+      if (attempts < maxAttempts) {
+        setTimeout(tryOpen, 500);
+      }
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => setTimeout(tryOpen, 400));
+    } else {
+      setTimeout(tryOpen, 400);
+    }
+  })();
+
 })();
