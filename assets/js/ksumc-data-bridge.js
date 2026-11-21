@@ -1662,6 +1662,7 @@
       if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncCAPARecord === 'function') {
         window.ksuFirebaseSync.syncCAPARecord(newRecord);
       }
+      this.syncToSharePoint(newRecord, 'capa');
       window.dispatchEvent(new CustomEvent('ksumc_capa_updated', { detail: { record: newRecord, list } }));
       return newRecord;
     },
@@ -1782,8 +1783,10 @@
           }
         } else if (type === 'asset') {
           title = record.name || record.assetId || record.code || `أصل سلامة (${record.id || 'ASSET'})`;
+        } else if (type === 'capa') {
+          title = record.title || record.sourceTitle || `إجراء تصحيحي (${record.code || record.id || 'CAPA'})`;
         } else {
-          title = record.title || record.id || 'سجل سلامة';
+          title = record.title || record.sourceTitle || record.id || 'سجل سلامة';
         }
 
         const autoSummary = (typeof record.score === 'number')
@@ -1801,21 +1804,21 @@
           else overallRating = 'مطابق بالكامل';
         }
 
-        const inspectorName = record.inspectorName || record.inspector || (record.user && record.user.name) || 'مفتش السلامة';
+        const inspectorName = record.inspectorName || record.inspector || record.reportedBy || (record.user && record.user.name) || 'مفتش السلامة';
         const timeStr = record.time || new Date().toTimeString().slice(0, 5);
 
         const payload = {
           Title: title,
           type: type,
-          recordId: record.id || record.roundId || '',
-          inspectionType: record.formTitle || record.formType || record.category || '',
+          recordId: record.code || record.id || record.roundId || '',
+          inspectionType: record.formTitle || record.formType || record.roundTitle || record.category || '',
           inspector: inspectorName,
           inspectorSignature: record.signature || record.inspectorSignature || inspectorName,
           facility: facilityName || 'المدينة الطبية',
           building: record.building || record.zone || '',
           floor: record.floor || '',
           detailedLocation: record.room || record.locationDetails || record.zone || record.facpName || '',
-          shift: record.shiftName || record.shift || '',
+          shift: record.shiftName || record.shift || record.reporterShift || '',
           status: record.status || 'مكتملة',
           qualityStatus: record.workflowStatusLabel || record.qualityStatus || 'بانتظار المراجعة',
           complianceScore: complianceScore,
@@ -1829,7 +1832,7 @@
           date: record.date || new Date().toISOString().split('T')[0],
           time: timeStr,
           timestamp: record.timestamp || new Date().toISOString(),
-          notes: record.notes || record.findingsSummary || autoSummary || (record.findings ? `عدد الملاحظات: ${record.findings.length}` : 'تم التوثيق عبر منصة رصد')
+          notes: record.notes || record.description || record.itemDescription || record.findingsSummary || autoSummary || (record.findings ? `عدد الملاحظات: ${record.findings.length}` : 'تم التوثيق عبر منصة رصد')
         };
 
         const response = await fetch(SHAREPOINT_CONFIG.WEBHOOK_URL, {

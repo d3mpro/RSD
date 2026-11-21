@@ -13037,6 +13037,9 @@ function saveNewInspectionRound() {
         if (window.KSUOracleSync && typeof window.KSUOracleSync.saveCAPA === 'function') {
           try { window.KSUOracleSync.saveCAPA(capaTicket); } catch (_) {}
         }
+        if (window.KSUDataBridge && typeof window.KSUDataBridge.syncToSharePoint === 'function') {
+          try { window.KSUDataBridge.syncToSharePoint(capaTicket, 'capa'); } catch (_) {}
+        }
       });
       try { saveCAPA(); } catch (e) { console.warn('saveCAPA error:', e); }
     }
