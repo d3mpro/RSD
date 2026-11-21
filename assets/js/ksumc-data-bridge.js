@@ -1807,6 +1807,20 @@
         const inspectorName = record.inspectorName || record.inspector || record.reportedBy || (record.user && record.user.name) || 'مفتش السلامة';
         const timeStr = record.time || new Date().toTimeString().slice(0, 5);
 
+        const rawSev = String(record.severity || record.priority || '').toLowerCase();
+        const severityLabel = rawSev === 'high' || rawSev === 'critical' ? 'عالية'
+          : rawSev === 'medium' ? 'متوسطة'
+          : rawSev === 'low' ? 'منخفضة'
+          : (record.severity || record.priority || '');
+
+        const rawStatus = String(record.status || '').toLowerCase();
+        const statusLabel = type === 'capa'
+          ? (rawStatus === 'closed' || rawStatus === 'resolved' ? 'مغلقة ومطابقة'
+            : rawStatus === 'in_progress' ? 'قيد المعالجة'
+            : rawStatus === 'open' ? 'مفتوحة'
+            : (record.status || 'مفتوحة'))
+          : (record.status || 'مكتملة');
+
         const payload = {
           Title: title,
           type: type,
@@ -1819,7 +1833,7 @@
           floor: record.floor || '',
           detailedLocation: record.room || record.locationDetails || record.zone || record.facpName || '',
           shift: record.shiftName || record.shift || record.reporterShift || '',
-          status: record.status || 'مكتملة',
+          status: statusLabel,
           qualityStatus: record.workflowStatusLabel || record.qualityStatus || 'بانتظار المراجعة',
           complianceScore: complianceScore,
           overallRating: overallRating,
@@ -1828,7 +1842,7 @@
           violationCount: Number(record.violationCount || 0),
           assetCategory: record.category || '',
           assetType: record.type || '',
-          severity: record.severity || record.priority || '',
+          severity: severityLabel,
           date: record.date || new Date().toISOString().split('T')[0],
           time: timeStr,
           timestamp: record.timestamp || new Date().toISOString(),
