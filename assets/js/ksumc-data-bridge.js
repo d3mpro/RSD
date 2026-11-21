@@ -1792,7 +1792,7 @@
 
         const complianceScore = (typeof record.score === 'number')
           ? record.score
-          : (typeof record.complianceScore === 'number' ? record.complianceScore : null);
+          : (typeof record.complianceScore === 'number' ? record.complianceScore : 0);
 
         let overallRating = record.overallRating || '';
         if (!overallRating && type === 'inspection') {
