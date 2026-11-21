@@ -8228,6 +8228,9 @@ function saveRounds(targetRound) {
         try { window.ksuFirebaseSync.syncRoundsList(state.rounds); } catch (_) {}
       }
     }
+    if (targetRound && window.KSUDataBridge && typeof window.KSUDataBridge.syncToSharePoint === 'function') {
+      try { window.KSUDataBridge.syncToSharePoint(targetRound, 'inspection'); } catch (_) {}
+    }
   }
   notifyCloudSync();
 }
@@ -8501,8 +8504,13 @@ function saveAssets(targetAsset) {
   localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(state.assets));
   renderAssetKPIs();
   renderAssetsList();
-  if (!window._ksumcApplyingRemoteSync && targetAsset && window.KSUOracleSync && typeof window.KSUOracleSync.saveAsset === 'function') {
-    window.KSUOracleSync.saveAsset(targetAsset);
+  if (!window._ksumcApplyingRemoteSync && targetAsset) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.saveAsset === 'function') {
+      window.KSUOracleSync.saveAsset(targetAsset);
+    }
+    if (window.KSUDataBridge && typeof window.KSUDataBridge.syncToSharePoint === 'function') {
+      try { window.KSUDataBridge.syncToSharePoint(targetAsset, 'asset'); } catch (_) {}
+    }
   }
   notifyCloudSync();
 }
@@ -8976,6 +8984,7 @@ function saveAsset() {
 
   const today = new Date().toISOString().split('T')[0];
 
+  let savedAsset = null;
   if (state.editingAssetId) {
     const idx = state.assets.findIndex(item => item.id === state.editingAssetId);
     if (idx !== -1) {
@@ -8994,6 +9003,7 @@ function saveAsset() {
         notes,
         lastInspectionDate: today
       };
+      savedAsset = state.assets[idx];
       showToast('تم تحديث بيانات الأصل بنجاح.', 'success');
     }
   } else {
@@ -9014,10 +9024,11 @@ function saveAsset() {
       notes
     };
     state.assets.unshift(newAsset);
+    savedAsset = newAsset;
     showToast('تم تسجيل وحفظ الأصل الثابت بنجاح وتوليد ملصق الـ QR.', 'success');
   }
 
-  saveAssets();
+  saveAssets(savedAsset);
   closeAssetModal();
 }
 

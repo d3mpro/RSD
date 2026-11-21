@@ -1766,28 +1766,43 @@
       try {
         if (!SHAREPOINT_CONFIG.ENABLED || !SHAREPOINT_CONFIG.WEBHOOK_URL) return;
         
+        const facilityName = record.facility || record.hospital || '';
         let title = '';
         if (type === 'inspection') {
-          title = record.title || (record.facility ? `${record.facility} - جولة تفتيشية` : `جولة تفتيش ميداني (${record.id || 'RSD'})`);
+          if (record.title) {
+            title = record.title;
+          } else if (record.formTitle && facilityName) {
+            title = `${record.formTitle} - ${facilityName}`;
+          } else if (record.formTitle) {
+            title = record.formTitle;
+          } else if (facilityName) {
+            title = `${facilityName} - جولة تفتيشية`;
+          } else {
+            title = `جولة تفتيش ميداني (${record.id || 'RSD'})`;
+          }
         } else if (type === 'asset') {
           title = record.name || record.assetId || record.code || `أصل سلامة (${record.id || 'ASSET'})`;
         } else {
           title = record.title || record.id || 'سجل سلامة';
         }
 
+        const autoSummary = (typeof record.score === 'number')
+          ? `نسبة الامتثال: ${record.score}% | مطابق: ${record.compliantCount || 0} | ملاحظات: ${record.observationCount || 0} | مخالفات: ${record.violationCount || 0}`
+          : '';
+
         const payload = {
           Title: title,
           type: type,
           recordId: record.id || record.roundId || '',
           inspector: record.inspectorName || record.inspector || (record.user && record.user.name) || 'مفتش السلامة',
-          facility: record.facility || record.hospital || 'المدينة الطبية',
+          facility: facilityName || 'المدينة الطبية',
           building: record.building || record.zone || '',
           floor: record.floor || '',
-          shift: record.shift || '',
+          shift: record.shiftName || record.shift || '',
           status: record.status || 'مكتملة',
           date: record.date || new Date().toISOString().split('T')[0],
           timestamp: record.timestamp || new Date().toISOString(),
-          notes: record.notes || record.findingsSummary || (record.findings ? `عدد الملاحظات: ${record.findings.length}` : 'تم التوثيق عبر منصة رصد')
+          notes: record.notes || record.findingsSummary || autoSummary || (record.findings ? `عدد الملاحظات: ${record.findings.length}` : 'تم التوثيق عبر منصة رصد')
         };
 
         const response = await fetch(SHAREPOINT_CONFIG.WEBHOOK_URL, {
