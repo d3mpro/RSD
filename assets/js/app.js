@@ -8319,6 +8319,9 @@ function saveCAPA(targetCAPA) {
         try { window.ksuFirebaseSync.syncCAPAList(state.capa); } catch (_) {}
       }
     }
+    if (targetCAPA && window.KSUDataBridge && typeof window.KSUDataBridge.syncToSharePoint === 'function') {
+      try { window.KSUDataBridge.syncToSharePoint(targetCAPA, 'capa'); } catch (_) {}
+    }
   }
   notifyCloudSync();
 }

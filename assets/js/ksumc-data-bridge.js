@@ -1790,17 +1790,44 @@
           ? `نسبة الامتثال: ${record.score}% | مطابق: ${record.compliantCount || 0} | ملاحظات: ${record.observationCount || 0} | مخالفات: ${record.violationCount || 0}`
           : '';
 
+        const complianceScore = (typeof record.score === 'number')
+          ? record.score
+          : (typeof record.complianceScore === 'number' ? record.complianceScore : null);
+
+        let overallRating = record.overallRating || '';
+        if (!overallRating && type === 'inspection') {
+          if ((record.violationCount || 0) > 0) overallRating = 'يوجد مخالفات';
+          else if ((record.observationCount || 0) > 0) overallRating = 'يوجد ملاحظات';
+          else overallRating = 'مطابق بالكامل';
+        }
+
+        const inspectorName = record.inspectorName || record.inspector || (record.user && record.user.name) || 'مفتش السلامة';
+        const timeStr = record.time || new Date().toTimeString().slice(0, 5);
+
         const payload = {
           Title: title,
           type: type,
           recordId: record.id || record.roundId || '',
-          inspector: record.inspectorName || record.inspector || (record.user && record.user.name) || 'مفتش السلامة',
+          inspectionType: record.formTitle || record.formType || record.category || '',
+          inspector: inspectorName,
+          inspectorSignature: record.signature || record.inspectorSignature || inspectorName,
           facility: facilityName || 'المدينة الطبية',
           building: record.building || record.zone || '',
           floor: record.floor || '',
+          detailedLocation: record.room || record.locationDetails || record.zone || record.facpName || '',
           shift: record.shiftName || record.shift || '',
           status: record.status || 'مكتملة',
+          qualityStatus: record.workflowStatusLabel || record.qualityStatus || 'بانتظار المراجعة',
+          complianceScore: complianceScore,
+          overallRating: overallRating,
+          compliantCount: Number(record.compliantCount || 0),
+          observationCount: Number(record.observationCount || 0),
+          violationCount: Number(record.violationCount || 0),
+          assetCategory: record.category || '',
+          assetType: record.type || '',
+          severity: record.severity || record.priority || '',
           date: record.date || new Date().toISOString().split('T')[0],
+          time: timeStr,
           timestamp: record.timestamp || new Date().toISOString(),
           notes: record.notes || record.findingsSummary || autoSummary || (record.findings ? `عدد الملاحظات: ${record.findings.length}` : 'تم التوثيق عبر منصة رصد')
         };
