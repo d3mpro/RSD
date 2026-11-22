@@ -1834,6 +1834,77 @@
           reportUrl = `${baseUrl}/admin.html?assetId=${encodeURIComponent(recordKey)}`;
         }
 
+        const dateStr = record.date || new Date().toISOString().split('T')[0];
+        const safeId = String(recordKey || Date.now()).replace(/[\\/:*?"<>|#%\s]+/g, '-').slice(0, 60);
+        const typePrefix = type === 'inspection' ? 'INSP' : (type === 'capa' ? 'CAPA' : (type === 'asset' ? 'ASSET' : 'RSD'));
+        const reportFileName = `${typePrefix}-${dateStr}-${safeId}.html`;
+
+        const escHtml = (v) => String(v == null ? '' : v)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        const notesText = record.notes || record.description || record.itemDescription || record.findingsSummary || autoSummary || (record.findings ? `عدد الملاحظات: ${record.findings.length}` : 'تم التوثيق عبر منصة رصد');
+        let innerReportHtml = '';
+        if (type === 'inspection' && typeof window !== 'undefined' && typeof window.generateOfficialInspectionCardHtml === 'function') {
+          try {
+            innerReportHtml = window.generateOfficialInspectionCardHtml(record)
+              .replace(/src=["'](?:\.\/)?assets\//g, `src="${baseUrl}/assets/`);
+          } catch (_) {
+            innerReportHtml = '';
+          }
+        }
+        if (!innerReportHtml) {
+          const badgeTitle = type === 'capa' ? 'بطاقة إجراء تصحيحي ووقائي (CAPA)' : (type === 'asset' ? 'بطاقة سجل أصل سلامة' : 'محضر تفتيش ميداني رسمي');
+          innerReportHtml = `
+            <div style="max-width:790px;margin:0 auto;border:1.5px solid #004B87;border-radius:10px;overflow:hidden;background:#fff;">
+              <div style="background:#004B87;color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                <div>
+                  <div style="font-size:12px;opacity:.9;">المدينة الطبية بجامعة الملك سعود — قسم السلامة والصحة المهنية</div>
+                  <div style="font-size:18px;font-weight:800;margin-top:4px;">${escHtml(badgeTitle)}</div>
+                </div>
+                <img src="${baseUrl}/assets/images/ksu_official_logo.png" alt="KSU" style="height:52px;background:#fff;padding:4px;border-radius:8px;" />
+              </div>
+              <div style="padding:18px 20px;">
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                  <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;width:28%;">رقم السجل</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml(recordKey)}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">العنوان / النوع</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml(title)}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">المنشأة / المبنى / الدور</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml([facilityName || 'المدينة الطبية', record.building || record.zone || '', record.floor || ''].filter(Boolean).join(' — '))}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">الموقع التفصيلي</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml(record.room || record.locationDetails || record.zone || record.facpName || '-')}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">المفتش / الوردية</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml(inspectorName)} ${record.shiftName || record.shift ? '— ' + escHtml(record.shiftName || record.shift) : ''}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">التاريخ والوقت</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml(dateStr)} — ${escHtml(timeStr)}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">الحالة / الخطورة</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml(statusLabel)}${severityLabel ? ' — ' + escHtml(severityLabel) : ''}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">التفاصيل والملاحظات</td><td style="padding:8px;border:1px solid #cbd5e1;line-height:1.7;">${escHtml(notesText)}</td></tr>
+                </table>
+              </div>
+            </div>`;
+        }
+
+        const reportHtml = `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escHtml(title)} — أرشيف منصة رصد (KSUMC)</title>
+  <style>
+    @page { size: A4 portrait; margin: 8mm 6mm; }
+    body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; margin: 0; padding: 16px; background: #f1f5f9; direction: rtl; color: #0f172a; }
+    .rsd-archive-toolbar { max-width: 790px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: space-between; background: #0f172a; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; }
+    .rsd-archive-btn { background: #004B87; color: #fff; border: 0; padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .rsd-archive-btn:hover { background: #0369a1; }
+    @media print {
+      body { background: #fff; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .no-print, .rsd-archive-toolbar { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="rsd-archive-toolbar no-print">
+    <span>أرشيف قسم السلامة — منصة رصد (KSUMC) | ${escHtml(recordKey)}</span>
+    <button class="rsd-archive-btn" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+  </div>
+  ${innerReportHtml}
+</body>
+</html>`;
+
         const payload = {
           Title: title,
           type: type,
@@ -1856,11 +1927,13 @@
           assetCategory: record.category || '',
           assetType: record.type || '',
           severity: severityLabel,
-          date: record.date || new Date().toISOString().split('T')[0],
+          date: dateStr,
           time: timeStr,
           timestamp: record.timestamp || new Date().toISOString(),
           reportUrl: reportUrl,
-          notes: record.notes || record.description || record.itemDescription || record.findingsSummary || autoSummary || (record.findings ? `عدد الملاحظات: ${record.findings.length}` : 'تم التوثيق عبر منصة رصد')
+          reportFileName: reportFileName,
+          reportHtml: reportHtml,
+          notes: notesText
         };
 
         const response = await fetch(SHAREPOINT_CONFIG.WEBHOOK_URL, {
