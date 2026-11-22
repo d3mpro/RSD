@@ -7,7 +7,7 @@
       ".read": "auth != null",
       ".indexOn": ["username", "empId", "roleCategory", "shift", "status", "authUid"],
       "$userId": {
-        ".write": "auth != null && newData.exists() && (auth.uid == $userId || auth.token.role == 'admin' || auth.token.role == 'developer')",
+        ".write": "auth != null && newData.exists() && (auth.uid == $userId || auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer')",
         ".validate": "(newData.hasChildren(['id', 'name']) || newData.hasChildren(['username'])) && !newData.hasChildren(['password']) && !newData.hasChildren(['passwordHash']) && (!newData.hasChild('id') || (newData.child('id').isString() && newData.child('id').val().length < 100))"
       }
     },
@@ -15,7 +15,7 @@
     "ksumc_users": {
       ".read": "auth != null",
       "$userId": {
-        ".write": "auth != null && newData.exists() && (auth.uid == $userId || auth.token.role == 'admin' || auth.token.role == 'developer')",
+        ".write": "auth != null && newData.exists() && (auth.uid == $userId || auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer')",
         ".validate": "newData.hasChildren(['id']) && !newData.hasChildren(['password']) && !newData.hasChildren(['passwordHash']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },

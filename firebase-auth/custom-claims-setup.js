@@ -117,20 +117,94 @@ async function syncAllUsersFromRTDB() {
   }
 }
 
+async function provisionRosterFromRTDB() {
+  const db = admin.database();
+  const snap = await db.ref('users').once('value');
+  const usersVal = snap.val();
+  if (!usersVal || typeof usersVal !== 'object') {
+    console.log('No users found under /users in RTDB.');
+    return;
+  }
+
+  const entries = Array.isArray(usersVal)
+    ? usersVal.map((u, idx) => [String(idx), u])
+    : Object.entries(usersVal);
+
+  let provisioned = 0;
+  for (const [key, user] of entries) {
+    if (!user || typeof user !== 'object') continue;
+    const empId = String(user.empId || user.employeeId || user.username || key || '').trim();
+    if (!empId) continue;
+
+    const rawRole = String(user.roleCategory || user.role || 'field_inspector').trim().toLowerCase();
+    const mappedRole = ALLOWED_ROLES.has(rawRole) ? rawRole : 'field_inspector';
+
+    const rawEmail = String(user.email || '').trim().toLowerCase();
+    const safeEmpAlias = empId.toLowerCase().replace(/[^a-z0-9._-]+/g, '') || key.toLowerCase().replace(/[^a-z0-9._-]+/g, '');
+    const authEmail = (rawEmail && rawEmail.includes('@')) ? rawEmail : `${safeEmpAlias}@rsd-ksu.local`;
+
+    let userRecord = null;
+    try {
+      if (user.authUid) {
+        userRecord = await admin.auth().getUser(user.authUid);
+      } else {
+        userRecord = await admin.auth().getUserByEmail(authEmail);
+      }
+    } catch (err) {
+      if (err && err.code === 'auth/user-not-found') {
+        const isDev = mappedRole === 'developer' || empId.toLowerCase() === 'dev' || user.id === 'USR-01';
+        const initialPassword = isDev ? 'Kk@122566##' : '123456';
+        userRecord = await admin.auth().createUser({
+          email: authEmail,
+          password: initialPassword,
+          displayName: user.name || empId,
+          disabled: String(user.status || '').includes('موقوف') || String(user.status || '').includes('معطل')
+        });
+        console.log(`Created Firebase Auth user: ${empId} -> ${authEmail} (${userRecord.uid})`);
+      } else {
+        console.warn(`Error looking up "${key}" (${authEmail}): ${err.message}`);
+        continue;
+      }
+    }
+
+    try {
+      const claims = {
+        role: mappedRole,
+        headOrAdmin: HEAD_OR_ADMIN_ROLES.has(mappedRole),
+        empId: empId,
+        shift: String(user.shift || '').trim()
+      };
+      await admin.auth().setCustomUserClaims(userRecord.uid, claims);
+      await db.ref(`users/${key}`).update({
+        authUid: userRecord.uid,
+        authEmail: authEmail
+      });
+      provisioned += 1;
+      console.log(`Synced [${empId}] (${authEmail}) -> role=${mappedRole}`);
+    } catch (err) {
+      console.warn(`Failed syncing claims for "${key}": ${err.message}`);
+    }
+  }
+  console.log(`Provisioning complete: ${provisioned} user(s) synced with Firebase Auth & Custom Claims.`);
+}
+
 async function main() {
   const args = parseArgs(process.argv);
-  if (args.help || (!args.email && !args.uid && !args['sync-db'])) {
+  if (args.help || (!args.email && !args.uid && !args['sync-db'] && !args['provision-roster'])) {
     console.log([
       'Usage:',
       '  node firebase-auth/custom-claims-setup.js --email <email> --role <role> [--empId <empId>] [--shift <shift>]',
       '  node firebase-auth/custom-claims-setup.js --uid <uid> --role <role> [--empId <empId>]',
-      '  node firebase-auth/custom-claims-setup.js --sync-db'
+      '  node firebase-auth/custom-claims-setup.js --sync-db',
+      '  node firebase-auth/custom-claims-setup.js --provision-roster'
     ].join('\n'));
     return;
   }
 
   initFirebaseAdmin();
-  if (args['sync-db']) {
+  if (args['provision-roster']) {
+    await provisionRosterFromRTDB();
+  } else if (args['sync-db']) {
     await syncAllUsersFromRTDB();
   } else {
     await assignClaimsForUser({
@@ -154,5 +228,6 @@ module.exports = {
   ALLOWED_ROLES,
   HEAD_OR_ADMIN_ROLES,
   assignClaimsForUser,
-  syncAllUsersFromRTDB
+  syncAllUsersFromRTDB,
+  provisionRosterFromRTDB
 };

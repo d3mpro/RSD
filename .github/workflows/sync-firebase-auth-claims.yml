@@ -1,0 +1,29 @@
+name: Provision Firebase Auth & Custom Claims
+
+on:
+  workflow_dispatch:
+
+jobs:
+  provision_auth:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install firebase-admin
+        run: npm install --no-save firebase-admin
+
+      - name: Provision 22-user roster & sync Custom Claims
+        env:
+          FIREBASE_SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_RSD_KSU }}
+          FIREBASE_DATABASE_URL: https://rsd-ksu-default-rtdb.firebaseio.com
+        run: |
+          printf '%s' "$FIREBASE_SA_JSON" > /tmp/sa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
+          node firebase-auth/custom-claims-setup.js --provision-roster
+          rm -f /tmp/sa.json

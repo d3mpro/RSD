@@ -472,6 +472,18 @@
           <span class="material-symbols-outlined text-lg">login</span>
           <span>تسجيل الدخول للمنظومة</span>
         </button>
+
+        <!-- Password Reset via University Email -->
+        <div class="pt-1 text-center">
+          <button
+            type="button"
+            onclick="handlePasswordReset()"
+            class="inline-flex items-center gap-1.5 text-xs font-bold text-[#1E667F] hover:text-[#082B49] transition-colors cursor-pointer"
+          >
+            <span class="material-symbols-outlined text-sm">lock_reset</span>
+            <span>نسيت كلمة المرور؟ استعادة عبر البريد الإلكتروني</span>
+          </button>
+        </div>
       </form>
     </div>
 
@@ -681,6 +693,72 @@
             }
           }
 
+          // مصادقة Firebase الحقيقية (Email/Password + Custom Claims) مع ربط الرقم الوظيفي تلقائياً
+          if (typeof firebase !== 'undefined' && typeof firebase.auth === 'function') {
+            try {
+              const typedLower = username.trim().toLowerCase();
+              let resolvedAuthEmail = '';
+              if (typedLower.includes('@')) {
+                resolvedAuthEmail = typedLower;
+              } else if (user) {
+                const empAlias = String(user.empId || user.employeeId || user.username || '').trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '');
+                resolvedAuthEmail = (user.authEmail && user.authEmail.includes('@'))
+                  ? user.authEmail.trim().toLowerCase()
+                  : ((user.email && user.email.includes('@')) ? user.email.trim().toLowerCase() : (empAlias ? `${empAlias}@rsd-ksu.local` : ''));
+              } else {
+                const safeAlias = typedLower.replace(/[^a-z0-9._-]+/g, '');
+                if (safeAlias) resolvedAuthEmail = `${safeAlias}@rsd-ksu.local`;
+              }
+
+              if (resolvedAuthEmail) {
+                const cred = await firebase.auth().signInWithEmailAndPassword(resolvedAuthEmail, password);
+                if (cred && cred.user) {
+                  const tokenRes = await cred.user.getIdTokenResult(true).catch(() => null);
+                  const claims = (tokenRes && tokenRes.claims) ? tokenRes.claims : {};
+                  if (!user) {
+                    const allUsers = (window.KSUAuth && typeof window.KSUAuth.getUsers === 'function') ? window.KSUAuth.getUsers() : KSU_BOOTSTRAP_ACCOUNTS;
+                    user = allUsers.find(u =>
+                      (u.authUid && u.authUid === cred.user.uid) ||
+                      (u.authEmail && u.authEmail.toLowerCase() === resolvedAuthEmail) ||
+                      (u.email && u.email.toLowerCase() === resolvedAuthEmail) ||
+                      (claims.empId && String(u.empId || u.username || '').toLowerCase() === String(claims.empId).toLowerCase())
+                    ) || {
+                      id: cred.user.uid,
+                      name: cred.user.displayName || resolvedAuthEmail.split('@')[0],
+                      empId: claims.empId || resolvedAuthEmail.split('@')[0],
+                      username: claims.empId || resolvedAuthEmail.split('@')[0],
+                      email: resolvedAuthEmail,
+                      roleCategory: claims.role || 'field_inspector',
+                      role: claims.role === 'head' ? 'رئيس قسم السلامة' : (claims.role === 'admin' || claims.role === 'developer' ? 'مسؤول النظام' : 'مفتش سلامة ميداني'),
+                      portal: claims.role === 'head' ? 'head' : (claims.role === 'quality' ? 'quality' : (claims.role === 'admin' || claims.role === 'developer' ? 'admin' : 'field'))
+                    };
+                  }
+                  user = Object.assign({}, user, {
+                    authUid: cred.user.uid,
+                    authEmail: resolvedAuthEmail,
+                    firebaseAuthenticated: true
+                  });
+                }
+              }
+            } catch (fbAuthErr) {
+              const code = fbAuthErr && fbAuthErr.code ? fbAuthErr.code : '';
+              if (code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') {
+                // إذا كان الحساب مفعّلاً في Firebase Auth بكلمة مرور مختلفة، نرفض الدخول بكلمة مرور خاطئة
+                if (user && user.authUid) {
+                  user = null;
+                }
+              } else if (code === 'auth/user-disabled') {
+                user = null;
+                showLoginAlert('هذا الحساب موقوف حالياً. يرجى مراجعة رئيس القسم أو مسؤول النظام.', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined text-lg">login</span> <span>تسجيل الدخول للمنظومة</span>';
+                return;
+              } else {
+                console.warn('[Firebase Auth]', code || fbAuthErr.message);
+              }
+            }
+          }
+
           if (user) {
             if (window.KSUAuth && typeof window.KSUAuth.login === 'function') {
               window.KSUAuth.login(user);
@@ -709,6 +787,34 @@
           btn.innerHTML = '<span class="material-symbols-outlined text-lg">login</span> <span>تسجيل الدخول للمنظومة</span>';
         }
       }, 250);
+    }
+
+    async function handlePasswordReset() {
+      const usernameInput = document.getElementById('login-username');
+      const currentVal = usernameInput ? usernameInput.value.trim() : '';
+      const defaultEmail = currentVal.includes('@') ? currentVal : '';
+      const email = prompt('أدخل بريدك الإلكتروني الجامعي المسجّل في المنصة (مثال: name@ksu.edu.sa) لإرسال رابط استعادة كلمة المرور:', defaultEmail);
+      if (!email) return;
+      const cleanEmail = email.trim().toLowerCase();
+      if (!cleanEmail.includes('@') || cleanEmail.endsWith('.local')) {
+        showLoginAlert('يرجى إدخال بريد إلكتروني صحيح (مثل name@ksu.edu.sa) لاستلام رابط استعادة كلمة المرور.', 'error');
+        return;
+      }
+      if (typeof firebase === 'undefined' || typeof firebase.auth !== 'function') {
+        showLoginAlert('خدمة المصادقة السحابية قيد التهيئة، يرجى المحاولة بعد لحظات.', 'error');
+        return;
+      }
+      try {
+        await firebase.auth().sendPasswordResetEmail(cleanEmail);
+        showLoginAlert(`تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني (${cleanEmail}) بنجاح ✓`, 'success');
+      } catch (err) {
+        const code = err && err.code ? err.code : '';
+        if (code === 'auth/user-not-found') {
+          showLoginAlert('لم يتم العثور على حساب مرتبط بهذا البريد الإلكتروني. يرجى مراجعة رئيس القسم لربط بريدك الجامعي بحسابك.', 'error');
+        } else {
+          showLoginAlert('تعذر إرسال رابط الاستعادة حالياً: ' + (err.message || code), 'error');
+        }
+      }
     }
 
     function showLoginAlert(msg, type = 'error') {
