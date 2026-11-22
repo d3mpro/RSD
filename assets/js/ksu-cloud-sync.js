@@ -1372,17 +1372,9 @@ class KSUCloudSyncEngine {
   }
 
   openSyncModal() {
-    const modal = this.ensureArchiveModalInjected();
-    if (modal) {
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-      modal.style.display = 'flex';
-      this.updateUI();
-    }
-    const legacyModal = document.getElementById('ksu-cloud-sync-modal');
-    if (legacyModal && legacyModal !== modal) {
-      legacyModal.classList.add('hidden');
-    }
+    // تم استبدال نافذة الأرشفة اليدوية بالمزامنة التلقائية المباشرة إلى شيربوينت قسم السلامة
+    this.closeSyncModal();
+    return false;
   }
 
   closeSyncModal() {

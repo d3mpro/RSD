@@ -8489,7 +8489,11 @@ function saveMonthlySchedule() {
   notifyCloudSync();
 }
 function saveUsers() {
-  localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(state.users));
+  const serialized = JSON.stringify(state.users || []);
+  localStorage.setItem(STORAGE_KEY_USERS, serialized);
+  localStorage.setItem('ksumc_users_db', serialized);
+  localStorage.setItem('ksumc_users', serialized);
+  try { window.dispatchEvent(new CustomEvent('ksumc_users_updated', { detail: { users: state.users } })); } catch (_) {}
   renderAdminUsers();
   populateDynamicDropdowns();
   notifyCloudSync();
@@ -8499,7 +8503,7 @@ function saveUsers() {
   }
   if (!window._ksumcApplyingRemoteSync && window.ksuFirebaseSync && typeof window.ksuFirebaseSync.pushUsersToFirebase === 'function') {
     if (state.users && state.users.length > 0) {
-      window.ksuFirebaseSync.pushUsersToFirebase(state.users, 'admin_save_users');
+      window.ksuFirebaseSync.pushUsersToFirebase(state.users, 'head_or_admin_save_users');
     }
   }
 }
@@ -11950,8 +11954,11 @@ function deleteUser(id) {
     if (window.KSUOracleSync && typeof window.KSUOracleSync.deleteUser === 'function') {
       window.KSUOracleSync.deleteUser(id);
     }
+    if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.deleteUser === 'function') {
+      try { window.ksuFirebaseSync.deleteUser(id); } catch (_) {}
+    }
     saveUsers();
-    showToast('تم حذف المستخدم بنجاح.', 'info');
+    showToast('تم حذف المستخدم ومزامنة التحديث لحظياً.', 'info');
   }
 }
 

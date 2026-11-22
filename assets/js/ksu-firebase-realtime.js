@@ -1119,6 +1119,10 @@
             localStorage.setItem('ksumc_admin_users', serialized);
             if (window.state) window.state.users = users;
 
+            if (this.db && !this.isUpdatingFromRemote) {
+                const key = this.sanitizeFirebaseKey(userId);
+                this.db.ref('users/' + key).remove().catch(() => {});
+            }
             return this.pushUsersToFirebase(users, 'delete_user_' + userId);
         }
 

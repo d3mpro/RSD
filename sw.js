@@ -4,7 +4,7 @@
  */
 
 const isDemoHost = typeof self !== 'undefined' && self.location && self.location.hostname && self.location.hostname.includes('rsd-go-demo');
-const CACHE_NAME = isDemoHost ? 'rsd-go-demo-cache-v2.3.1' : 'rsd-ksu-cache-v3.1.1-sharepoint-fix';
+const CACHE_NAME = isDemoHost ? 'rsd-go-demo-cache-v2.3.2' : 'rsd-ksu-cache-v3.2.0-governance';
 const FIREBASE_NOTIFS_URL = isDemoHost
   ? 'https://rsd-go-demo-default-rtdb.firebaseio.com/notifications.json'
   : 'https://rsd-ksu-default-rtdb.firebaseio.com/notifications.json';
