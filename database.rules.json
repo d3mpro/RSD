@@ -4,186 +4,188 @@
     ".write": false,
 
     "users": {
-      ".read": true,
-      ".indexOn": ["username", "empId", "roleCategory", "shift", "status"],
+      ".read": "auth != null",
+      ".indexOn": ["username", "empId", "roleCategory", "shift", "status", "authUid"],
       "$userId": {
-        ".write": "newData.exists()",
-        ".validate": "(newData.hasChildren(['id', 'name']) || newData.hasChildren(['username'])) && !newData.hasChildren(['password']) && (!newData.hasChild('id') || (newData.child('id').isString() && newData.child('id').val().length < 100))"
+        ".write": "auth != null && newData.exists() && (auth.uid == $userId || auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer')",
+        ".validate": "(newData.hasChildren(['id', 'name']) || newData.hasChildren(['username'])) && !newData.hasChildren(['password']) && !newData.hasChildren(['passwordHash']) && (!newData.hasChild('id') || (newData.child('id').isString() && newData.child('id').val().length < 100))"
       }
     },
 
     "ksumc_users": {
-      ".read": true,
+      ".read": "auth != null",
       "$userId": {
-        ".write": "newData.exists()",
-        ".validate": "newData.hasChildren(['id']) && !newData.hasChildren(['password']) && newData.child('id').isString() && newData.child('id').val().length < 100"
+        ".write": "auth != null && newData.exists() && (auth.uid == $userId || auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer')",
+        ".validate": "newData.hasChildren(['id']) && !newData.hasChildren(['password']) && !newData.hasChildren(['passwordHash']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },
 
     "rounds": {
-      ".read": true,
-      ".indexOn": ["timestamp", "inspectorName", "facility", "building", "checklistType", "status"],
+      ".read": "auth != null",
+      ".indexOn": ["timestamp", "inspectorName", "facility", "building", "checklistType", "status", "createdByUid"],
       "$roundId": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists()",
         ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },
 
     "shift_inspection_logs": {
-      ".read": true,
+      ".read": "auth != null",
       ".indexOn": ["timestamp", "date", "shift", "supervisor"],
       "$logId": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists()",
         ".validate": "newData.hasChildren(['id', 'timestamp', 'date', 'shift']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },
 
     "safety_dept_reports": {
-      ".read": true,
+      ".read": "auth != null",
       ".indexOn": ["timestamp", "date", "facility", "shift"],
       "$reportId": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists()",
         ".validate": "newData.hasChildren(['id', 'timestamp', 'date', 'shift']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },
 
     "compliance_registry": {
-      ".read": true,
+      ".read": "auth != null",
       ".indexOn": ["standard", "status", "category"],
       "$recordId": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists() && (auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer' || auth.token.role == 'quality')",
         ".validate": "newData.hasChildren(['id', 'standard', 'status']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },
 
     "doors": {
-      ".read": true,
+      ".read": "auth != null",
       ".indexOn": ["timestamp", "doorId", "status", "building"],
       "$doorId": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists()",
         ".validate": "newData.hasChildren(['id']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },
 
     "permits": {
-      ".read": true,
+      ".read": "auth != null",
       ".indexOn": ["timestamp", "permitType", "status", "building"],
       "$permitId": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists()",
         ".validate": "newData.hasChildren(['id']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },
 
     "alarms": {
-      ".read": true,
+      ".read": "auth != null",
       ".indexOn": ["timestamp", "alarmCode", "status", "building"],
       "$alarmId": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists()",
         ".validate": "newData.hasChildren(['id']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },
 
     "shift_incidents": {
-      ".read": true,
+      ".read": "auth != null",
       ".indexOn": ["timestamp", "severity", "status", "location"],
       "$incidentId": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists()",
         ".validate": "newData.hasChildren(['id', 'timestamp', 'severity']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },
 
     "incidents": {
-      ".read": true,
+      ".read": "auth != null",
       ".indexOn": ["timestamp", "severity", "status"],
       "$incidentId": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists()",
         ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },
 
     "safety_violations": {
-      ".read": true,
+      ".read": "auth != null && ((auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer' || auth.token.role == 'executive' || auth.token.role == 'quality') || (query.orderByChild == 'createdByUid' && query.equalTo == auth.uid))",
       ".indexOn": ["timestamp", "severity", "status", "building", "createdByUid", "createdByEmpId", "archived", "shift"],
       "$violId": {
-        ".write": "newData.exists()",
+        ".read": "auth != null && ((auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer' || auth.token.role == 'executive' || auth.token.role == 'quality') || (data.exists() && data.child('createdByUid').val() == auth.uid && data.child('archived').val() != true))",
+        ".write": "auth != null && newData.exists() && ((auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer' || auth.token.role == 'executive') || (!data.exists() && newData.child('createdByUid').val() == auth.uid && newData.child('archived').val() != true && newData.child('isArchived').val() != true) || (data.exists() && data.child('createdByUid').val() == auth.uid && data.child('archived').val() != true && newData.child('archived').val() != true && newData.child('isArchived').val() != true && newData.child('createdByUid').val() == data.child('createdByUid').val()))",
         ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100 && (!newData.child('status').exists() || newData.child('status').val() != 'deleted')"
       }
     },
 
     "smoking_violations": {
-      ".read": true,
+      ".read": "auth != null && ((auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer' || auth.token.role == 'executive' || auth.token.role == 'quality') || (query.orderByChild == 'createdByUid' && query.equalTo == auth.uid))",
       ".indexOn": ["timestamp", "status", "building", "createdByUid", "createdByEmpId", "archived", "shift"],
       "$violId": {
-        ".write": "newData.exists()",
+        ".read": "auth != null && ((auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer' || auth.token.role == 'executive' || auth.token.role == 'quality') || (data.exists() && data.child('createdByUid').val() == auth.uid && data.child('archived').val() != true))",
+        ".write": "auth != null && newData.exists() && ((auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer' || auth.token.role == 'executive') || (!data.exists() && newData.child('createdByUid').val() == auth.uid && newData.child('archived').val() != true && newData.child('isArchived').val() != true) || (data.exists() && data.child('createdByUid').val() == auth.uid && data.child('archived').val() != true && newData.child('archived').val() != true && newData.child('isArchived').val() != true && newData.child('createdByUid').val() == data.child('createdByUid').val()))",
         ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100 && (!newData.child('status').exists() || newData.child('status').val() != 'deleted')"
       }
     },
 
     "audit_logs": {
-      ".read": true,
+      ".read": "auth != null && (auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer' || auth.token.role == 'executive')",
       ".indexOn": ["timestamp", "action", "actorEmpId", "actorRole"],
       "$logId": {
-        ".write": "newData.exists() && !data.exists()",
+        ".write": "auth != null && newData.exists() && !data.exists()",
         ".validate": "newData.hasChildren(['id', 'action', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },
 
     "department_targets": {
-      ".read": true,
-      ".write": "newData.exists()"
+      ".read": "auth != null",
+      ".write": "auth != null && newData.exists() && (auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer')"
     },
 
     "capa_records": {
-      ".read": true,
+      ".read": "auth != null",
       ".indexOn": ["timestamp", "dueDate", "status", "severity", "building"],
       "$capaId": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists()",
         ".validate": "newData.hasChildren(['id', 'timestamp']) && newData.child('id').isString() && newData.child('id').val().length < 100"
       }
     },
 
     "notifications": {
-      ".read": true,
+      ".read": "auth != null",
       ".indexOn": ["timestamp", "priority", "targetRole"],
       "$notifId": {
-        ".write": true,
-        ".validate": "newData.hasChildren(['id']) && (newData.hasChild('timestamp') || newData.hasChild('createdAt') || newData.hasChild('date')) || !newData.exists()"
+        ".write": "auth != null && newData.exists()",
+        ".validate": "newData.hasChildren(['id']) && (newData.hasChild('timestamp') || newData.hasChild('createdAt') || newData.hasChild('date'))"
       }
     },
 
     "ai_queue": {
-      ".read": true,
+      ".read": "auth != null",
       ".indexOn": ["status", "createdAt", "action"],
       "$taskId": {
-        ".write": true,
-        ".validate": "newData.hasChildren(['status', 'createdAt']) || !newData.exists()"
+        ".write": "auth != null && newData.exists()",
+        ".validate": "newData.hasChildren(['status', 'createdAt'])"
       }
     },
 
     "system_status": {
-      ".read": true,
+      ".read": "auth != null",
       ".write": false,
       "lastUpdate": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists()",
         ".validate": "newData.hasChildren(['timestamp'])"
       },
       "shiftLogResetAt": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists() && (auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer' || auth.token.role == 'quality')",
         ".validate": "newData.hasChildren(['timestamp'])"
       },
       "prodCleanVersion": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists() && (auth.token.role == 'admin' || auth.token.role == 'developer')",
         ".validate": "newData.isString() && newData.val().length < 100"
       },
       "systemMode": {
-        ".write": "newData.exists()",
+        ".write": "auth != null && newData.exists() && (auth.token.role == 'admin' || auth.token.role == 'developer')",
         ".validate": "newData.isString() && newData.val().length < 50"
       }
     },
 
     "system_config": {
-      ".read": true,
-      ".write": "newData.exists()"
+      ".read": "auth != null && (auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer')",
+      ".write": "auth != null && newData.exists() && (auth.token.role == 'admin' || auth.token.role == 'developer')"
     }
   }
 }

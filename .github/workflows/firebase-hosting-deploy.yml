@@ -20,3 +20,12 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_RSD_KSU }}
           channelId: live
           projectId: rsd-ksu
+
+      - name: Deploy Firebase Realtime Database Security Rules (rsd-ksu)
+        env:
+          FIREBASE_SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_RSD_KSU }}
+        run: |
+          printf '%s' "$FIREBASE_SA_JSON" > /tmp/sa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json
+          npx --yes firebase-tools@latest deploy --only database --project rsd-ksu --non-interactive
+          rm -f /tmp/sa.json
