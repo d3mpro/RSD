@@ -131,6 +131,7 @@ async function provisionRosterFromRTDB() {
     : Object.entries(usersVal);
 
   let provisioned = 0;
+  const usedEmails = new Set();
   for (const [key, user] of entries) {
     if (!user || typeof user !== 'object') continue;
     const empId = String(user.empId || user.employeeId || user.username || key || '').trim();
@@ -141,15 +142,13 @@ async function provisionRosterFromRTDB() {
 
     const rawEmail = String(user.email || '').trim().toLowerCase();
     const safeEmpAlias = empId.toLowerCase().replace(/[^a-z0-9._-]+/g, '') || key.toLowerCase().replace(/[^a-z0-9._-]+/g, '');
-    const authEmail = (rawEmail && rawEmail.includes('@')) ? rawEmail : `${safeEmpAlias}@rsd-ksu.local`;
+    const candidateEmail = (rawEmail && rawEmail.includes('@')) ? rawEmail : `${safeEmpAlias}@rsd-ksu.local`;
+    const authEmail = usedEmails.has(candidateEmail) ? `${safeEmpAlias}@rsd-ksu.local` : candidateEmail;
+    usedEmails.add(authEmail);
 
     let userRecord = null;
     try {
-      if (user.authUid) {
-        userRecord = await admin.auth().getUser(user.authUid);
-      } else {
-        userRecord = await admin.auth().getUserByEmail(authEmail);
-      }
+      userRecord = await admin.auth().getUserByEmail(authEmail);
     } catch (err) {
       if (err && err.code === 'auth/user-not-found') {
         const isDev = mappedRole === 'developer' || empId.toLowerCase() === 'dev' || user.id === 'USR-01';
