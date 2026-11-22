@@ -1847,7 +1847,10 @@
         if (type === 'inspection' && typeof window !== 'undefined' && typeof window.generateOfficialInspectionCardHtml === 'function') {
           try {
             innerReportHtml = window.generateOfficialInspectionCardHtml(record)
-              .replace(/src=["'](?:\.\/)?assets\//g, `src="${baseUrl}/assets/`);
+              .replace(/src=["'](?:\.\/)?assets\//g, `src="${baseUrl}/assets/`)
+              .replace(/\sonerror="[^"]*"/gi, '')
+              .replace(/\sonerror='[^']*'/gi, '')
+              .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
           } catch (_) {
             innerReportHtml = '';
           }
@@ -1887,8 +1890,8 @@
   <style>
     @page { size: A4 portrait; margin: 8mm 6mm; }
     body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; margin: 0; padding: 16px; background: #f1f5f9; direction: rtl; color: #0f172a; }
-    .rsd-archive-toolbar { max-width: 790px; margin: 0 auto 12px; display: flex; align-items: center; justify-content: space-between; background: #0f172a; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; }
-    .rsd-archive-btn { background: #004B87; color: #fff; border: 0; padding: 8px 16px; border-radius: 8px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .rsd-archive-toolbar { max-width: 790px; margin: 0 auto 12px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; background: #0f172a; color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; }
+    .rsd-archive-btn { background: #004B87; color: #fff; border: 0; padding: 8px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-family: inherit; text-decoration: none; display: inline-block; font-size: 12px; }
     .rsd-archive-btn:hover { background: #0369a1; }
     @media print {
       body { background: #fff; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -1899,7 +1902,9 @@
 <body>
   <div class="rsd-archive-toolbar no-print">
     <span>أرشيف قسم السلامة — منصة رصد (KSUMC) | ${escHtml(recordKey)}</span>
-    <button class="rsd-archive-btn" onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <a class="rsd-archive-btn" href="${escHtml(reportUrl)}" target="_blank" rel="noopener noreferrer">🖨️ فتح للطباعة / PDF</a>
+    </div>
   </div>
   ${innerReportHtml}
 </body>
