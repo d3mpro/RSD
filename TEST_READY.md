@@ -11,7 +11,7 @@
 ---
 
 ## 1. Executive Summary
-The comprehensive End-to-End Production Readiness test suite has been implemented and verified. All 22 production features, the 22-account official roster (`accounts-credentials-a4.html`), short username authentication (`M1`..`M14`, `S1`..`S3`, `H1`, `H2`, `D1`, `Q1`, `DEV`), shift isolation policies, multi-stage approval workflows, and emergency code broadcasts have been independently tested and verified.
+The comprehensive End-to-End Production Readiness test suite has been implemented and verified. All 22 production features, the 22-account official roster (`KSUAuth`), short username authentication (`M1`..`M14`, `S1`..`S3`, `H1`, `H2`, `D1`, `Q1`, `DEV`), shift isolation policies, multi-stage approval workflows, and emergency code broadcasts have been independently tested and verified.
 
 ---
 
@@ -24,7 +24,7 @@ node --test tests/e2e_production_readiness.test.js
 
 ### Verbatim Output
 ```text
-✔ Tier 1.1: Official Credentials Document (accounts-credentials-a4.html) Integrity (2.974105ms)
+✔ Tier 1.1: Official Roster Integrity (KSUAuth 22 Accounts) & Plaintext A4 Roster Removed
 ✔ Tier 1.2: Short Username Authentication for all 14 Field Inspectors (M1..M14) (6.036757ms)
 ✔ Tier 1.3: Short Username Authentication for all 3 Field Shift Supervisors (S1..S3) (2.336849ms)
 ✔ Tier 1.4: Short Username Authentication for Leadership, Supervision & Quality (H1, H2, D1, Q1, DEV) (2.320109ms)
@@ -72,16 +72,15 @@ node --test tests/e2e_production_readiness.test.js
 
 | # | Feature Inventory Item (`PROJECT.md`) | Verified In | Verification Result |
 |---|---------------------------------------|-------------|---------------------|
-| 1 | Official Accounts & Roster Restoration (`accounts-credentials-a4.html`) | Tier 1.1 | Document code `KSUMC-RSD-ACT-01`, 22 accounts, PIN `123456` verified |
+| 1 | Official Accounts & Roster Restoration (`KSUAuth`) | Tier 1.1 | 22 canonical accounts verified; plaintext A4 & system-mode removed |
 | 2 | Short Username Authentication (`M1`..`M14`, `S1`..`S3`, `H1`, `H2`, `D1`, `Q1`, `DEV`) | Tier 1.2, 1.3, 1.4 | All 22 accounts authenticate with unified PIN `123456` |
 | 3 | Bootstrap & App State Roster Sync (`index.html`, `app.js`) | Tier 1.8 | `OFFICIAL_ROSTER_VERSION = '2026.11.10_PRODUCTION_ROSTER_V8'` verified |
-| 4 | Quick Persona Official Binding (`ksu-system-mode.js`) | Tier 1.8 | Personas bind real names (`أ. عادل الشلوي`, `أ. ناصر القحطاني`, etc.) |
-| 5 | Firebase Passwordless Cloud Sync | Tier 2.3 | `database.rules.json` & client-side password stripping verified |
-| 6 | Inspector & Supervisor Session Auto-Binding (`field.html`) | Tier 1.9 | Header badges and form auto-binding elements confirmed |
-| 7 | Firebase Hosting Security Hardening (`firebase.json`) | Tier 1.7 | `tests/**`, `docs/**`, `*.md`, `.agents/**` ignored in hosting |
-| 8 | Clean Route Rewrites (`firebase.json`) | Tier 1.7 | Rewrites for `/report`, `/sharek`, `/accounts` verified |
-| 9 | Unix Deployment Script Parity (`deploy-to-firebase.sh`) | Tier 1.7 | Executable POSIX script verified |
-| 10 | PWA Cache Invalidation Release Bump (`sw.js`) | Tier 1.7 | `CACHE_NAME = 'rsd-ksu-cache-v3.0.0-prod-launch'` verified |
+| 4 | Firebase Passwordless Cloud Sync | Tier 2.3 | `database.rules.json` & client-side password stripping verified |
+| 5 | Inspector & Supervisor Session Auto-Binding (`field.html`) | Tier 1.9 | Header badges and form auto-binding elements confirmed |
+| 6 | Firebase Hosting Security Hardening (`firebase.json`) | Tier 1.7 | `tests/**`, `docs/**`, `*.md`, `.agents/**` ignored in hosting |
+| 7 | Production Hosting Rewrites (`firebase.json`) | Tier 1.7 | Active portal rewrites verified; canceled `/report`, `/sharek`, `/accounts` removed |
+| 8 | Unix Deployment Script Parity (`deploy-to-firebase.sh`) | Tier 1.7 | Executable POSIX script verified |
+| 9 | PWA Cache Invalidation Release Bump (`sw.js`) | Tier 1.7 | `CACHE_NAME = 'rsd-ksu-cache-v3.2.0-governance'` verified |
 | 11 | Production Environment Domain Auto-Switch | Tier 1.10 | Target `https://rsd-ksu-default-rtdb.firebaseio.com` verified |
 | 12 | 14 CBAHI/NFPA Inspection Checklists | Tier 1.6 | All 14 inspection modal triggers and specifications verified |
 | 13 | Emergency Hospital Codes Broadcast | Tier 4.2 | Code Red and elevator entrapment payloads and lifecycles verified |

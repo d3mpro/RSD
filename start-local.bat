@@ -12,7 +12,6 @@ if %ERRORLEVEL% equ 0 (
     echo [OK] تم العثور على Node.js. جاري تشغيل الخادم المحلي...
     echo.
     echo * بوابة النظام الرئيسية:   http://localhost:8080/
-    echo * صفحة ملف شارك 7:         http://localhost:8080/sharek
     echo.
     start http://localhost:8080
     node server.js

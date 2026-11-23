@@ -79,13 +79,13 @@
      * Execute the clean slate reset
      */
     executeReset() {
-      const pass = prompt('🔒 يرجى إدخال الرقم السري المعتمد لتأكيد التصفير وتفعيل النسخة الحقيقية:');
-      if (pass === null) return false;
-      const isValid = (window.KSUSystemMode && typeof window.KSUSystemMode.verifyPassword === 'function')
-        ? window.KSUSystemMode.verifyPassword(pass)
-        : (pass.trim() === 'Kk@122566##' || pass.trim().toLowerCase() === 'kk@122566##');
-      if (!isValid) {
-        alert('❌ الرقم السري غير صحيح. تم إلغاء العملية.');
+      const currentUser = (window.KSUAuth && typeof window.KSUAuth.getUser === 'function') ? window.KSUAuth.getUser() : null;
+      const roleCat = (window.KSUAuth && typeof window.KSUAuth.getRoleCategory === 'function')
+        ? window.KSUAuth.getRoleCategory(currentUser)
+        : (currentUser?.roleCategory || currentUser?.role || '');
+      const isAuthorized = Boolean(currentUser && (roleCat === 'developer' || roleCat === 'admin' || currentUser.role === 'developer' || currentUser.role === 'admin'));
+      if (!isAuthorized) {
+        alert('❌ هذه العملية مقصورة على حساب المطور أو مسؤول النظام فقط.');
         return false;
       }
       const inp = document.getElementById('inp-confirm-production-reset');
@@ -133,9 +133,6 @@
         localStorage.setItem('ksumc_sample_data_version', 'v6.0-clean-pilot-launch-2026');
         localStorage.setItem('ksu_production_launch_initialized', new Date().toISOString());
         localStorage.setItem('ksumc_system_mode', 'production');
-        if (window.KSUSystemMode && typeof window.KSUSystemMode.setMode === 'function') {
-          window.KSUSystemMode.setMode('production');
-        }
 
         // Call backend reset
         fetch('/safety/api/admin/reset-operational-data', { method: 'POST' }).catch(() => {});

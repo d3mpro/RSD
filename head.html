@@ -98,7 +98,6 @@
   <script src="assets/js/auth-guard.js?v=5.8"></script>
   <script src="assets/js/ksumc-data-bridge.js?v=6.3.1"></script>
   <script src="assets/js/ksu-firebase-realtime.js?v=6.9.1"></script>
-  <script src="assets/js/ksu-system-mode.js?v=1.2"></script>
   <script src="assets/js/ksu-nav-component.js?v=5.15"></script>
   <script src="assets/js/vision-reticle-helper.js"></script>
   <script src="assets/js/ksu-ai-client.js?v=7.3.1"></script>
@@ -830,106 +829,6 @@
     <!-- TAB 4: MASTER ARCHIVE & LOGS (الأرشيف والسجل المرجعي الشامل)               -->
     <!-- ========================================================================= -->
     <div id="head-tab-archive" class="head-portal-tab-pane space-y-6 hidden">
-      <!-- ========================================================================= -->
-    <!-- 6. COMPREHENSIVE ROUNDS LOG FOR ALL SHIFTS (سجل الجولات التفتيشية الشامل)  -->
-    <!-- (تم إخفاء هذا السجل والاكتفاء بالأرشيف والسجل المرجعي الشامل أدناه)       -->
-    <!-- ========================================================================= -->
-    <section id="comprehensiveRoundsLogSection" class="hidden" style="display: none !important;" aria-hidden="true">
-      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-        <div class="flex items-center gap-3">
-          <div class="w-11 h-11 rounded-2xl bg-[#082B49] text-amber-400 flex items-center justify-center shadow-sm shrink-0">
-            <span class="material-symbols-outlined text-2xl">checklist_rtl</span>
-          </div>
-          <div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <h3 class="text-base sm:text-lg font-black text-[#082B49]">سجل الجولات التفتيشية الشامل (كافة الورديات والمرافق)</h3>
-              <span id="full-rounds-total-badge" class="px-3 py-0.5 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-xs font-black">0 جولة مسجلة</span>
-            </div>
-            <p class="text-xs text-slate-500 mt-0.5">معاينة تفاصيل الجولات الميدانية، طباعة التقارير الرسمية، وتوجيه واعتماد المخرجات من كافة الورديات الثلاث</p>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2 flex-wrap">
-          <button onclick="updateDashboardData()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center gap-1 transition-all">
-            <span class="material-symbols-outlined text-sm">refresh</span>
-            <span>تحديث السجل</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Filters & Search Toolbar -->
-      <div class="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-3">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          
-          <!-- Shift Filters (جميع الورديات) -->
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="text-xs font-black text-slate-700 ml-1">الوردية:</span>
-            <button onclick="switchRoundShiftFilter('all')" id="btn-round-shift-all" class="px-3 py-1.5 rounded-xl font-black text-xs bg-[#082B49] text-white shadow-xs transition-all">
-              كافة الورديات
-            </button>
-            <button onclick="switchRoundShiftFilter('1')" id="btn-round-shift-1" class="px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 transition-all flex items-center gap-1">
-              <span>☀️</span><span>الوردية 1 (صباحي)</span>
-            </button>
-            <button onclick="switchRoundShiftFilter('2')" id="btn-round-shift-2" class="px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 transition-all flex items-center gap-1">
-              <span>🌤️</span><span>الوردية 2 (مسائي)</span>
-            </button>
-            <button onclick="switchRoundShiftFilter('3')" id="btn-round-shift-3" class="px-3 py-1.5 rounded-xl font-bold text-xs bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 transition-all flex items-center gap-1">
-              <span>🌙</span><span>الوردية 3 (ليلي)</span>
-            </button>
-          </div>
-
-          <!-- Time Range Filter -->
-          <div class="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200">
-            <button onclick="switchRoundTimeFilter('all')" id="btn-round-time-all" class="px-3 py-1 rounded-lg text-xs font-black bg-[#082B49] text-white shadow-2xs">كافة التواريخ</button>
-            <button onclick="switchRoundTimeFilter('today')" id="btn-round-time-today" class="px-3 py-1 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100">اليوم فقط</button>
-          </div>
-
-        </div>
-
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2 border-t border-slate-200/60">
-          
-          <!-- Status Filters -->
-          <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="text-xs font-black text-slate-700 ml-1">حالة الجولة:</span>
-            <button onclick="switchRoundStatusFilter('all')" id="btn-round-status-all" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#004B87] text-white shadow-2xs">الكل</button>
-            <button onclick="switchRoundStatusFilter('completed')" id="btn-round-status-comp" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-100">مكتملة</button>
-            <button onclick="switchRoundStatusFilter('approved')" id="btn-round-status-approved" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-100">معتمدة رسمياً</button>
-            <button onclick="switchRoundStatusFilter('forwarded')" id="btn-round-status-forwarded" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-100">بانتظار الاعتماد</button>
-            <button onclick="switchRoundStatusFilter('inProgress')" id="btn-round-status-inprog" class="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-100">قيد التنفيذ</button>
-          </div>
-
-          <!-- Live Search Bar -->
-          <div class="relative w-full md:w-80">
-            <span class="material-symbols-outlined absolute right-3 top-2.5 text-slate-400 text-base">search</span>
-            <input type="text" oninput="filterRoundsSearch(this.value)" placeholder="بحث برقم الجولة، المفتش، المبنى، النموذج..." class="w-full pr-9 pl-3 py-2 rounded-xl bg-white border border-slate-200 text-xs font-semibold focus:ring-2 focus:ring-primary focus:outline-none" />
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Main Table Container -->
-      <div class="overflow-x-auto rounded-2xl border border-slate-200">
-        <table class="w-full text-right text-xs">
-          <thead class="bg-slate-50 text-slate-600 font-black border-b border-slate-200">
-            <tr>
-              <th class="p-3">رقم الجولة والتوقيت</th>
-              <th class="p-3">الوردية</th>
-              <th class="p-3">الموقع الميداني</th>
-              <th class="p-3">نموذج التفتيش المعتمد</th>
-              <th class="p-3">مفتش السلامة</th>
-              <th class="p-3 text-center">الامتثال والمطابقة</th>
-              <th class="p-3 text-center">حالة الاعتماد</th>
-              <th class="p-3 text-center">الإجراءات المتاحة</th>
-            </tr>
-          </thead>
-          <tbody id="full-rounds-table-body" class="divide-y divide-slate-100 font-semibold text-slate-800 bg-white">
-            <!-- Dynamically populated via renderFullRoundsLog() -->
-          </tbody>
-        </table>
-      </div>
-
-    </section>
-
       <!-- ========================================================================= -->
     <!-- 6.5. COMPREHENSIVE REFERENCE ARCHIVE (الأرشيف والسجل المرجعي الشامل)        -->
     <!-- (أرشيف دائم للجولات، التقارير، المخالفات، والتصاريح مع الطباعة والبريد)     -->
@@ -2550,14 +2449,6 @@
           document.body.classList.remove('printing-single-round');
         }, 800);
       }, 200);
-    }
-
-    function renderTasks(tasks) {
-      renderFullRoundsLog();
-    }
-
-    function switchTaskFilter(filter) {
-      renderFullRoundsLog();
     }
 
     function renderShiftsTargetCards(todayRounds, targets) {

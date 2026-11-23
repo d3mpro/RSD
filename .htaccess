@@ -23,7 +23,6 @@ AddDefaultCharset UTF-8
     # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
     # Clean URLs matching Cloud Hosting (e.g., /field -> field.html)
-    RewriteRule ^sharek/?$ sharek-pitch.html [L]
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME}\.html -f
     RewriteRule ^([a-zA-Z0-9_-]+)/?$ $1.html [L]

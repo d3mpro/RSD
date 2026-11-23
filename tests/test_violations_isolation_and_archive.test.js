@@ -7,7 +7,6 @@ const vm = require('node:vm');
 const repoRoot = path.resolve(__dirname, '..');
 const bridgeCode = fs.readFileSync(path.join(repoRoot, 'assets/js/ksumc-data-bridge.js'), 'utf-8');
 const aiClientCode = fs.readFileSync(path.join(repoRoot, 'assets/js/ksu-ai-client.js'), 'utf-8');
-const shareServiceCode = fs.readFileSync(path.join(repoRoot, 'assets/js/ksu-share-service.js'), 'utf-8');
 const masterArchiveCode = fs.readFileSync(path.join(repoRoot, 'assets/js/ksu-master-archive.js'), 'utf-8');
 const firebaseRealtimeCode = fs.readFileSync(path.join(repoRoot, 'assets/js/ksu-firebase-realtime.js'), 'utf-8');
 const appJsCode = fs.readFileSync(path.join(repoRoot, 'assets/js/app.js'), 'utf-8');
@@ -625,40 +624,6 @@ test('Suite 1: KSUDataBridge isolates violations per role, enforces head/admin-o
 });
 
 // =========================================================================
-// Suite 2: Share Service IDOR Blocking & No Mock Fallback
-// =========================================================================
-test('Suite 2: KSUShareService blocks cross-inspector violation lookup and never fabricates mock violations', () => {
-  const sample = sampleViolations();
-  const ctx = createSandbox(USERS.inspectorA, {
-    ksumc_safety_violations: sample.safety,
-    ksumc_smoking_violations: sample.smoking
-  });
-  vm.runInContext(bridgeCode, ctx);
-  vm.runInContext(shareServiceCode, ctx);
-
-  // Inspector A cannot fetch Inspector B's violation by ID or by object
-  assert.equal(ctx.KSUShareService.fetchRecord('safety_violation', 'SV-OWN-B1'), null);
-  assert.equal(ctx.KSUShareService.fetchRecord('smoking_violation', 'SMK-OWN-B1'), null);
-  assert.equal(ctx.KSUShareService.fetchRecord('safety_violation', sample.safety[1]), null);
-
-  // Inspector A cannot fetch non-existent violation (no mock fallback fabricated)
-  assert.equal(ctx.KSUShareService.fetchRecord('safety_violation', 'SV-DOES-NOT-EXIST'), null);
-  assert.equal(ctx.KSUShareService.fetchRecord('smoking_violation', 'SMK-DOES-NOT-EXIST'), null);
-
-  // Inspector A cannot fetch own archived violation; CAN fetch own active violation
-  assert.equal(ctx.KSUShareService.fetchRecord('safety_violation', 'SV-ARCH-A1'), null);
-  const ownActive = ctx.KSUShareService.fetchRecord('safety_violation', 'SV-OWN-A1');
-  assert.ok(ownActive);
-  assert.equal(ownActive.id, 'SV-OWN-A1');
-
-  // Head CAN fetch archived violations
-  ctx.localStorage.setItem('ksu_active_user', JSON.stringify(USERS.head));
-  const headArch = ctx.KSUShareService.fetchRecord('safety_violation', 'SV-ARCH-A1');
-  assert.ok(headArch);
-  assert.equal(headArch.id, 'SV-ARCH-A1');
-});
-
-// =========================================================================
 // Suite 3: AI Client Ownership Stamping & Field HTML Officer Lock
 // =========================================================================
 test('Suite 3: ksu-ai-client stamps active user ownership without hardcoded officer ID, and field.html locks officer fields', async () => {
@@ -1121,17 +1086,14 @@ test('Suite 7: quality.html hides archived violations and ksu-firebase-realtime 
 });
 
 // =========================================================================
-// Suite 8: Firebase RTDB Rules (Compat + Strict) & Custom Claims Tool
+// Suite 8: Firebase RTDB Rules & Custom Claims Tool
 // =========================================================================
-test('Suite 8: database.rules.json, database.rules.strict.json, and custom-claims-setup.js enforce valid security invariants', () => {
+test('Suite 8: database.rules.json and custom-claims-setup.js enforce valid security invariants', () => {
   const compatRaw = fs.readFileSync(path.join(repoRoot, 'database.rules.json'), 'utf-8');
-  const strictRaw = fs.readFileSync(path.join(repoRoot, 'database.rules.strict.json'), 'utf-8');
 
   // Valid JSON & no JS === or !== inside Firebase RTDB rule strings
-  assert.equal(/===|!==/.test(compatRaw), false, 'database.rules.json must use == / != not === / !==')
-  assert.equal(/===|!==/.test(strictRaw), false, 'database.rules.strict.json must use == / != not === / !==');
+  assert.equal(/===|!==/.test(compatRaw), false, 'database.rules.json must use == / != not === / !==');
   const compatRules = JSON.parse(compatRaw).rules;
-  const strictRules = JSON.parse(strictRaw).rules;
 
   // Root lockdown & password strip compat
   assert.equal(compatRules['.read'], false);
@@ -1142,13 +1104,11 @@ test('Suite 8: database.rules.json, database.rules.strict.json, and custom-claim
   // Violations reject status == 'deleted' and audit_logs is append-only
   for (const node of ['safety_violations', 'smoking_violations']) {
     assert.equal(compatRules[node].$violId['.validate'].includes("status').val() != 'deleted'"), true);
-    assert.equal(strictRules[node].$violId['.validate'].includes("status').val() != 'deleted'"), true);
-    assert.equal(strictRules[node]['.read'].includes('auth != null'), true);
-    assert.equal(strictRules[node].$violId['.write'].includes("auth.token.role == 'head'"), true);
+    assert.equal(compatRules[node]['.read'].includes('auth != null'), true);
+    assert.equal(compatRules[node].$violId['.write'].includes("auth.token.role == 'head'"), true);
   }
   assert.equal(compatRules.audit_logs.$logId['.write'].includes('!data.exists()'), true);
-  assert.equal(strictRules.audit_logs.$logId['.write'].includes('!data.exists()'), true);
-  assert.equal(strictRules.audit_logs['.read'].includes("auth.token.role == 'head'"), true);
+  assert.equal(compatRules.audit_logs['.read'].includes("auth.token.role == 'head'"), true);
 
   // Custom claims setup syntax & roles
   const claimsSrc = fs.readFileSync(path.join(repoRoot, 'firebase-auth/custom-claims-setup.js'), 'utf-8');

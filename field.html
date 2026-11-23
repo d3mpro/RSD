@@ -100,7 +100,6 @@
   <script src="assets/js/auth-guard.js?v=4.8.2"></script>
   <script src="assets/js/ksumc-data-bridge.js?v=6.3.1"></script>
   <script src="assets/js/ksu-firebase-realtime.js?v=6.9.1"></script>
-  <script src="assets/js/ksu-system-mode.js?v=1.2"></script>
   <script src="assets/js/ksu-nav-component.js?v=5.15"></script>
   <script>
     KSUAuth.protect('field');
@@ -176,10 +175,10 @@
           <!-- مؤشر حالة الاتصال والمزامنة اللحظية -->
           <div class="my-2.5 px-3 py-2 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-between text-[10px]" style="background-color: #f1f5f9 !important;">
             <span class="flex items-center gap-1.5 text-slate-700 font-bold">
-              <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-ping"></span>
+              <span id="field-cloud-status-dot" class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-ping"></span>
               <span>الربط اللحظي السحابي</span>
             </span>
-            <span class="text-emerald-700 font-black text-[9.5px] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-300">نشط ⚡</span>
+            <span id="field-cloud-status-pill" class="text-emerald-700 font-black text-[9.5px] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-300">نشط ⚡</span>
           </div>
 
           <!-- روابط سريعة للمفتش -->
@@ -290,7 +289,23 @@
 
     <!-- VIEW 1: HOME DASHBOARD & BENTO ACTIONS -->
     <div id="view-home" class="field-view space-y-4">
-      
+
+      <!-- Demo Sandbox Mode Banner (Shown only for demo/demo account) -->
+      <div id="demo-sandbox-banner" class="hidden rounded-2xl bg-amber-50 border-2 border-amber-400 text-slate-900 p-3.5 sm:p-4 shadow-sm flex items-start gap-3">
+        <div class="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 mt-0.5">
+          <span class="material-symbols-outlined text-xl">science</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 flex-wrap mb-1">
+            <span class="px-2 py-0.5 rounded-md bg-slate-900 text-amber-300 font-black text-[10px] tracking-wide">DEMO SANDBOX</span>
+            <span class="text-xs font-black text-amber-950">بيئة تدريب وتجربة معزولة</span>
+          </div>
+          <p class="text-xs sm:text-[13px] font-bold text-slate-800 leading-relaxed">
+            وضع الحساب التجريبي (Demo Mode) — الجولات والمخالفات في هذا الحساب معزولة ولا تُسجل رسمياً وتُحذف تلقائياً عند تسجيل الخروج أو إغلاق المتصفح
+          </p>
+        </div>
+      </div>
+
       <!-- Modern Compact Inspector Banner -->
       <div class="rounded-2xl bg-gradient-to-l from-[#00162B] via-[#082B49] to-[#004B87] text-white p-4 sm:p-5 shadow-sm border border-white/10 relative overflow-hidden">
         <div class="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -4697,7 +4712,7 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-          .then((reg) => console.log('[KSUMC PWA] Service Worker registered:', reg.scope))
+          .then(() => {})
           .catch((err) => console.warn('[KSUMC PWA] Service Worker registration failed:', err));
       });
     }
@@ -4892,18 +4907,6 @@
         } else {
           s.classList.add('hidden');
           s.classList.remove('flex');
-        }
-      }
-    }
-
-    function openFieldEmergencyModal() {
-      if (typeof triggerImmediateHazardModal === 'function') {
-        triggerImmediateHazardModal();
-      } else {
-        const m = document.getElementById('hazardModal');
-        if (m) {
-          m.classList.remove('hidden');
-          m.classList.add('flex');
         }
       }
     }
@@ -5355,11 +5358,6 @@
       }
     }
 
-    function triggerElevatorTrappedForm() {
-      switchMobileTab('codes');
-      selectEmergencyCode('elevator');
-    }
-
     function submitEmergencyCodeForm(e) {
       e.preventDefault();
       const codeKey = document.getElementById('inp-code-key')?.value || 'red';
@@ -5674,6 +5672,31 @@
           } else {
             cardAssignTask.classList.add('hidden');
           }
+        }
+
+        // Demo Sandbox Mode UI Setup
+        if (window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser(user)) {
+          const demoBanner = document.getElementById('demo-sandbox-banner');
+          if (demoBanner) demoBanner.classList.remove('hidden');
+
+          const cloudDot = document.getElementById('field-cloud-status-dot');
+          if (cloudDot) {
+            cloudDot.className = 'w-2 h-2 rounded-full bg-amber-500 inline-block';
+          }
+          const cloudPill = document.getElementById('field-cloud-status-pill');
+          if (cloudPill) {
+            cloudPill.className = 'text-amber-900 font-black text-[9.5px] bg-amber-100 px-2 py-0.5 rounded-md border border-amber-400';
+            cloudPill.textContent = 'وضع تجريبي معزول';
+          }
+
+          ['#field-user-menu', '#field-portal-sheet'].forEach(containerSel => {
+            const container = document.querySelector(containerSel);
+            if (!container) return;
+            container.querySelectorAll('a[href="dashboard.html"], a[href="profile.html"], a[href="admin.html"], a[href="quality.html"]').forEach(link => {
+              link.classList.add('hidden');
+              link.setAttribute('aria-hidden', 'true');
+            });
+          });
         }
       }
 

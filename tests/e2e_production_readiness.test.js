@@ -24,9 +24,7 @@ const AUTH_GUARD_PATH = path.join(REPO_ROOT, 'assets/js/auth-guard.js');
 const APP_JS_PATH = path.join(REPO_ROOT, 'assets/js/app.js');
 const FIELD_HTML_PATH = path.join(REPO_ROOT, 'field.html');
 const INDEX_HTML_PATH = path.join(REPO_ROOT, 'index.html');
-const SYSTEM_MODE_PATH = path.join(REPO_ROOT, 'assets/js/ksu-system-mode.js');
 const FIREBASE_SYNC_PATH = path.join(REPO_ROOT, 'assets/js/ksu-firebase-realtime.js');
-const CREDENTIALS_A4_PATH = path.join(REPO_ROOT, 'accounts-credentials-a4.html');
 const FIREBASE_JSON_PATH = path.join(REPO_ROOT, 'firebase.json');
 const DATABASE_RULES_PATH = path.join(REPO_ROOT, 'database.rules.json');
 const SW_JS_PATH = path.join(REPO_ROOT, 'sw.js');
@@ -37,9 +35,7 @@ const authGuardSource = fs.readFileSync(AUTH_GUARD_PATH, 'utf8');
 const appJsSource = fs.readFileSync(APP_JS_PATH, 'utf8');
 const fieldHtmlSource = fs.readFileSync(FIELD_HTML_PATH, 'utf8');
 const indexHtmlSource = fs.readFileSync(INDEX_HTML_PATH, 'utf8');
-const systemModeSource = fs.readFileSync(SYSTEM_MODE_PATH, 'utf8');
 const firebaseSyncSource = fs.readFileSync(FIREBASE_SYNC_PATH, 'utf8');
-const credentialsA4Source = fs.readFileSync(CREDENTIALS_A4_PATH, 'utf8');
 const firebaseJson = JSON.parse(fs.readFileSync(FIREBASE_JSON_PATH, 'utf8'));
 const databaseRulesJson = JSON.parse(fs.readFileSync(DATABASE_RULES_PATH, 'utf8'));
 const swJsSource = fs.readFileSync(SW_JS_PATH, 'utf8');
@@ -154,45 +150,30 @@ function createAppApprovalSandbox(customState = {}) {
 // =============================================================================
 // TIER 1: FEATURE COVERAGE (REQUIREMENT VERIFICATION)
 // =============================================================================
-test('Tier 1.1: Official Credentials Document (accounts-credentials-a4.html) Integrity', () => {
-  assert.ok(
-    credentialsA4Source.includes('KSUMC-RSD-ACT-01'),
-    'A4 credentials document must contain document code KSUMC-RSD-ACT-01'
+test('Tier 1.1: Official Roster Integrity (KSUAuth 22 Accounts) & Plaintext A4 Roster Removed', () => {
+  assert.equal(
+    fs.existsSync(path.join(REPO_ROOT, 'accounts-credentials-a4.html')),
+    false,
+    'accounts-credentials-a4.html must be removed for IT readiness'
+  );
+  assert.equal(
+    fs.existsSync(path.join(REPO_ROOT, 'assets/js/ksu-system-mode.js')),
+    false,
+    'assets/js/ksu-system-mode.js must be removed for IT readiness'
   );
 
-  assert.ok(
-    credentialsA4Source.includes('123456'),
-    'A4 credentials document must specify unified default PIN 123456'
-  );
+  const { auth } = createAuthSandbox();
+  const users = auth.getDefaultUsers();
+  const codes = users.map((u) => u.empId || u.username);
 
-  // Group 1: Leadership accounts present in document
-  const leadershipCodes = ['H2', 'H1', 'SAF1', 'Q1', 'DEV'];
-  leadershipCodes.forEach((code) => {
-    assert.ok(
-      credentialsA4Source.includes(`>${code}</span>`),
-      `A4 document must contain leadership username code ${code}`
-    );
+  ['H2', 'H1', 'SAF1', 'Q1', 'DEV', 'S1', 'S2', 'S3'].forEach((code) => {
+    assert.ok(codes.includes(code), `KSUAuth roster must contain ${code}`);
   });
-
-  // Group 2: Supervisors present
-  const supervisorCodes = ['S1', 'S2', 'S3'];
-  supervisorCodes.forEach((code) => {
-    assert.ok(
-      credentialsA4Source.includes(`>${code}</span>`),
-      `A4 document must contain supervisor username code ${code}`
-    );
-  });
-
-  // Group 3: All 14 Field Inspectors present
   for (let i = 1; i <= 14; i++) {
     const code = `M${i}`;
-    assert.ok(
-      credentialsA4Source.includes(`>${code}</span>`),
-      `A4 document must contain inspector username code ${code}`
-    );
+    assert.ok(codes.includes(code), `KSUAuth roster must contain inspector ${code}`);
   }
 
-  // Official full Arabic names verified in A4 document
   const expectedNames = [
     'أ. مصعب عبدالله آل حماد',
     'أ. حسن إبراهيم دعاك',
@@ -217,10 +198,11 @@ test('Tier 1.1: Official Credentials Document (accounts-credentials-a4.html) Int
     'أ. سليمان سالم العنزي'
   ];
 
+  const allNames = users.map((u) => u.name);
   expectedNames.forEach((name) => {
     assert.ok(
-      credentialsA4Source.includes(name),
-      `A4 credentials document must include official name: ${name}`
+      allNames.includes(name),
+      `KSUAuth roster must include official name: ${name}`
     );
   });
 });
@@ -465,12 +447,9 @@ test('Tier 1.7: Production Hosting Configuration & Security Parity', () => {
     const targetFile = path.join(REPO_ROOT, rw.destination.replace(/^\//, ''));
     assert.ok(fs.existsSync(targetFile), `Rewrite destination for ${rw.source} must exist on disk: ${rw.destination}`);
   }
-  const reportRewrite = rewrites.find((r) => r.source === '/report');
-  assert.ok(reportRewrite && reportRewrite.destination === '/executive_report.html', 'Must rewrite /report');
-  const sharekRewrite = rewrites.find((r) => r.source === '/sharek');
-  assert.ok(sharekRewrite && sharekRewrite.destination === '/sharek-pitch.html', 'Must rewrite /sharek');
-  const accountsRewrite = rewrites.find((r) => r.source === '/accounts');
-  assert.ok(accountsRewrite && accountsRewrite.destination === '/accounts-credentials-a4.html', 'Must rewrite /accounts');
+  assert.equal(rewrites.some((r) => r.source === '/report'), false, '/report rewrite must be removed');
+  assert.equal(rewrites.some((r) => r.source === '/sharek'), false, '/sharek rewrite must be removed');
+  assert.equal(rewrites.some((r) => r.source === '/accounts'), false, '/accounts rewrite must be removed');
 
   // Check deploy-to-firebase.sh executable existence
   assert.ok(fs.existsSync(DEPLOY_SCRIPT_PATH), 'deploy-to-firebase.sh must exist');
@@ -479,7 +458,7 @@ test('Tier 1.7: Production Hosting Configuration & Security Parity', () => {
 
   // Check sw.js cache bump
   assert.ok(
-    swJsSource.includes('rsd-ksu-cache-v3.1.0-official-launch') || swJsSource.includes('rsd-ksu-cache-v3.0.0-prod-launch'),
+    swJsSource.includes('rsd-ksu-cache-v3.2.0-governance') || swJsSource.includes('rsd-ksu-cache-v3.1.0-official-launch') || swJsSource.includes('rsd-ksu-cache-v3.0.0-prod-launch'),
     'sw.js must use bumped production CACHE_NAME'
   );
 });
@@ -511,24 +490,6 @@ test('Tier 1.8: Roster Synchronization & Bootstrap State Parity', () => {
   assert.ok(
     appJsSource.includes("name: 'أ. ناصر فلاح القحطاني'"),
     'app.js INITIAL_USERS must include supervisor S1 official name'
-  );
-
-  // 3. Verify ksu-system-mode.js Quick Personas
-  assert.ok(
-    systemModeSource.includes("name: 'أ. عادل عاضة الشلوي'"),
-    'ksu-system-mode.js QUICK_PERSONAS inspector must bind official name'
-  );
-  assert.ok(
-    systemModeSource.includes("name: 'أ. ناصر فلاح القحطاني'"),
-    'ksu-system-mode.js QUICK_PERSONAS supervisor must bind official name'
-  );
-  assert.ok(
-    systemModeSource.includes("name: 'أ. حسن إبراهيم دعاك'"),
-    'ksu-system-mode.js QUICK_PERSONAS head must bind official name'
-  );
-  assert.ok(
-    systemModeSource.includes("name: 'أ. مصعب عبدالله آل حماد'"),
-    'ksu-system-mode.js QUICK_PERSONAS dept_head must bind official name'
   );
 });
 

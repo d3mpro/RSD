@@ -114,7 +114,7 @@ test('Task 4.1: Field inspector and field.html portal NEVER render #ksu-nav-clou
   assert.equal(headerGuest.innerHTML.includes('ksu-nav-cloud-archive-btn'), false, 'guest must NEVER see cloud archive button');
 });
 
-test('Task 4.2: Authorized roles (head, admin, quality, supervisor, developer) render #ksu-nav-cloud-archive-btn and openCloudArchiveHub invokes or lazy-loads ksuSyncEngine', () => {
+test('Task 4.2: openCloudArchiveHub and #ksu-nav-cloud-archive-btn are removed from KSUNav', () => {
   for (const roleCategory of ['head', 'admin', 'quality', 'supervisor', 'developer']) {
     const ctx = createNavSandbox('/head.html', {
       name: 'مشرف معتمد',
@@ -125,44 +125,7 @@ test('Task 4.2: Authorized roles (head, admin, quality, supervisor, developer) r
     ctx.window.KSUNav.init({ activePortal: roleCategory === 'quality' ? 'quality' : 'head' });
 
     const header = ctx.document.getElementById('ksu-global-header');
-    assert.equal(
-      header.innerHTML.includes('id="ksu-nav-cloud-archive-btn"'),
-      true,
-      `Role ${roleCategory} must see #ksu-nav-cloud-archive-btn`
-    );
+    assert.equal(header.innerHTML.includes('id="ksu-nav-cloud-archive-btn"'), false);
+    assert.equal(ctx.window.KSUNav.openCloudArchiveHub, undefined);
   }
-
-  // Test openCloudArchiveHub when ksuSyncEngine is already loaded
-  const ctxLoaded = createNavSandbox('/head.html', { name: 'رئيس القسم', roleCategory: 'head' });
-  let modalOpened = 0;
-  ctxLoaded.window.ksuSyncEngine = { openSyncModal: () => { modalOpened++; } };
-  vm.runInContext(navCode, ctxLoaded);
-  assert.equal(typeof ctxLoaded.window.KSUNav.openCloudArchiveHub, 'function');
-  ctxLoaded.window.KSUNav.openCloudArchiveHub();
-  assert.equal(modalOpened, 1);
-
-  // Test openCloudArchiveHub lazy-loader when ksuSyncEngine is not yet loaded on page
-  const ctxLazy = createNavSandbox('/dashboard.html', { name: 'مشرف', roleCategory: 'admin' });
-  vm.runInContext(navCode, ctxLazy);
-  ctxLazy.window.KSUNav.openCloudArchiveHub();
-  assert.equal(ctxLazy._appendedScripts.some(s => /ksu-cloud-sync\.js/.test(s.src)), true);
-  assert.equal(ctxLazy._appendedScripts.some(s => /ksu-ai-client\.js/.test(s.src)), true, 'Must also lazy-load ksu-ai-client.js on portals like admin.html/dashboard.html when missing');
-});
-
-test('Task 4.3: Shift supervisor with KSUAuth roleCategory shift_supervisor sees #ksu-nav-cloud-archive-btn on non-field portals', () => {
-  const ctxSup = createNavSandbox('/admin.html', {
-    id: 'S1',
-    name: 'مشرف الوردية الأولى',
-    role: 'مشرف السلامة الميدانية',
-    roleCategory: 'shift_supervisor'
-  });
-  ctxSup.window.KSUAuth = {
-    getUser: () => ({ id: 'S1', name: 'مشرف الوردية الأولى', role: 'مشرف السلامة الميدانية' }),
-    getRoleCategory: () => 'shift_supervisor'
-  };
-  vm.runInContext(navCode, ctxSup);
-  ctxSup.window.KSUNav.init({ activePortal: 'admin' });
-
-  const header = ctxSup.document.getElementById('ksu-global-header');
-  assert.equal(header.innerHTML.includes('id="ksu-nav-cloud-archive-btn"'), true, 'shift_supervisor must see #ksu-nav-cloud-archive-btn');
 });

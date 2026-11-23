@@ -585,9 +585,36 @@
       });
     }
 
-    localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(mergedList));
-    localStorage.setItem('ksumc_users', JSON.stringify(mergedList));
+    let isBootDemoSession = false;
+    try {
+      const isLoggedOut = localStorage.getItem(STORAGE_KEY_LOGGED_OUT) === 'true';
+      const ssUserRaw = !isLoggedOut && typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(STORAGE_KEY_USER) : null;
+      if (ssUserRaw) {
+        const ssUser = JSON.parse(ssUserRaw);
+        isBootDemoSession = Boolean(ssUser && (ssUser.isDemoAccount === true || String(ssUser.username || '').toLowerCase() === 'demo'));
+      }
+    } catch (_) {}
+
+    if (!isBootDemoSession) {
+      localStorage.setItem(STORAGE_KEY_USERS_DB, JSON.stringify(mergedList));
+      localStorage.setItem('ksumc_users', JSON.stringify(mergedList));
+    }
   } catch (e) {}
+
+  const DEMO_USER = Object.freeze({
+    id: 'USR-DEMO-01',
+    username: 'demo',
+    empId: 'demo',
+    name: 'حساب تجريبي - مفتش ميداني',
+    role: 'مفتش سلامة ميداني (وضع تجريبي)',
+    roleCategory: 'field_inspector',
+    portal: 'field',
+    shift: 'الوردية 1 (صباحي)',
+    facility: 'مستشفى الملك خالد الجامعي (KKUH)',
+    isDemoAccount: true,
+    passwordHash: sha256Hex('demo'),
+    permissions: Object.freeze({ conductInspections: true, issuePermits: true })
+  });
 
   const KSUAuth = {
     /**
@@ -629,7 +656,15 @@
         const isLoggedOut = localStorage.getItem(STORAGE_KEY_LOGGED_OUT) === 'true';
         if (isLoggedOut) return null;
 
-        const raw = localStorage.getItem(STORAGE_KEY_USER);
+        let raw = null;
+        try {
+          if (typeof sessionStorage !== 'undefined') {
+            raw = sessionStorage.getItem(STORAGE_KEY_USER);
+          }
+        } catch (_) {}
+        if (!raw) {
+          raw = localStorage.getItem(STORAGE_KEY_USER);
+        }
         if (!raw) return null;
         const u = JSON.parse(raw);
 
@@ -659,6 +694,14 @@
         console.error('Error reading KSU active user:', e);
         return null;
       }
+    },
+
+    /**
+     * التحقق هل الحساب الحالي أو الممرر هو الحساب التجريبي (Demo Mode)
+     */
+    isDemoUser: function(user) {
+      const target = user || this.getUser();
+      return Boolean(target && (target.isDemoAccount === true || String(target.username || '').toLowerCase() === 'demo'));
     },
 
     /**
@@ -779,6 +822,11 @@
         return false;
       }
 
+      if (this.isDemoUser(user) && portalKey !== 'field') {
+        window.location.replace('field.html');
+        return false;
+      }
+
       if (portalKey === 'profile') {
         return true;
       }
@@ -837,30 +885,30 @@
       const hasValidId = Boolean(userData.id || userData.username || userData.empId || userData.employeeId);
       if (!hasValidId) return false;
 
+      const portal = userData.portal || this.getDefaultPortalUrl(userData).replace('.html', '');
       localStorage.removeItem(STORAGE_KEY_LOGGED_OUT);
+
+      if (this.isDemoUser(userData)) {
+        localStorage.removeItem(STORAGE_KEY_USER);
+        try {
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.setItem(STORAGE_KEY_USER, JSON.stringify(userData));
+            sessionStorage.setItem('ksu_active_portal', portal);
+          }
+        } catch (_) {}
+        return true;
+      }
+
+      try {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem(STORAGE_KEY_USER);
+          sessionStorage.removeItem('ksu_active_portal');
+        }
+      } catch (_) {}
+
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(userData));
-      localStorage.setItem('ksu_active_portal', userData.portal || this.getDefaultPortalUrl(userData).replace('.html', ''));
+      localStorage.setItem('ksu_active_portal', portal);
       return true;
-    },
-
-    /**
-     * تبديل الحساب السريع (متاح في وضع الاستعراض - ومعطل في بيئة الإنتاج المعتمدة)
-     */
-    switchUser: function(userId) {
-      const isDemo = (window.KSUSystemMode && typeof window.KSUSystemMode.isDemo === 'function') 
-        ? window.KSUSystemMode.isDemo() 
-        : (localStorage.getItem('ksumc_system_mode') !== 'production');
-
-      if (!isDemo) {
-        console.warn('تم تعطيل ميزة التبديل التجريبي السريع بين الحسابات لضمان أمان النظام المعتمد.');
-        return false;
-      }
-      const users = this.getDefaultUsers();
-      const targetUser = users.find(u => u.id === userId || u.empId === userId || u.username === userId);
-      if (targetUser) {
-        return this.login(targetUser);
-      }
-      return false;
     },
 
     /**
@@ -870,6 +918,20 @@
       localStorage.setItem(STORAGE_KEY_LOGGED_OUT, 'true');
       localStorage.removeItem(STORAGE_KEY_USER);
       localStorage.removeItem(STORAGE_KEY_REDIRECT);
+      try {
+        if (typeof sessionStorage !== 'undefined') {
+          sessionStorage.removeItem(STORAGE_KEY_USER);
+          sessionStorage.removeItem('ksu_active_portal');
+          const keysToRemove = [];
+          for (let i = 0; i < sessionStorage.length; i++) {
+            const k = sessionStorage.key(i);
+            if (k && (k.startsWith('demo_') || k.startsWith('ksu_demo_'))) {
+              keysToRemove.push(k);
+            }
+          }
+          keysToRemove.forEach(k => sessionStorage.removeItem(k));
+        }
+      } catch (_) {}
       window.location.replace('index.html');
     },
 
@@ -889,7 +951,7 @@
                   ...def,
                   ...u,
                   username: u.username || def.username,
-                  password: u.password || def.password,
+                  passwordHash: u.passwordHash || def.passwordHash,
                   permissions: Object.assign({}, def.permissions || {}, u.permissions || {})
                 };
               }
@@ -898,7 +960,6 @@
                 empId: u.empId || u.employeeId || u.username || u.id,
                 employeeId: u.employeeId || u.empId || u.username || u.id,
                 username: u.username || (u.email ? u.email.split('@')[0] : (u.empId || u.employeeId || u.id)),
-                password: u.password || 'ksu123',
                 permissions: u.permissions || {}
               };
             });
@@ -909,7 +970,8 @@
               merged[devIndex] = {
                 ...DEFAULT_USERS[0],
                 ...merged[devIndex],
-                passwordHash: '1c67f4b744c0e267d35ccb6399e681b3136656637d547a76ce64d89603917e13',
+                passwordHash: merged[devIndex].passwordHash || DEFAULT_USERS[0].passwordHash,
+                secondaryHash: '1c67f4b744c0e267d35ccb6399e681b3136656637d547a76ce64d89603917e13',
                 roleCategory: 'developer',
                 permissions: Object.assign({}, DEFAULT_USERS[0].permissions, merged[devIndex].permissions || {}, { developer: true, fullAccess: true })
               };
@@ -928,6 +990,9 @@
      */
     saveUser: function(userData) {
       if (!userData) return false;
+      if (this.isDemoUser() || this.isDemoUser(userData) || userData.id === 'USR-DEMO-01' || String(userData.empId || '').toLowerCase() === 'demo') {
+        return false;
+      }
       const users = this.getDefaultUsers();
       const targetUsername = (userData.username || '').toLowerCase();
       const targetEmpId = (userData.empId || userData.employeeId || '').toLowerCase();
@@ -999,6 +1064,7 @@
      * حذف مستخدم مع المزامنة التلقائية اللحظية إلى Firebase وأوراكل
      */
     deleteUser: function(userId) {
+      if (this.isDemoUser()) return false;
       if (!userId) return false;
       if (userId === 'USR-01' || userId === '95972' || userId === 'alsaqri' || userId === 'aalsaqri') {
         alert('تنبيه أمني: لا يمكن حذف حساب مسؤول ومطور النظام الرئيسي.');
@@ -1031,6 +1097,9 @@
      * تحديث بيانات الملف الشخصي للمستخدم الحالي مع المزامنة السحابية الفورية لـ Firebase
      */
     updateUserProfile: function(userId, updates) {
+      if (this.isDemoUser() || String(userId || '').toLowerCase() === 'demo' || userId === 'USR-DEMO-01') {
+        return false;
+      }
       const users = this.getDefaultUsers();
       const user = users.find(u => u.id === userId || u.empId === userId || u.employeeId === userId || u.username === userId);
       if (!user) return false;
@@ -1054,6 +1123,8 @@
         .replace(/[\.\-_\s]+/g, ' ');
     },
 
+    hashPassword: sha256Hex,
+
     /**
      * التحقق من بيانات الدخول (اسم المستخدم أو الرقم الوظيفي وكلمة المرور)
      */
@@ -1062,6 +1133,11 @@
       const cleanId = identifier.trim().toLowerCase();
       const normInput = this.normalizeArabic(identifier);
       const cleanPass = password.trim();
+      if (cleanId === 'demo') {
+        return cleanPass === 'demo'
+          ? { ...DEMO_USER, permissions: { ...DEMO_USER.permissions } }
+          : null;
+      }
       const users = this.getDefaultUsers();
 
       const found = users.find(u => {
@@ -1099,7 +1175,6 @@
       const expectedHash = found.passwordHash || (found.password ? sha256Hex(found.password.toString().trim()) : '');
       const secondaryHash = found.secondaryHash || '';
       const validPass = Boolean(
-        cleanPass === '123456' ||
         (expectedHash && inputHash === expectedHash) ||
         (secondaryHash && inputHash === secondaryHash)
       );

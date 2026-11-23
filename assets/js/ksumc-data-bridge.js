@@ -130,8 +130,16 @@
     { id: 'BLD-06', name: 'مبنى إدارة المدينة الطبية (Building 19)', hospital: 'Admin', floors: 'الأرضي، 1 - 3', type: 'مبنى إداري' }
   ];
 
+  function isDemoModeActive() {
+    return Boolean(typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser());
+  }
+
   function getFromStorage(key, fallback = []) {
     try {
+      if (isDemoModeActive() && typeof sessionStorage !== 'undefined') {
+        const demoData = sessionStorage.getItem('demo_' + key);
+        return demoData ? JSON.parse(demoData) : fallback;
+      }
       const data = localStorage.getItem(key);
       return data ? JSON.parse(data) : fallback;
     } catch (e) {
@@ -142,7 +150,11 @@
 
   function setToStorage(key, value) {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      if (isDemoModeActive() && typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('demo_' + key, JSON.stringify(value));
+      } else {
+        localStorage.setItem(key, JSON.stringify(value));
+      }
       if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' && typeof window.CustomEvent === 'function') {
         window.dispatchEvent(new window.CustomEvent('ksumc_data_updated', { detail: { key, value } }));
       }
@@ -518,10 +530,12 @@
       if (!newRound.timestamp) newRound.timestamp = nowIso;
       rounds.unshift(newRound);
       setToStorage(KEYS.ROUNDS, rounds);
-      try {
-        localStorage.setItem('ksumc_field_rounds', JSON.stringify(rounds));
-        localStorage.setItem('ksumc_rounds_registry', JSON.stringify(rounds));
-      } catch (_) {}
+      if (!isDemoModeActive()) {
+        try {
+          localStorage.setItem('ksumc_field_rounds', JSON.stringify(rounds));
+          localStorage.setItem('ksumc_rounds_registry', JSON.stringify(rounds));
+        } catch (_) {}
+      }
       if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncRound === 'function') {
         window.ksuFirebaseSync.syncRound(newRound);
       }
@@ -957,7 +971,11 @@
       const merged = Object.assign({}, current, targetsObj, {
         updatedAt: new Date().toISOString()
       });
-      localStorage.setItem('ksumc_department_targets', JSON.stringify(merged));
+      if (!isDemoModeActive()) {
+        localStorage.setItem('ksumc_department_targets', JSON.stringify(merged));
+      } else if (typeof sessionStorage !== 'undefined') {
+        try { sessionStorage.setItem('demo_ksumc_department_targets', JSON.stringify(merged)); } catch (_) {}
+      }
       if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncDepartmentTargets === 'function') {
         window.ksuFirebaseSync.syncDepartmentTargets(merged);
       }
@@ -989,6 +1007,13 @@
         'ksumc_notifications',
         'ksumc_head_workflow_decisions'
       ];
+      if (isDemoModeActive()) {
+        keysToClear.forEach(k => {
+          try { if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('demo_' + k, JSON.stringify([])); } catch (e) {}
+        });
+        window.dispatchEvent(new CustomEvent('ksumc_data_updated', { detail: { key: KEYS.ROUNDS, value: [] } }));
+        return true;
+      }
       keysToClear.forEach(k => {
         try { localStorage.setItem(k, JSON.stringify([])); } catch (e) {}
       });
@@ -1765,6 +1790,9 @@
      */
     syncToSharePoint: async function(record, type = 'inspection') {
       try {
+        if (isDemoModeActive()) {
+          return { success: false, blocked: true, demo: true };
+        }
         if (!SHAREPOINT_CONFIG.ENABLED || !SHAREPOINT_CONFIG.WEBHOOK_URL) return;
         
         const facilityName = record.facility || record.hospital || '';
@@ -1948,7 +1976,6 @@
         });
 
         if (response.ok || response.status === 202) {
-          console.log('[KSU-SharePoint-Sync] تم بنجاح الحفظ التلقائي في شيربوينت قسم السلامة:', payload.Title);
           return { success: true, payload };
         } else {
           console.warn('[KSU-SharePoint-Sync] استجابة شيربوينت:', response.status);

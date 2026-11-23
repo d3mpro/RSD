@@ -32,13 +32,10 @@
           this.barcodeDetector = new BarcodeDetector({
             formats: ['qr_code', 'code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'data_matrix']
           });
-          console.log('[KSU Scanner] Native BarcodeDetector API initialized.');
         } catch (e) {
           console.warn('[KSU Scanner] Native BarcodeDetector init notice:', e);
           this.barcodeDetector = null;
         }
-      } else {
-        console.log('[KSU Scanner] Native BarcodeDetector not supported, using jsQR offline engine.');
       }
     }
 
@@ -326,8 +323,6 @@
     handleScannedCode(rawCode) {
       const code = this.cleanCode(rawCode);
       if (!code) return;
-
-      console.log('[KSU Scanner] Processing Scanned Code:', code);
 
       const allAssets = window.state?.assets || [];
       const codeLower = code.toLowerCase();

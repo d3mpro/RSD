@@ -25,7 +25,10 @@ test('1. Routing & Rewrites Parity for /api and api.html', (t) => {
   // Check database.rules.json
   const rulesJson = JSON.parse(fs.readFileSync(path.join(__dirname, '../database.rules.json'), 'utf8'));
   assert.ok(rulesJson.rules.system_config, 'database.rules.json must define system_config');
-  assert.equal(rulesJson.rules.system_config['.read'], true, 'system_config must be readable by inspectors');
+  assert.ok(
+    typeof rulesJson.rules.system_config['.read'] === 'string' && rulesJson.rules.system_config['.read'].includes("auth.token.role == 'admin'"),
+    'system_config must restrict reads to authorized roles'
+  );
 });
 
 // 2. Verify api.html Password Gate and Security

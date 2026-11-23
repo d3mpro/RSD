@@ -2,7 +2,7 @@
 chcp 65001 > nul
 title KSUMC Safety System - Firebase Production Deployment (rsd-ksu)
 cd /d "%~dp0"
-set "PATH=%~dp0tools\node_modules\.bin;%~dp0..\RSD-GO-DEMO\tools\node_modules\.bin;%PATH%"
+set "PATH=%~dp0tools\node_modules\.bin;%PATH%"
 
 echo ===================================================================
 echo    منظومة جولات وتفتيش السلامة والصحة المهنية - KSUMC
@@ -14,8 +14,6 @@ echo.
 set FB_CMD=npx --yes firebase-tools@latest
 if exist "%~dp0tools\node_modules\.bin\firebase.cmd" (
     set FB_CMD=call "%~dp0tools\node_modules\.bin\firebase.cmd"
-) else if exist "%~dp0..\RSD-GO-DEMO\tools\node_modules\.bin\firebase.cmd" (
-    set FB_CMD=call "%~dp0..\RSD-GO-DEMO\tools\node_modules\.bin\firebase.cmd"
 )
 
 echo -------------------------------------------------------------------

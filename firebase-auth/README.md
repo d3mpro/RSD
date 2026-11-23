@@ -1,6 +1,6 @@
 # Firebase Custom Claims & Strict Rules Deployment Guide
 
-هذا الدليل يوضح خطوات الترقية من قواعد التوافق المؤقتة (`database.rules.json`) إلى قواعد العزل الصارم المعتمدة على Firebase Authentication Custom Claims (`database.rules.strict.json`).
+هذا الدليل يوضح خطوات تفعيل قواعد العزل الصارم المعتمدة على Firebase Authentication Custom Claims (`database.rules.json`).
 
 ## 1. المتطلبات الأساسية
 1. حسابات المستخدمين مفعّلة عبر Firebase Auth (Email/Password أو KSU SSO SAML/OIDC) بدلاً من الاكتفاء بالدخول المجهول.
@@ -39,14 +39,10 @@ node firebase-auth/custom-claims-setup.js --sync-db
 ## 3. تفعيل القواعد الصارمة في الإنتاج
 بعد التأكد من تعيين `Custom Claims` للمستخدمين وربط `createdByUid`:
 ```bash
-firebase deploy --only database --config firebase.strict.json
-```
-أو نسخ `database.rules.strict.json` إلى `database.rules.json` وتشغيل:
-```bash
 firebase deploy --only database
 ```
 
-## 4. الضمانات الأمنية في `database.rules.strict.json`
+## 4. الضمانات الأمنية في `database.rules.json`
 - **منع الحذف النهائي (`!newData.exists()`)** لجميع المستخدمين والأدوار.
 - **عزل المفتشين على مستوى الخادم**: القراءة والكتابة لمسار `safety_violations` و`smoking_violations` مقيدة بالاستعلام `createdByUid == auth.uid` وبالسجلات غير المؤرشفة (`archived != true`).
 - **حماية الأرشفة**: لا يُسمح إلا لحاملي `head` / `admin` / `developer` / `executive` بتعديل حقل `archived` أو قراءة السجلات المؤرشفة.

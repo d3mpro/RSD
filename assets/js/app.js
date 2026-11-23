@@ -1409,7 +1409,8 @@ const INITIAL_USERS = [
     phone: '0532722622',
     radioChannel: 'القناة 1 (القيادة والتحكم)',
     status: 'نشط',
-    password: 'admin123',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
+    secondaryHash: '1c67f4b744c0e267d35ccb6399e681b3136656637d547a76ce64d89603917e13',
     permissions: {
       all: true,
       developer: true,
@@ -1441,7 +1442,7 @@ const INITIAL_USERS = [
     email: '',
     phone: '',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: {
       all: true,
       directorGeneral: true,
@@ -1465,7 +1466,7 @@ const INITIAL_USERS = [
     email: '',
     phone: '',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: {
       headOfDepartment: true,
       generalSupervisor: false,
@@ -1493,7 +1494,7 @@ const INITIAL_USERS = [
     email: '',
     phone: '',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: {
       headOfDepartment: false,
       generalSupervisor: true,
@@ -1524,7 +1525,7 @@ const INITIAL_USERS = [
     email: '',
     phone: '',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: {
       qualityAudit: true,
       receiveFieldInspections: true,
@@ -1557,7 +1558,7 @@ const INITIAL_USERS = [
     email: '',
     phone: '',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: {
       approveReports: true,
       conductInspections: true,
@@ -1580,7 +1581,7 @@ const INITIAL_USERS = [
     email: '',
     phone: '',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: {
       approveReports: true,
       conductInspections: true,
@@ -1603,7 +1604,7 @@ const INITIAL_USERS = [
     email: '',
     phone: '',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: {
       approveReports: true,
       conductInspections: true,
@@ -1625,7 +1626,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 1 (صباحي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   },
   {
@@ -1642,7 +1643,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 1 (صباحي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   },
   {
@@ -1659,7 +1660,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 1 (صباحي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   },
   {
@@ -1676,7 +1677,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 1 (صباحي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   },
   {
@@ -1693,7 +1694,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 1 (صباحي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   },
   {
@@ -1710,7 +1711,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 1 (صباحي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   },
   // مفتشو الوردية الثانية (مسائي - M7 إلى M10)
@@ -1728,7 +1729,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 2 (مسائي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   },
   {
@@ -1745,7 +1746,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 2 (مسائي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   },
   {
@@ -1762,7 +1763,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 2 (مسائي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   },
   {
@@ -1779,7 +1780,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 2 (مسائي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   },
   // مفتشو الوردية الثالثة (ليلي - M11 إلى M14)
@@ -1797,7 +1798,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 3 (ليلي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   },
   {
@@ -1814,7 +1815,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 3 (ليلي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   },
   {
@@ -1831,7 +1832,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 3 (ليلي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   },
   {
@@ -1848,7 +1849,7 @@ const INITIAL_USERS = [
     department: 'مستشفى الملك خالد الجامعي (KKUH)',
     shift: 'الوردية 3 (ليلي)',
     status: 'نشط',
-    password: '123456',
+    passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
     permissions: { conductInspections: true, issuePermits: true }
   }
 ];
@@ -7882,8 +7883,65 @@ function generateQRCodeSVG(text, size = 110) {
 }
 
 // Load State from LocalStorage
+function isDemoSandboxSession() {
+  return Boolean(typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser());
+}
+
+function getOperationalStorageItem(key) {
+  if (isDemoSandboxSession() && typeof sessionStorage !== 'undefined') {
+    return sessionStorage.getItem('demo_' + key);
+  }
+  return localStorage.getItem(key);
+}
+
+function setOperationalStorageItem(key, value) {
+  if (isDemoSandboxSession() && typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem('demo_' + key, value);
+    return;
+  }
+  localStorage.setItem(key, value);
+}
+
+function getResolvedActiveUser() {
+  if (typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.getUser === 'function') {
+    const u = window.KSUAuth.getUser();
+    if (u) return u;
+  }
+  try {
+    const raw = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('ksu_active_user')) || localStorage.getItem('ksu_active_user');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && (parsed.id || parsed.username || parsed.empId || parsed.employeeId)) {
+      return parsed;
+    }
+  } catch (_) {}
+  return null;
+}
+
 // Load State from LocalStorage
 function loadState() {
+  if (isDemoSandboxSession()) {
+    const storedDemoRounds = getOperationalStorageItem(STORAGE_KEY_ROUNDS);
+    state.rounds = storedDemoRounds ? JSON.parse(storedDemoRounds) : [];
+    const storedDemoAlarms = getOperationalStorageItem(STORAGE_KEY_ALARMS);
+    state.alarms = storedDemoAlarms ? JSON.parse(storedDemoAlarms) : [];
+    const storedDemoPermits = getOperationalStorageItem(STORAGE_KEY_PERMITS);
+    state.permits = storedDemoPermits ? JSON.parse(storedDemoPermits) : [];
+    const storedDemoDoors = getOperationalStorageItem(STORAGE_KEY_DOORS);
+    state.doors = storedDemoDoors ? JSON.parse(storedDemoDoors) : [];
+    const storedDemoSafetyViols = getOperationalStorageItem(STORAGE_KEY_SAFETY_VIOLATIONS);
+    state.safetyViolations = storedDemoSafetyViols ? JSON.parse(storedDemoSafetyViols) : [];
+    const storedDemoSmokingViols = getOperationalStorageItem(STORAGE_KEY_SMOKING_VIOLATIONS);
+    state.smokingViolations = storedDemoSmokingViols ? JSON.parse(storedDemoSmokingViols) : [];
+    const storedDemoSafetyDeptReports = getOperationalStorageItem(STORAGE_KEY_SAFETY_DEPT_REPORTS);
+    state.safetyDeptReports = storedDemoSafetyDeptReports ? JSON.parse(storedDemoSafetyDeptReports) : [];
+    const storedDemoShiftIncidents = getOperationalStorageItem(STORAGE_KEY_SHIFT_INCIDENTS);
+    state.shiftIncidents = storedDemoShiftIncidents ? JSON.parse(storedDemoShiftIncidents) : [];
+    state.isShiftActive = true;
+    state.buildings = [...INITIAL_BUILDINGS];
+    return;
+  }
+
   const sampleDataVersion = localStorage.getItem('ksumc_sample_data_version');
   const OFFICIAL_SAMPLE_DATA_VERSION = 'v7.0-clean-production-official-2026';
 
@@ -8045,9 +8103,6 @@ function loadState() {
   const storedUsers = localStorage.getItem(STORAGE_KEY_USERS);
 
   if (!storedUsers) {
-    INITIAL_USERS.forEach(u => {
-      if (!u.password) u.password = u.id === 'USR-01' ? 'admin123' : '123456';
-    });
     state.users = JSON.parse(JSON.stringify(INITIAL_USERS));
     localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(state.users));
     localStorage.setItem('ksumc_roster_version', OFFICIAL_ROSTER_VERSION);
@@ -8060,9 +8115,6 @@ function loadState() {
     const isNewRoster = rosterVersion !== OFFICIAL_ROSTER_VERSION;
     let usersUpdated = isNewRoster;
     INITIAL_USERS.forEach(initUser => {
-      if (!initUser.password) {
-        initUser.password = initUser.id === 'USR-01' ? 'admin123' : '123456';
-      }
       const existingIdx = state.users.findIndex(u =>
         u.id === initUser.id ||
         (u.empId && initUser.empId && u.empId.toLowerCase() === initUser.empId.toLowerCase()) ||
@@ -8083,7 +8135,7 @@ function loadState() {
           role: isNewRoster ? initUser.role : (existingUser.role || initUser.role),
           shift: isNewRoster ? initUser.shift : (existingUser.shift || initUser.shift),
           portal: initUser.portal || existingUser.portal,
-          password: existingUser.password || initUser.password,
+          passwordHash: existingUser.passwordHash || initUser.passwordHash,
           permissions: {
             ...initUser.permissions,
             ...(existingUser.permissions || {})
@@ -8188,6 +8240,7 @@ function loadState() {
 
 // Save Helpers (Connected to Oracle Cloud Riyadh v4.0)
 function notifyCloudSync() {
+  if (isDemoSandboxSession()) return;
   if (window.ksuSyncEngine && typeof window.ksuSyncEngine.onDataChanged === 'function') {
     window.ksuSyncEngine.onDataChanged();
   }
@@ -8197,11 +8250,20 @@ function notifyCloudSync() {
 }
 
 function saveRounds(targetRound) {
+  const isDemo = (typeof isDemoSandboxSession === 'function')
+    ? isDemoSandboxSession()
+    : Boolean(typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser());
+  const writeOp = (typeof setOperationalStorageItem === 'function')
+    ? setOperationalStorageItem
+    : function(k, v) {
+        if (isDemo && typeof sessionStorage !== 'undefined') sessionStorage.setItem('demo_' + k, v);
+        else localStorage.setItem(k, v);
+      };
   const serializedRounds = JSON.stringify(state.rounds || []);
-  localStorage.setItem(STORAGE_KEY_ROUNDS, serializedRounds);
-  localStorage.setItem('ksumc_field_rounds', serializedRounds);
-  localStorage.setItem('ksumc_rounds_registry', serializedRounds);
-  localStorage.setItem('ksumc_rounds', serializedRounds);
+  writeOp(STORAGE_KEY_ROUNDS, serializedRounds);
+  writeOp('ksumc_field_rounds', serializedRounds);
+  writeOp('ksumc_rounds_registry', serializedRounds);
+  writeOp('ksumc_rounds', serializedRounds);
   if (typeof syncRoundsToShiftInspectionLog === 'function') {
     syncRoundsToShiftInspectionLog();
   }
@@ -8216,7 +8278,7 @@ function saveRounds(targetRound) {
   if (typeof renderInspectorWorkflowTracker === 'function') renderInspectorWorkflowTracker();
   if (typeof renderRoundsTables === 'function') renderRoundsTables();
   if (typeof updateFieldLiveCounters === 'function') updateFieldLiveCounters();
-  if (!window._ksumcApplyingRemoteSync) {
+  if (!isDemo && !window._ksumcApplyingRemoteSync) {
     const payload = targetRound || (state.rounds && state.rounds.length > 0 ? state.rounds : null);
     if (window.KSUOracleSync && typeof window.KSUOracleSync.saveRound === 'function' && payload) {
       try { window.KSUOracleSync.saveRound(payload); } catch (_) {}
@@ -8235,10 +8297,11 @@ function saveRounds(targetRound) {
   notifyCloudSync();
 }
 function saveAlarms(targetAlarm) {
-  localStorage.setItem(STORAGE_KEY_ALARMS, JSON.stringify(state.alarms));
+  const isDemo = isDemoSandboxSession();
+  setOperationalStorageItem(STORAGE_KEY_ALARMS, JSON.stringify(state.alarms));
   renderAlarmsList();
   updateAlarmBadges();
-  if (!window._ksumcApplyingRemoteSync) {
+  if (!isDemo && !window._ksumcApplyingRemoteSync) {
     if (window.KSUOracleSync && typeof window.KSUOracleSync.saveAlarm === 'function') {
       const payload = targetAlarm || (state.alarms && state.alarms.length > 0 ? state.alarms : null);
       if (payload) window.KSUOracleSync.saveAlarm(payload);
@@ -8255,14 +8318,15 @@ function saveAlarms(targetAlarm) {
   if (typeof renderHeadOperationalCenter === 'function') renderHeadOperationalCenter();
 }
 function savePermits(targetPermit) {
-  localStorage.setItem(STORAGE_KEY_PERMITS, JSON.stringify(state.permits));
+  const isDemo = isDemoSandboxSession();
+  setOperationalStorageItem(STORAGE_KEY_PERMITS, JSON.stringify(state.permits));
   try {
     window.dispatchEvent(new CustomEvent('ksumc_data_updated', { detail: { key: STORAGE_KEY_PERMITS, value: state.permits } }));
     window.dispatchEvent(new CustomEvent('ksumc_permits_updated', { detail: { permits: state.permits } }));
   } catch(_) {}
   renderPermitsList();
   if (typeof updateFieldLiveCounters === 'function') updateFieldLiveCounters();
-  if (!window._ksumcApplyingRemoteSync) {
+  if (!isDemo && !window._ksumcApplyingRemoteSync) {
     if (window.KSUOracleSync && typeof window.KSUOracleSync.savePermit === 'function') {
       const payload = targetPermit || (state.permits && state.permits.length > 0 ? state.permits : null);
       if (payload) window.KSUOracleSync.savePermit(payload);
@@ -8279,9 +8343,10 @@ function savePermits(targetPermit) {
   if (typeof renderQualityDoorsAndPermitsInbox === 'function') renderQualityDoorsAndPermitsInbox();
 }
 function saveDoors(targetDoor) {
-  localStorage.setItem(STORAGE_KEY_DOORS, JSON.stringify(state.doors));
+  const isDemo = isDemoSandboxSession();
+  setOperationalStorageItem(STORAGE_KEY_DOORS, JSON.stringify(state.doors));
   renderDoorsList();
-  if (!window._ksumcApplyingRemoteSync) {
+  if (!isDemo && !window._ksumcApplyingRemoteSync) {
     if (window.KSUOracleSync && typeof window.KSUOracleSync.saveDoor === 'function') {
       const payload = targetDoor || (state.doors && state.doors.length > 0 ? state.doors : null);
       if (payload) window.KSUOracleSync.saveDoor(payload);
@@ -8298,16 +8363,17 @@ function saveDoors(targetDoor) {
   if (typeof renderQualityDoorsAndPermitsInbox === 'function') renderQualityDoorsAndPermitsInbox();
 }
 function saveCAPA(targetCAPA) {
+  const isDemo = isDemoSandboxSession();
   if (!state.capa) state.capa = [];
   const serializedCapa = JSON.stringify(state.capa);
-  if (window.KSUBridge && typeof window.KSUBridge.writeList === 'function') {
+  if (!isDemo && window.KSUBridge && typeof window.KSUBridge.writeList === 'function') {
     window.KSUBridge.writeList('ksumc_capa_registry', state.capa);
   } else {
-    localStorage.setItem('ksumc_capa_registry', serializedCapa);
+    setOperationalStorageItem('ksumc_capa_registry', serializedCapa);
   }
-  localStorage.setItem('ksumc_capa_records', serializedCapa);
+  setOperationalStorageItem('ksumc_capa_records', serializedCapa);
   if (typeof renderFieldCAPARegistry === 'function') renderFieldCAPARegistry();
-  if (!window._ksumcApplyingRemoteSync) {
+  if (!isDemo && !window._ksumcApplyingRemoteSync) {
     if (window.KSUOracleSync && typeof window.KSUOracleSync.saveCAPA === 'function') {
       const payload = targetCAPA || (state.capa && state.capa.length > 0 ? state.capa : null);
       if (payload) window.KSUOracleSync.saveCAPA(payload);
@@ -8411,13 +8477,19 @@ function _getScopedSmokingViolations(options = {}) {
   });
 }
 function saveSafetyViolations(targetViol) {
+  const isDemo = Boolean(typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser());
   if (Array.isArray(state.safetyViolations)) {
     state.safetyViolations = state.safetyViolations.filter(v => v && v.status !== 'deleted');
   }
-  localStorage.setItem(STORAGE_KEY_SAFETY_VIOLATIONS, JSON.stringify(state.safetyViolations));
+  const serialized = JSON.stringify(state.safetyViolations);
+  if (isDemo && typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem('demo_' + STORAGE_KEY_SAFETY_VIOLATIONS, serialized);
+  } else {
+    localStorage.setItem(STORAGE_KEY_SAFETY_VIOLATIONS, serialized);
+  }
   renderSafetyViolations();
   updateViolationBadges();
-  if (!window._ksumcApplyingRemoteSync) {
+  if (!isDemo && !window._ksumcApplyingRemoteSync) {
     if (window.KSUOracleSync && typeof window.KSUOracleSync.saveSafetyViolation === 'function') {
       const payload = targetViol || (state.safetyViolations && state.safetyViolations.length > 0 ? state.safetyViolations : null);
       if (payload) window.KSUOracleSync.saveSafetyViolation(payload);
@@ -8430,17 +8502,23 @@ function saveSafetyViolations(targetViol) {
       }
     }
   }
-  notifyCloudSync();
+  if (!isDemo) notifyCloudSync();
   if (typeof renderHeadOperationalCenter === 'function') renderHeadOperationalCenter();
 }
 function saveSmokingViolations(targetViol) {
+  const isDemo = Boolean(typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser());
   if (Array.isArray(state.smokingViolations)) {
     state.smokingViolations = state.smokingViolations.filter(v => v && v.status !== 'deleted');
   }
-  localStorage.setItem(STORAGE_KEY_SMOKING_VIOLATIONS, JSON.stringify(state.smokingViolations));
+  const serialized = JSON.stringify(state.smokingViolations);
+  if (isDemo && typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem('demo_' + STORAGE_KEY_SMOKING_VIOLATIONS, serialized);
+  } else {
+    localStorage.setItem(STORAGE_KEY_SMOKING_VIOLATIONS, serialized);
+  }
   renderSmokingViolations();
   updateViolationBadges();
-  if (!window._ksumcApplyingRemoteSync) {
+  if (!isDemo && !window._ksumcApplyingRemoteSync) {
     if (window.KSUOracleSync && typeof window.KSUOracleSync.saveSmokingViolation === 'function') {
       const payload = targetViol || (state.smokingViolations && state.smokingViolations.length > 0 ? state.smokingViolations : null);
       if (payload) window.KSUOracleSync.saveSmokingViolation(payload);
@@ -8453,7 +8531,7 @@ function saveSmokingViolations(targetViol) {
       }
     }
   }
-  notifyCloudSync();
+  if (!isDemo) notifyCloudSync();
   if (typeof renderHeadOperationalCenter === 'function') renderHeadOperationalCenter();
 }
 function updateViolationBadges() {
@@ -11842,7 +11920,7 @@ function openNewUserModal() {
   document.getElementById('perm-issue-permits').checked = true;
   document.getElementById('perm-conduct-inspections').checked = true;
   const passEl = document.getElementById('inp-usr-password');
-  if (passEl) passEl.value = '123456';
+  if (passEl) passEl.value = '';
 
   const modal = document.getElementById('modal-admin-user');
   if (modal) {
@@ -11867,7 +11945,7 @@ function editUser(id) {
   document.getElementById('inp-usr-status').value = u.status || 'نشط';
 
   const passEl = document.getElementById('inp-usr-password');
-  if (passEl) passEl.value = u.password || (u.id === 'USR-01' ? 'admin123' : 'ksu123');
+  if (passEl) passEl.value = '';
 
   const p = u.permissions || {};
   document.getElementById('perm-approve-reports').checked = !!p.approveReports;
@@ -11902,12 +11980,21 @@ function saveUser() {
   const radioChannel = document.getElementById('inp-usr-radio').value;
   const status = document.getElementById('inp-usr-status').value;
   const passEl = document.getElementById('inp-usr-password');
-  const password = passEl && passEl.value.trim() ? passEl.value.trim() : (state.editingUserId ? (state.users.find(u => u.id === state.editingUserId)?.password || '123456') : '123456');
+  const rawPassword = passEl && passEl.value.trim() ? passEl.value.trim() : '';
 
   if (!name || !employeeId) {
     alert('يرجى كتابة الاسم الكامل واسم المستخدم (أو الرقم الوظيفي).');
     return;
   }
+  if (!state.editingUserId && !rawPassword) {
+    alert('يرجى إدخال كلمة مرور للحساب الجديد.');
+    return;
+  }
+
+  const existingUser = state.editingUserId ? state.users.find(u => u.id === state.editingUserId) : null;
+  const hashedPass = rawPassword
+    ? (window.KSUAuth && typeof window.KSUAuth.hashPassword === 'function' ? window.KSUAuth.hashPassword(rawPassword) : '')
+    : (existingUser?.passwordHash || '');
 
   const permissions = {
     approveReports: document.getElementById('perm-approve-reports').checked,
@@ -11921,7 +12008,10 @@ function saveUser() {
   if (state.editingUserId) {
     const idx = state.users.findIndex(item => item.id === state.editingUserId);
     if (idx !== -1) {
-      state.users[idx] = { ...state.users[idx], name, employeeId, empId: employeeId, username: employeeId, role, department, email, phone, radioChannel, status, permissions, password };
+      const updated = { ...state.users[idx], name, employeeId, empId: employeeId, username: employeeId, role, department, email, phone, radioChannel, status, permissions };
+      if (hashedPass) updated.passwordHash = hashedPass;
+      delete updated.password;
+      state.users[idx] = updated;
       showToast('تم تحديث بيانات المستخدم وصلاحياته والرقم السري بنجاح.', 'success');
     }
   } else {
@@ -11938,7 +12028,7 @@ function saveUser() {
       radioChannel,
       status,
       permissions,
-      password
+      passwordHash: hashedPass
     };
     state.users.push(newUser);
     showToast(`تمت إضافة المستخدم (${employeeId}) وتفعيل حسابه بنجاح.`, 'success');
@@ -12997,13 +13087,22 @@ function saveNewInspectionRound() {
     state.rounds.unshift(newRound);
     try { saveRounds(newRound); } catch (e) { console.warn('saveRounds error:', e); }
 
-    // Direct LocalStorage fallback guarantee across all round mirror keys
+    // Direct LocalStorage / Demo SessionStorage fallback guarantee across all round mirror keys
     try {
+      const isDemoRound = (typeof isDemoSandboxSession === 'function')
+        ? isDemoSandboxSession()
+        : Boolean(typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser());
+      const writeOp = (typeof setOperationalStorageItem === 'function')
+        ? setOperationalStorageItem
+        : function(k, v) {
+            if (isDemoRound && typeof sessionStorage !== 'undefined') sessionStorage.setItem('demo_' + k, v);
+            else localStorage.setItem(k, v);
+          };
       const serialized = JSON.stringify(state.rounds);
-      localStorage.setItem(STORAGE_KEY_ROUNDS, serialized);
-      localStorage.setItem('ksumc_field_rounds', serialized);
-      localStorage.setItem('ksumc_rounds_registry', serialized);
-      localStorage.setItem('ksumc_rounds', serialized);
+      writeOp(STORAGE_KEY_ROUNDS, serialized);
+      writeOp('ksumc_field_rounds', serialized);
+      writeOp('ksumc_rounds_registry', serialized);
+      writeOp('ksumc_rounds', serialized);
     } catch (lsErr) {
       console.warn('LocalStorage save error:', lsErr);
     }
@@ -13041,10 +13140,13 @@ function saveNewInspectionRound() {
           closedAt: null
         };
         state.capa.unshift(capaTicket);
-        if (window.KSUOracleSync && typeof window.KSUOracleSync.saveCAPA === 'function') {
+        const isDemoCapa = (typeof isDemoSandboxSession === 'function')
+          ? isDemoSandboxSession()
+          : Boolean(typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser());
+        if (!isDemoCapa && window.KSUOracleSync && typeof window.KSUOracleSync.saveCAPA === 'function') {
           try { window.KSUOracleSync.saveCAPA(capaTicket); } catch (_) {}
         }
-        if (window.KSUDataBridge && typeof window.KSUDataBridge.syncToSharePoint === 'function') {
+        if (!isDemoCapa && window.KSUDataBridge && typeof window.KSUDataBridge.syncToSharePoint === 'function') {
           try { window.KSUDataBridge.syncToSharePoint(capaTicket, 'capa'); } catch (_) {}
         }
       });
@@ -15003,15 +15105,16 @@ function toggleShiftStatus() {
 // =============================================================
 
 function saveShiftIncidents(targetIncident) {
-  localStorage.setItem(STORAGE_KEY_SHIFT_INCIDENTS, JSON.stringify(state.shiftIncidents));
+  const isDemo = isDemoSandboxSession();
+  setOperationalStorageItem(STORAGE_KEY_SHIFT_INCIDENTS, JSON.stringify(state.shiftIncidents));
   renderShiftIncidentsList();
   updateShiftIncidentBadges();
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.reportIncident === 'function') {
+  if (!isDemo && !window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.reportIncident === 'function') {
     const payload = targetIncident || (state.shiftIncidents && state.shiftIncidents.length > 0 ? state.shiftIncidents : null);
     if (payload) window.KSUOracleSync.reportIncident(payload);
   }
   notifyCloudSync();
-  if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncShiftIncidentsList === 'function') {
+  if (!isDemo && window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncShiftIncidentsList === 'function') {
     window.ksuFirebaseSync.syncShiftIncidentsList(state.shiftIncidents);
   }
   if (typeof renderHeadOperationalCenter === 'function') renderHeadOperationalCenter();
@@ -16089,10 +16192,6 @@ function resetSafetyDeptReportForm() {
   showToast('تم تفريغ حقول النموذج وتجهيز تقرير جديد.', 'info');
 }
 
-function loadSampleSafetyReport() {
-  showToast('تم إيقاف النماذج التجريبية - النظام يعمل في وضع الإنتاج الفعلي الرسمي.', 'warning');
-}
-
 function submitSafetyDeptReport() {
   const now = new Date();
   const arabicDays = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
@@ -16282,9 +16381,10 @@ function submitSafetyDeptReport() {
     state.safetyDeptReports.unshift(reportToSave);
   }
 
-  localStorage.setItem(STORAGE_KEY_SAFETY_DEPT_REPORTS, JSON.stringify(state.safetyDeptReports));
+  const isDemo = isDemoSandboxSession();
+  setOperationalStorageItem(STORAGE_KEY_SAFETY_DEPT_REPORTS, JSON.stringify(state.safetyDeptReports));
 
-  if (window.KSUDataBridge && typeof window.KSUDataBridge.saveNotification === 'function') {
+  if (!isDemo && window.KSUDataBridge && typeof window.KSUDataBridge.saveNotification === 'function') {
     try {
       window.KSUDataBridge.saveNotification({
         title: `📋 تقرير سلامة جديد (${newId}) بانتظار مراجعة المشرف العام (H1)`,
@@ -16301,10 +16401,10 @@ function submitSafetyDeptReport() {
   if (typeof syncRoundsToShiftInspectionLog === 'function') {
     syncRoundsToShiftInspectionLog();
   }
-  if (window.KSUOracleSync && typeof window.KSUOracleSync.saveReport === 'function') {
+  if (!isDemo && window.KSUOracleSync && typeof window.KSUOracleSync.saveReport === 'function') {
     window.KSUOracleSync.saveReport(reportToSave);
   }
-  if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncSafetyDeptReport === 'function') {
+  if (!isDemo && window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncSafetyDeptReport === 'function') {
     window.ksuFirebaseSync.syncSafetyDeptReport(reportToSave);
   }
 
@@ -16369,7 +16469,13 @@ function renderSafetyDeptReportsTable() {
   const cleanReports = rawReports.filter(r => r && r.subject && !String(r.id || '').startsWith('REP-KKUH-'));
   if (cleanReports.length !== rawReports.length) {
     state.safetyDeptReports = cleanReports;
-    try { localStorage.setItem(STORAGE_KEY_SAFETY_DEPT_REPORTS, JSON.stringify(cleanReports)); } catch (e) {}
+    try {
+      if (typeof setOperationalStorageItem === 'function') {
+        setOperationalStorageItem(STORAGE_KEY_SAFETY_DEPT_REPORTS, JSON.stringify(cleanReports));
+      } else if (!(typeof isDemoSandboxSession === 'function' && isDemoSandboxSession())) {
+        localStorage.setItem(STORAGE_KEY_SAFETY_DEPT_REPORTS, JSON.stringify(cleanReports));
+      }
+    } catch (e) {}
   }
   const reports = cleanReports;
 
@@ -16500,12 +16606,23 @@ function editSafetyDeptReport(reportId) {
 
 function deleteSafetyDeptReport(reportId) {
   if (!confirm(`هل أنت متأكد من حذف تقرير قسم السلامة رقم (${reportId})؟`)) return;
+  const isDemo = (typeof isDemoSandboxSession === 'function')
+    ? isDemoSandboxSession()
+    : Boolean(typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser());
   state.safetyDeptReports = (state.safetyDeptReports || []).filter(x => x.id !== reportId);
-  localStorage.setItem(STORAGE_KEY_SAFETY_DEPT_REPORTS, JSON.stringify(state.safetyDeptReports));
-  if (window.KSUOracleSync && typeof window.KSUOracleSync.deleteSafetyDeptReport === 'function') {
-    window.KSUOracleSync.deleteSafetyDeptReport(reportId);
+  if (typeof setOperationalStorageItem === 'function') {
+    setOperationalStorageItem(STORAGE_KEY_SAFETY_DEPT_REPORTS, JSON.stringify(state.safetyDeptReports));
+  } else if (isDemo && typeof sessionStorage !== 'undefined') {
+    sessionStorage.setItem('demo_' + STORAGE_KEY_SAFETY_DEPT_REPORTS, JSON.stringify(state.safetyDeptReports));
+  } else {
+    localStorage.setItem(STORAGE_KEY_SAFETY_DEPT_REPORTS, JSON.stringify(state.safetyDeptReports));
   }
-  notifyCloudSync();
+  if (!isDemo) {
+    if (window.KSUOracleSync && typeof window.KSUOracleSync.deleteSafetyDeptReport === 'function') {
+      window.KSUOracleSync.deleteSafetyDeptReport(reportId);
+    }
+    notifyCloudSync();
+  }
   renderSafetyDeptReportsTable();
   showToast(`تم حذف التقرير (${reportId}) بنجاح.`, 'success');
 }
@@ -21522,9 +21639,10 @@ function getShiftLabel(shiftKey) {
 }
 
 function syncRoundsToShiftInspectionLog(silent = false) {
+  const isDemo = isDemoSandboxSession();
   let storedRecords = [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_SHIFT_INSPECTION_LOGS);
+    const raw = getOperationalStorageItem(STORAGE_KEY_SHIFT_INSPECTION_LOGS);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) storedRecords = parsed;
@@ -21659,8 +21777,8 @@ function syncRoundsToShiftInspectionLog(silent = false) {
     return tB - tA;
   });
 
-  localStorage.setItem(STORAGE_KEY_SHIFT_INSPECTION_LOGS, JSON.stringify(mergedList));
-  if (!silent && window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncShiftLogs === 'function') {
+  setOperationalStorageItem(STORAGE_KEY_SHIFT_INSPECTION_LOGS, JSON.stringify(mergedList));
+  if (!isDemo && !silent && window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncShiftLogs === 'function') {
     window.ksuFirebaseSync.syncShiftLogs(mergedList);
   }
   return mergedList;
@@ -21672,11 +21790,12 @@ function getShiftInspectionRecords() {
 }
 
 function saveShiftInspectionRecords(records) {
-  localStorage.setItem(STORAGE_KEY_SHIFT_INSPECTION_LOGS, JSON.stringify(records));
-  if (!window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveShiftLog === 'function') {
+  const isDemo = isDemoSandboxSession();
+  setOperationalStorageItem(STORAGE_KEY_SHIFT_INSPECTION_LOGS, JSON.stringify(records));
+  if (!isDemo && !window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveShiftLog === 'function') {
     if (Array.isArray(records) && records.length > 0) window.KSUOracleSync.saveShiftLog(records);
   }
-  if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncShiftLogs === 'function') {
+  if (!isDemo && window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncShiftLogs === 'function') {
     window.ksuFirebaseSync.syncShiftLogs(records);
   }
   notifyCloudSync();
@@ -22591,10 +22710,7 @@ function openAssignTaskModal() {
     state.currentUser = window.KSUAuth.getUser();
   }
   if (!state.currentUser) {
-    const raw = localStorage.getItem('ksu_active_user');
-    if (raw) {
-      try { state.currentUser = JSON.parse(raw); } catch(e){}
-    }
+    state.currentUser = getResolvedActiveUser();
   }
 
   const currentUserObj = state.currentUser;
@@ -23272,10 +23388,10 @@ document.addEventListener('DOMContentLoaded', () => {
   updateHeaderUserProfile();
 
   const isLoggedOut = localStorage.getItem('ksu_user_logged_out') === 'true';
-  const savedActive = localStorage.getItem('ksu_active_user');
+  const savedActive = getResolvedActiveUser();
 
   // Enforce Unified Login Gate immediately if:
-  // 1. Incognito / Private Browsing (no savedActive session in localStorage)
+  // 1. Incognito / Private Browsing (no savedActive session in sessionStorage/localStorage)
   // 2. Explicitly logged out
   // 3. User clicked login link or URL contains login=1 / #login
   if (!savedActive || isLoggedOut || window.location.search.includes('login=1') || window.location.hash === '#login') {
@@ -24365,15 +24481,11 @@ function openLoginModal() {
 
   // Reset to portal selection view if no user active
   const isLoggedOut = localStorage.getItem('ksu_user_logged_out') === 'true';
-  const savedActive = localStorage.getItem('ksu_active_user');
-  let activeUser = null;
-  if (savedActive && !isLoggedOut) {
-    try { activeUser = JSON.parse(savedActive); } catch (e) {}
-  }
+  const activeUser = !isLoggedOut ? getResolvedActiveUser() : null;
 
   // Strict Portal Isolation: Directly lock to active portal
   const urlParams = new URLSearchParams(window.location.search);
-  const qPortal = urlParams.get('portal') || state.activePortal || localStorage.getItem('ksu_active_portal') || 'field';
+  const qPortal = urlParams.get('portal') || state.activePortal || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('ksu_active_portal')) || localStorage.getItem('ksu_active_portal') || 'field';
   state.activePortal = qPortal;
   state.selectedLoginPortal = qPortal;
   selectPortal(qPortal);
@@ -24411,7 +24523,7 @@ function openLoginModal() {
 
 function closeLoginModal() {
   const isLoggedOut = localStorage.getItem('ksu_user_logged_out') === 'true';
-  const savedActive = localStorage.getItem('ksu_active_user');
+  const savedActive = getResolvedActiveUser();
   
   if (!savedActive || isLoggedOut || !state.currentUser) {
     showLoginFeedback('يرجى تسجيل الدخول أولاً للوصول إلى بيانات النظام.', 'warning');
@@ -24578,10 +24690,10 @@ function selectLoginQuickUser(userId) {
     emailInput.value = targetUser.email || targetUser.employeeId;
   }
   if (passInput) {
-    const defaultPass = targetUser.password || (targetUser.id === 'USR-01' ? 'admin123' : 'ksu123');
-    passInput.value = defaultPass;
+    passInput.value = '';
+    passInput.focus();
   }
-  showLoginFeedback(`تم اختيار: ${targetUser.name} (${targetUser.role}). يمكنك النقر على "دخول النظام" للمتابعة مباشرة.`, 'success');
+  showLoginFeedback(`تم اختيار: ${targetUser.name} (${targetUser.role}). يرجى إدخال كلمة المرور للمتابعة.`, 'success');
 }
 
 function handleKsuLoginFormSubmit(e) {
@@ -24596,7 +24708,7 @@ function handleKsuLoginFormSubmit(e) {
     return;
   }
   if (!passVal) {
-    showLoginFeedback('يرجى إدخال كلمة المرور (الافتراضية للمفتشين: ksu123 أو الرقم الوظيفي).', 'warning');
+    showLoginFeedback('يرجى إدخال كلمة المرور.', 'warning');
     document.getElementById('ksu-login-password')?.focus();
     return;
   }
@@ -24647,33 +24759,16 @@ function handleKsuLoginFormSubmit(e) {
   }
 
   if (!foundUser) {
-    showLoginFeedback('لم يتم العثور على حساب مطابق لـ "' + inputVal + '". يمكنك اختيار اسمك مباشرة من تبويب "الدخول السريع للورديات".', 'error');
+    showLoginFeedback('لم يتم العثور على حساب مطابق لـ "' + inputVal + '".', 'error');
     return;
   }
 
-  // Password verification: flexible to support customized password, staff defaults, employee ID, and master key
-  const enteredPass = passVal.toLowerCase().trim();
-  const userPass = (foundUser.password || (foundUser.id === 'USR-01' ? 'admin123' : 'ksu123')).toLowerCase().trim();
-  const empIdClean = (foundUser.employeeId || '').toLowerCase().trim();
-  const empIdAlpha = empIdClean.replace(/[^a-z0-9]/g, '');
+  const verifiedUser = (window.KSUAuth && typeof window.KSUAuth.authenticate === 'function')
+    ? window.KSUAuth.authenticate(foundUser.username || foundUser.empId || foundUser.employeeId || inputVal, passVal)
+    : null;
 
-  const validPasswords = [
-    userPass,
-    'ksu123',
-    'admin123',
-    '123456',
-    '1234',
-    empIdClean,
-    empIdAlpha,
-    'ksu2026safety'
-  ];
-  if (foundUser.phone) {
-    validPasswords.push(foundUser.phone.trim());
-    validPasswords.push(foundUser.phone.slice(-4));
-  }
-
-  if (!validPasswords.includes(enteredPass)) {
-    showLoginFeedback(`كلمة المرور غير صحيحة لحساب (${foundUser.name}). يرجى استخدام كلمة المرور ksu123 أو الرقم الوظيفي.`, 'error');
+  if (!verifiedUser) {
+    showLoginFeedback(`كلمة المرور غير صحيحة لحساب (${foundUser.name}).`, 'error');
     const passEl = document.getElementById('ksu-login-password');
     if (passEl) {
       passEl.value = '';
@@ -24901,11 +24996,10 @@ function hasPermission(permKey) {
 function updateHeaderUserProfile() {
   let user = null;
   const isLoggedOut = localStorage.getItem('ksu_user_logged_out') === 'true';
-  const savedActive = localStorage.getItem('ksu_active_user');
+  const parsed = !isLoggedOut ? getResolvedActiveUser() : null;
 
-  if (savedActive && !isLoggedOut) {
+  if (parsed) {
     try { 
-      const parsed = JSON.parse(savedActive);
       const full = (state.users && state.users.find(u => u.employeeId === parsed.employeeId || u.email === (parsed.username || parsed.email) || u.name === parsed.name)) || parsed;
       user = { ...full, ...parsed, permissions: (full && full.permissions) ? full.permissions : (parsed.permissions || {}) };
     } catch(e) {}

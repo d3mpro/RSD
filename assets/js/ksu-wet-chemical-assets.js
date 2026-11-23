@@ -458,6 +458,5 @@ if (typeof INITIAL_ASSETS !== "undefined" && Array.isArray(INITIAL_ASSETS)) {
   const newWet = KSU_WET_CHEM_ASSETS.filter(a => !existingWetIds.has(a.id));
   if (newWet.length > 0) {
     INITIAL_ASSETS.push(...newWet);
-    console.log("[WET-CHEM] تم إضافة", newWet.length, "أنظمة إطفاء رطب (Wet Chemical) للمبنى الإداري إلى قاعدة الأصول");
   }
 }

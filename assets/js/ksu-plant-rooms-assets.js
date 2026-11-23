@@ -1140,6 +1140,5 @@ if (typeof INITIAL_ASSETS !== "undefined" && Array.isArray(INITIAL_ASSETS)) {
   const newInd = KSU_PLANT_ROOM_ASSETS.filter(a => !existingIndIds.has(a.id));
   if (newInd.length > 0) {
     INITIAL_ASSETS.push(...newInd);
-    console.log("[PlantRooms] تم إضافة", newInd.length, "غرفة صناعية إلى قاعدة الأصول");
   }
 }

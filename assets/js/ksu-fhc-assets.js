@@ -2153,6 +2153,5 @@ if (typeof INITIAL_ASSETS !== "undefined" && Array.isArray(INITIAL_ASSETS)) {
   const newFHC = KSU_FHC_ASSETS.filter(a => !existingFhcIds.has(a.id));
   if (newFHC.length > 0) {
     INITIAL_ASSETS.push(...newFHC);
-    console.log("[FHC] تم إضافة", newFHC.length, "صندوق حريق للمبنى الإداري إلى قاعدة الأصول");
   }
 }

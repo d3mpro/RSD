@@ -1,91 +1,57 @@
-# Project: Oracle Vision Agent (الراصد البصري الذكي) Diagnostic & Remediation
+# Project: RSD Field Demo Sandbox & IT-Readiness Cleanup
 
 ## Architecture
-The KSUMC Oracle Vision Agent (الراصد البصري) architecture consists of:
-1. **Frontend Portals**:
-   - `field.html`: Mobile-first field inspection portal for safety officers (fire safety, evacuation routes, chemical storage, electrical rooms, doors, cylinders).
-   - `quality.html`: Administrative and quality oversight portal for review, approvals, reporting, and duty schedule OCR.
-   - `assets/js/ksu-ai-client.js`: Unified client-side SDK managing AI provider fallback chain, image capture, compression, audio structuring, and inspection modals.
-   - `assets/js/vision-reticle-helper.js`: Visual reticle and target framing assistant.
-2. **Backend Vision & AI Services (`oracle-vision-agent/`)**:
-   - `agent_server.py`: FastAPI server handling multimodal vision analysis (`/safety/api/ai/analyze-inspection-image`), safety advisor (`/safety/api/ai/ask-safety-assistant`), voice structuring (`/safety/api/ai/structure-voice-record`), and status (`/safety/api/ai/status`).
-   - `agent_server.js`: Node.js server counterpart providing local endpoint tests and provider routing.
-   - `firebase_bridge.py`: Background worker bridging Firebase Firestore jobs to the local inference engine.
-   - Local Ollama AI Runtime: Local inference engine running `qwen2.5vl:3b`.
-3. **Data & Integration Layer**:
-   - Firebase Firestore for violation records, task dispatches, and activity feeds.
-   - External Multi-modal APIs (GitHub Models, Qwen OpenRouter/DashScope, Google Gemini) as Tier 1 cloud providers, failing over to local Ollama.
-
----
-
-## Root Causes Identified (Survey Phase Summary)
-1. **Invalid / Corrupted Cloud Keys**: The hardcoded Gemini key (`AQ.Ab8RN6K...`) returns HTTP 401 across all portals, and the live production server has zero cloud vision keys configured.
-2. **CPU Inference Bottleneck vs Premature Client Timeout**: Ollama on CPU takes ~120-130s per image, while the client has a 15s (Firebase) / 35s timeout. 100% of client requests abort due to timeout.
-3. **Deceptive Client Heuristic Fallback**: On timeout, `ksu-ai-client.js` executes `heuristicVisualAnalysis()`, generating static pre-canned violations without reading the image.
-4. **Camera & Reticle Disconnect**: No live stream (`getUserMedia`); clicking the camera opens native device file capture, hiding the SVG reticle.
-5. **Premature Auto-Analysis Trigger**: A 350ms timeout fires immediately upon photo selection, sending default/empty metadata before the user can select location or add notes.
-6. **Double Image Compression & Missing EXIF Transpose**: Images are compressed twice and rotated 90 degrees sideways without EXIF orientation handling.
-7. **Broken Text & Voice Endpoints**: Text endpoints fail (503) because `qwen2.5:3b` was not installed, while `qwen2.5vl:3b` is installed and can handle text.
-8. **UI/UX & Integration Disconnects**: Duplicate violation modal fields in `field.html`, missing scan keyframe animation, violations hidden from `quality.html` inbox, duty schedule OCR hard-wired to broken key.
+The KSUMC RSD (الراصد) platform is a multi-portal web application served by `server.js` / Firebase Hosting:
+1. **Authentication & Guards (`assets/js/auth-guard.js`, `index.html`)**:
+   - `KSUAuth` manages user authentication, roles (`field_inspector`, `shift_supervisor`, `quality`, `head`, `admin`, `developer`), session storage, and per-portal `KSUAuth.protect(...)` guards.
+2. **Field Inspector Portal (`field.html` + `assets/js/app.js`)**:
+   - Mobile-first inspection portal for rounds, violations, alarms, permits, doors, CAPA, and safety reports.
+3. **Sync & Data Layer**:
+   - `assets/js/ksumc-data-bridge.js`: Local storage abstraction + SharePoint webhook (`syncToSharePoint`).
+   - `assets/js/ksu-firebase-realtime.js`: Firebase Realtime Database bidirectional sync (`ksuFirebaseSync`).
+   - `assets/js/ksu-integrations.js`: Audit trail & integration hooks.
+4. **Oversight Portals**:
+   - `quality.html`, `head.html`, `admin.html`, `dashboard.html`, `profile.html`.
 
 ---
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
 |---|---------|-------------|-----------|--------|
-| 1 | EXIF Orientation & Preprocessing | Correct smartphone image orientation (`exif_transpose`) and clean single-pass resize without distortion | M1 | Backend Survey |
-| 2 | Multimodal & Text Model Fallback | Support `qwen2.5vl:3b` as text model fallback when `qwen2.5:3b` is absent; graceful fallback in `agent_server.py` | M1 | Backend Survey |
-| 3 | Backend Verification & Error Propagation | Proper status reporting, meaningful HTTP errors, and test harness execution | M1 | Backend Survey |
-| 4 | Client API Routing & Endpoint Discovery | Fix `getApiUrl` dead code, preserve localhost/remote URLs, prevent mixed content | M2 | Integration Survey |
-| 5 | Adaptive Timeout & Transparent Feedback | Replace 15s hard timeout cliff with adaptive timeout, progress indicators, and eliminate deceptive fake heuristic fallback | M2 | Frontend & Integration Survey |
-| 6 | Cloud Key Management & Validation | Sanitize API keys, eliminate HTTP 401 hardcoded key, support dynamic admin key entry | M2 | Integration Survey |
-| 7 | Live Camera Stream & Reticle Overlay | Implement `navigator.mediaDevices.getUserMedia` live camera feed with SVG reticle overlay, keeping file-picker as fallback | M3 | Frontend Survey |
-| 8 | Inspection Flow Control | Eliminate the 350ms auto-trigger cliff; allow inspectors to verify photo, select location, and trigger analysis explicitly | M3 | Frontend Survey |
-| 9 | Field Violation Modal Deduplication | Resolve duplicate `inp-violation-*` and `inp-sv-*` fields in `field.html` to prevent data loss | M3 | Frontend Survey |
-| 10 | Quality Portal Integration & Duty OCR | Include safety violations in `quality.html` inbox; include `vision-reticle-helper.js`; add OCR failover | M3 | Frontend Survey |
-| 11 | Impeccable UI/UX & Arabic Styling | Add `@keyframes scan`, ensure high contrast, clean typography, remove generic purple AI gradients | M3 | Frontend Survey & User Rules |
-| 12 | End-to-End Verification & Adversarial Hardening | Comprehensive test suite (Tiers 1-4) and adversarial verification (Tier 5) | M4 | System Requirement |
+| 1 | Demo Account (`demo` / `demo`) Auth | Add `DEMO_USER` (`isDemoAccount: true`, `field_inspector`, `portal: 'field'`) in `auth-guard.js`; store session in `sessionStorage`; skip Firebase email/password auth in `index.html`; restrict `demo` to `field.html` only (`protect()` + `dashboard.html` + `profile.html`). | M1 | Survey 1 & 3 |
+| 2 | Demo Storage Isolation & Sync Blocking | Isolate operational storage to `sessionStorage` (`demo_` prefix) in `ksumc-data-bridge.js` & `app.js`; block all `ksuFirebaseSync` inbound/outbound, `KSUDataBridge.syncToSharePoint`, `KSUOracleSync`, `KSUIntegrations.recordAuditTrail`, and `notifyCloudSync` when `isDemoUser()`; clear demo keys on logout/close. | M1 | Survey 1 & 3 |
+| 3 | Field Portal Demo Mode UI | Display a clear, high-contrast Demo Mode banner/badge in `field.html`, update cloud status pill, hide/disable links to other portals, and skip SW background notification sync. | M1 | Survey 1 |
+| 4 | Category A Safe Dead-Code Cleanup | Remove provably dead inline HTML functions (`field.html:4899-4909, 5358-5361`, `head.html:2555-2561`), hidden `#comprehensiveRoundsLogSection` (`head.html:834-931`), dead JS stubs (`app.js:16092-16094`, `ksu-nav-component.js:329-332`, `ksu-ai-client.js:38-39`), and 20 `console.log` debug leftovers. | M1 | Survey 2 |
+| 5 | Automated Demo Isolation & Regression Tests | Add `tests/test_demo_account_isolation.test.js` and verify all 14 baseline passing test suites + syntax checks pass with zero regressions. | M1 | Survey 3 |
+| 6 | Category B & Canceled Code Removal | Delete `accounts-credentials-a4.html`, `ksu-system-mode.js`, `ksu-share-service.js`, `sharek-pitch.html`, `executive_report.html`, `database.rules.strict.json`, `deploy-to-rsd-go-demo.*`, `deploy-test-rsd-pro.bat`; remove `QUICK_PERSONAS`/`#quick-access-section`, `openCloudArchiveHub()`, `switchUser()`, `rsd-go-demo` host/config refs, `sharek` routes/refs, hardcoded `apiKeyHeader` literal, and `Math.random()` in `syncWorkOrderToHospitalCMMS`. Keep `api.html` and `oracle-vision-agent/agent_server.js`. | M2 | CatB Survey 1-3 |
+| 7 | Test Alignment & Full Verification | Update only tests/docs tied to removed features (`test_tier5_auth_shift_adversarial.test.js`, `test_demo_account_isolation.test.js`, `e2e_production_readiness.test.js`, `test_violations_isolation_and_archive.test.js`, `test_nav_role_gating.js`, `test_api_vault_and_silent_fallback.test.js`, `TEST_INFRA.md`, `TEST_READY.md`) and pass `node --check`, full test suite, Playwright portal smoke, and final forensic audit. | M2 | CatB Survey 3 |
 
 ---
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Backend Vision Engine & API Resilience | `oracle-vision-agent/agent_server.py`, `agent_server.js`, EXIF handling, text model failover, status endpoint resilience | none | PLANNED |
-| M2 | Frontend AI Client & Communication Protocol | `assets/js/ksu-ai-client.js`, API routing, adaptive timeout, transparent status alerts, removal of fake heuristic results | M1 | PLANNED |
-| M3 | Field & Quality Portals UI/UX Overhaul | `field.html`, `quality.html`, `vision-reticle-helper.js`, live camera, removal of 350ms trigger, deduplicated modals, duty OCR failover | M2 | PLANNED |
-| M4 | E2E Testing & Final Acceptance Verification | Opaque-box test suite (Tiers 1-4) + adversarial coverage hardening (Tier 5) | M1, M2, M3 | PLANNED |
+| M1 | Demo Sandbox (`demo`/`demo`) + Category A Cleanup & Verification | `auth-guard.js`, `index.html`, `field.html`, `head.html`, `dashboard.html`, `quality.html`, `app.js`, `ksumc-data-bridge.js`, `ksu-firebase-realtime.js`, `ksu-integrations.js`, `ksu-nav-component.js`, `ksu-ai-client.js`, `ksu-cloud-sync.js`, `tests/test_demo_account_isolation.test.js` | none | DONE |
+| M2 | Category B Cleanup, Canceled Code Removal & Full Verification | All Category B items (B1–B9, B11; keeping B10 `agent_server.js` & `api.html`), `sharek`/`rsd-go-demo`/`QUICK_PERSONAS` leftovers across HTML/JS/config/deploy scripts, coupled test/doc updates, and full verification | M1 | IN_PROGRESS |
 
 ---
 
 ## Interface Contracts
-### Client ↔ Backend (`/safety/api/ai/analyze-inspection-image`)
-- **Request**:
-  - `image_base64`: Clean JPEG/PNG base64 string (EXIF orientation normalized).
-  - `checklist_type`: e.g. `'fire_extinguisher'`, `'evacuation_route'`, `'chemical_storage'`, etc.
-  - `notes`: Inspector observations.
-  - `building`, `floor`, `room`: Location metadata.
-- **Response**:
-  - `success`: boolean
-  - `status`: `'مطابق'` | `'غير مطابق'` | `'تحذير'` | `'غير محدد'`
-  - `risk`: `'منخفض'` | `'متوسط'` | `'عالي'` | `'حرج'`
-  - `observations`: string[]
-  - `recommendations`: string[]
-  - `raw_text`: string
-  - `provider_used`: string
-  - `processing_time_sec`: number
-
-### Client ↔ Backend (`/safety/api/ai/ask-safety-assistant` & `/safety/api/ai/structure-voice-record`)
-- **Text Queries**:
-  - When text model (`qwen2.5:3b`) is not installed, backend must dynamically fallback to `qwen2.5vl:3b` or rulebase without throwing 503 error.
+### `KSUAuth.isDemoUser(user)` (`assets/js/auth-guard.js`)
+- Returns `true` iff `(user || this.getUser())?.isDemoAccount === true` or `username === 'demo'`.
+- When `true`:
+  - `KSUAuth.login(user)` writes `ksu_active_user` and `ksu_active_portal` to `sessionStorage` (and removes `ksu_active_user` from `localStorage`).
+  - `KSUAuth.logout()` clears `sessionStorage` demo keys (`ksu_active_user`, `ksu_active_portal`, and all `demo_*` / `ksu_demo_*` keys).
+  - `KSUAuth.protect(portalKey)` redirects to `field.html` for any `portalKey !== 'field'`.
+  - `KSUAuth.saveUser` / `KSUAuth.updateUserProfile` are blocked and return `false`.
 
 ---
 
 ## Code Layout
-- `oracle-vision-agent/agent_server.py`: Python FastAPI backend server.
-- `oracle-vision-agent/agent_server.js`: Node.js backend server.
-- `assets/js/ksu-ai-client.js`: Core frontend AI client SDK.
-- `assets/js/vision-reticle-helper.js`: UI reticle framing helper.
-- `field.html`: Field inspector interface.
-- `quality.html`: Quality and admin oversight portal.
-- `tests/`: Automated unit and integration test suite.
+- `assets/js/auth-guard.js`: Authentication, session management, role guards.
+- `assets/js/ksumc-data-bridge.js`: Storage & SharePoint bridge.
+- `assets/js/ksu-firebase-realtime.js`: Firebase RTDB sync engine.
+- `assets/js/app.js`: Core portal state & persistence.
+- `assets/js/ksu-integrations.js`: Audit trail & integrations.
+- `field.html`, `index.html`, `head.html`, `quality.html`, `dashboard.html`: Portal pages.
+- `tests/`: Native `node --test` + `node:vm` test suite.

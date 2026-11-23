@@ -52,8 +52,6 @@
   <script src="assets/js/auth-guard.js?v=5.0"></script>
   <script src="assets/js/ksumc-data-bridge.js?v=6.3.1"></script>
   <script src="assets/js/ksu-firebase-realtime.js?v=6.9.1"></script>
-  <script src="assets/js/ksu-system-mode.js?v=1.2"></script>
-  <script src="assets/js/ksu-oracle-realtime.js?v=6.0"></script>
   <script src="assets/js/ksu-ai-client.js?v=7.3.1"></script>
   
   <style>
@@ -1012,7 +1010,7 @@
           await window.KSUOracleSync.syncInitialData();
         }
 
-        const apiKey = 'ksu_sec_token_95972_riyadh';
+        const apiKey = (typeof window !== 'undefined' && (window.KSU_AGENT_TOKEN || (window.localStorage && localStorage.getItem('ksu_agent_token')))) || '';
         let targetHost = (window.location.host && !window.location.host.includes('localhost') && !window.location.host.includes('127.0.0.1')) ? window.location.host : '84.13.138.203';
         const isHttps = window.location.protocol === 'https:';
         const httpProto = (targetHost.includes('84.13.138.203') && !isHttps) ? 'http:' : window.location.protocol;
@@ -1341,9 +1339,15 @@
     function updateDashboardUserProfile() {
       let user = null;
       const isLoggedOut = localStorage.getItem('ksu_user_logged_out') === 'true';
-      const savedActive = localStorage.getItem('ksu_active_user');
-      if (savedActive && !isLoggedOut) {
-        try { user = JSON.parse(savedActive); } catch(e) {}
+      if (!isLoggedOut) {
+        if (window.KSUAuth && typeof window.KSUAuth.getUser === 'function') {
+          user = window.KSUAuth.getUser();
+        } else {
+          const savedActive = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('ksu_active_user')) || localStorage.getItem('ksu_active_user');
+          if (savedActive) {
+            try { user = JSON.parse(savedActive); } catch(e) {}
+          }
+        }
       }
       const nameEl = document.getElementById('dash-user-name');
       const roleEl = document.getElementById('dash-user-role');
@@ -1470,23 +1474,27 @@
     window.approveSafetyReportByDirector = approveSafetyReportByDirector;
 
     // Initialization on Page Load
-    updateDashboardUserProfile();
-    renderDashboardLiveMetrics('all', currentRange);
-    renderDirectorSafetyReports();
-    triggerLiveSync();
+    if (window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser()) {
+      window.location.replace('field.html');
+    } else {
+      updateDashboardUserProfile();
+      renderDashboardLiveMetrics('all', currentRange);
+      renderDirectorSafetyReports();
+      triggerLiveSync();
 
-    window.addEventListener('storage', () => {
-      renderDashboardLiveMetrics(document.getElementById('dashFacilityFilter')?.value || 'all', currentRange);
-      renderDirectorSafetyReports();
-    });
-    window.addEventListener('ksumc_data_updated', () => {
-      renderDashboardLiveMetrics(document.getElementById('dashFacilityFilter')?.value || 'all', currentRange);
-      renderDirectorSafetyReports();
-    });
-    window.addEventListener('ksumc_rounds_updated', () => {
-      renderDashboardLiveMetrics(document.getElementById('dashFacilityFilter')?.value || 'all', currentRange);
-      renderDirectorSafetyReports();
-    });
+      window.addEventListener('storage', () => {
+        renderDashboardLiveMetrics(document.getElementById('dashFacilityFilter')?.value || 'all', currentRange);
+        renderDirectorSafetyReports();
+      });
+      window.addEventListener('ksumc_data_updated', () => {
+        renderDashboardLiveMetrics(document.getElementById('dashFacilityFilter')?.value || 'all', currentRange);
+        renderDirectorSafetyReports();
+      });
+      window.addEventListener('ksumc_rounds_updated', () => {
+        renderDashboardLiveMetrics(document.getElementById('dashFacilityFilter')?.value || 'all', currentRange);
+        renderDirectorSafetyReports();
+      });
+    }
   </script>
 
   <!-- Service Worker Registration for PWA Offline Functionality -->
@@ -1494,7 +1502,7 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-          .then((reg) => console.log('[KSUMC PWA] Service Worker registered:', reg.scope))
+          .then(() => {})
           .catch((err) => console.warn('[KSUMC PWA] Service Worker registration failed:', err));
       });
     }

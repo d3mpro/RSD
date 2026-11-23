@@ -22,12 +22,13 @@
     },
 
     /**
-     * 1. دالة إصدار وتكامل أمر العمل مع نظام الصيانة المؤسسي (CMMS / Oracle ERP / Maximo)
+     * 1. دالة إنشاء طلب صيانة داخلي محلي (Local Maintenance Request) وتوثيقه في سجل التدقيق
      */
     syncWorkOrderToHospitalCMMS: async function(capaFinding) {
-      console.log('[KSU-Integrations] جاري مزامنة الملاحظة مع نظام الصيانة المؤسسي...', capaFinding);
-
-      const woId = 'WO-KSU-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000);
+      const year = new Date().getFullYear();
+      this._woSeq = ((this._woSeq || 0) + 1) % 1000;
+      const seqStr = String(this._woSeq).padStart(3, '0');
+      const woId = `WO-KSU-${year}-${Date.now().toString().slice(-6)}${seqStr}`;
       const severityInfo = this.SLA_CONFIG[capaFinding.severity] || this.SLA_CONFIG['متوسط (Medium)'];
       
       const dueDate = new Date();
@@ -47,7 +48,7 @@
         targetDueDate: dueDate.toISOString(),
         reportedBy: capaFinding.inspector || 'مفتش السلامة المناوب',
         reportTimestamp: new Date().toISOString(),
-        status: 'OPEN_DISPATCHED_TO_MAINTENANCE'
+        status: 'LOCAL_MAINTENANCE_REQUEST_CREATED'
       };
 
       // تسجيل المعاملة في سجل التدقيق غير القابل للتعديل
@@ -68,7 +69,7 @@
         workOrderNumber: woId,
         dueDate: dueDate.toLocaleDateString('ar-SA'),
         slaLabel: severityInfo.label,
-        message: 'تم إصدار أمر عمل تلقائي بنجاح في نظام الصيانة: ' + woId
+        message: 'تم إنشاء طلب صيانة داخلي محلي بنجاح: ' + woId
       };
     },
 
@@ -107,6 +108,7 @@
      */
     recordAuditTrail: function(action, details) {
       try {
+        const isDemo = Boolean(typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser());
         const logEntry = {
           id: 'AUDIT-' + Date.now(),
           timestamp: new Date().toISOString(),
@@ -115,6 +117,16 @@
           operator: (window.state && window.state.currentUser && window.state.currentUser.name) || 'نظام الرقمنة الآلي',
           userRole: (window.state && window.state.currentUser && window.state.currentUser.role) || 'SYSTEM'
         };
+
+        if (isDemo) {
+          if (typeof sessionStorage !== 'undefined') {
+            const demoLogs = JSON.parse(sessionStorage.getItem('demo_ksu_safety_audit_trail') || '[]');
+            demoLogs.unshift(logEntry);
+            if (demoLogs.length > 500) demoLogs.pop();
+            sessionStorage.setItem('demo_ksu_safety_audit_trail', JSON.stringify(demoLogs));
+          }
+          return;
+        }
 
         const existingLogs = JSON.parse(localStorage.getItem('ksu_safety_audit_trail') || '[]');
         existingLogs.unshift(logEntry);

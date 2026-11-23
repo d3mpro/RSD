@@ -4,7 +4,7 @@ const path = require('path');
 
 // ==============================================================================
 // KSUMC Safety & Inspection Platform - Local HTTP Server
-// خادم منصة رصد الذكية المعتمد - دعم ملف شارك 7 والمسارات النظيفة
+// خادم منصة رصد الذكية المعتمد - دعم المسارات النظيفة
 // ==============================================================================
 
 const mimeTypes = {
@@ -33,17 +33,8 @@ const mimeTypes = {
   '.txt': 'text/plain; charset=utf-8'
 };
 
-// خريطة التوجيه الصريح للمسارات المختصرة وملف شارك
+// خريطة التوجيه الصريح للمسارات المختصرة
 const ROUTE_ALIASES = {
-  '/sharek': '/sharek-pitch.html',
-  '/sharek-pitch': '/sharek-pitch.html',
-  '/sharek.html': '/sharek-pitch.html',
-  '/pitch': '/sharek-pitch.html',
-  '/شارك': '/sharek-pitch.html',
-  '/ملف-شارك': '/sharek-pitch.html',
-  '/ملف_شارك': '/sharek-pitch.html',
-  '/report': '/executive_report.html',
-  '/executive-report': '/executive_report.html',
   '/field': '/field.html',
   '/head': '/head.html',
   '/admin': '/admin.html',
@@ -111,7 +102,6 @@ function send404(res) {
         <p>عذراً، لم يتم العثور على المسار المطلوب في منصة رصد الذكية.</p>
         <div class="links">
           <a href="/" class="btn-primary">الرئيسية</a>
-          <a href="/sharek" class="btn-amber">ملف شارك 7</a>
         </div>
       </div>
     </body>
@@ -191,8 +181,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`   الخادم المحلي يعمل الآن بنجاح على: http://localhost:${PORT}`);
   console.log(`=====================================================================`);
   console.log(`- بوابة المنظومة الرئيسية:   http://localhost:${PORT}/`);
-  console.log(`- ملف الترشيح في معرض شارك: http://localhost:${PORT}/sharek`);
-  console.log(`- الرابط المباشر لملف شارك: http://localhost:${PORT}/sharek-pitch.html`);
   console.log(`- البوابات المتاحة مباشرة:   /field, /head, /admin, /quality, /dashboard`);
   console.log(`=====================================================================`);
 });

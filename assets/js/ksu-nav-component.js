@@ -92,7 +92,6 @@
     detectCurrentPortal: function() {
       const path = window.location.pathname.toLowerCase();
       if (path.includes('developer')) return 'developer';
-      if (path.includes('sharek')) return 'sharek';
       if (path.includes('profile')) return 'profile';
       if (path.includes('head')) return 'head';
       if (path.includes('field')) return 'field';
@@ -128,7 +127,7 @@
       let user = (window.KSUAuth && typeof window.KSUAuth.getUser === 'function') ? window.KSUAuth.getUser() : null;
       if (!user) {
         try {
-          const raw = localStorage.getItem('ksu_active_user');
+          const raw = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('ksu_active_user')) || localStorage.getItem('ksu_active_user');
           if (raw) user = JSON.parse(raw);
         } catch (e) {}
       }
@@ -151,9 +150,7 @@
       );
 
       const isQuality = activeKey === 'quality';
-      const isProduction = (window.KSUSystemMode && typeof window.KSUSystemMode.isProduction === 'function') 
-        ? window.KSUSystemMode.isProduction() 
-        : (localStorage.getItem('ksumc_system_mode') === 'production');
+      const isProduction = true;
 
       header.innerHTML = `
         <!-- الجانب الأيمن: الشعار واسم البوابة الحالية (هوية موحدة مثل البوابة الميدانية) -->
@@ -324,16 +321,6 @@
           </div>
         </div>
       `;
-    },
-
-    togglePortalMenu: function() {
-      // المعاينة والتبديل التجريبي معطل تماماً في بيئة الإنتاج المعتمدة
-      return false;
-    },
-
-    openCloudArchiveHub: function() {
-      // تم الاستغناء عن نافذة الأرشفة اليدوية بعد تفعيل الحفظ التلقائي المباشر في شيربوينت
-      return false;
     },
 
     toggleUserMenu: function() {

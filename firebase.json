@@ -88,22 +88,6 @@
       {
         "source": "/profile",
         "destination": "/profile.html"
-      },
-      {
-        "source": "/executive_report",
-        "destination": "/executive_report.html"
-      },
-      {
-        "source": "/report",
-        "destination": "/executive_report.html"
-      },
-      {
-        "source": "/sharek",
-        "destination": "/sharek-pitch.html"
-      },
-      {
-        "source": "/accounts",
-        "destination": "/accounts-credentials-a4.html"
       }
     ],
     "headers": [

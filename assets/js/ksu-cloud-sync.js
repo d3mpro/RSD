@@ -46,8 +46,12 @@ class KSUCloudSyncEngine {
     this.archiveRootFolderName = 'KSUMC_RSD_Safety_Archive';
     this._cachedDirHandle = null;
 
-    const savedUser = localStorage.getItem('ksu_active_user');
-    if (savedUser) {
+    const savedUser = (window.KSUAuth && typeof window.KSUAuth.getUser === 'function')
+      ? null
+      : ((typeof sessionStorage !== 'undefined' && sessionStorage.getItem('ksu_active_user')) || localStorage.getItem('ksu_active_user'));
+    if (window.KSUAuth && typeof window.KSUAuth.getUser === 'function') {
+      this.currentUser = window.KSUAuth.getUser();
+    } else if (savedUser) {
       try {
         this.currentUser = JSON.parse(savedUser);
       } catch (e) {}
@@ -525,7 +529,7 @@ class KSUCloudSyncEngine {
 
     // 2. Vision Agent Cross-Device Archive Vault (direct HTTP -> Firebase Bridge fallback)
     if (cardId && /^[A-Za-z0-9_-]{1,80}$/.test(cardId)) {
-      const token = (window.KSUAI && window.KSUAI.apiKeyHeader) || 'ksu_sec_token_95972_riyadh';
+      const token = (window.KSUAI && window.KSUAI.apiKeyHeader) || (typeof window !== 'undefined' && (window.KSU_AGENT_TOKEN || (window.localStorage && localStorage.getItem('ksu_agent_token')))) || '';
       const agentBase = (window.KSUAI && typeof window.KSUAI.getApiUrl === 'function')
         ? window.KSUAI.getApiUrl(`/archive/media/${encodeURIComponent(cardId)}`)
         : `${(localStorage.getItem('ksumc_oracle_agent_url') || 'https://rsdsafety.online').replace(/\/+$/, '')}/safety/api/archive/media/${encodeURIComponent(cardId)}`;

@@ -42,14 +42,14 @@ The test suite in `tests/e2e_production_readiness.test.js` is structured into 4 
 
 ### Tier 1: Feature Coverage (Requirement Verification)
 Covers core feature specifications, user roster restoration, and portal accessibility:
-- **Tier 1.1**: Official Credentials Document (`accounts-credentials-a4.html`) integrity, Document Code `KSUMC-RSD-ACT-01`, unified PIN `123456`, and official personnel names.
+- **Tier 1.1**: Official 22-account roster integrity (`KSUAuth.getDefaultUsers()`) and verification that `accounts-credentials-a4.html` and `ksu-system-mode.js` are removed.
 - **Tier 1.2**: Short username authentication for all 14 field inspectors (`M1` through `M14`) with official names, shifts, and `/field.html` portal binding.
 - **Tier 1.3**: Short username authentication for all 3 shift supervisors (`S1`, `S2`, `S3`) with shifts and `/field.html` portal binding.
 - **Tier 1.4**: Short username authentication for leadership & supervision (`H1`, `H2`, `D1`, `Q1`, `DEV`) with official names and target portals.
 - **Tier 1.5**: Role protection across portals (`KSUAuth.protect`) ensuring unauthorized roles are redirected to default portals.
 - **Tier 1.6**: 14 CBAHI/NFPA inspection checklists structure, modal triggers, and form registry.
 - **Tier 1.7**: Production hosting configuration (`firebase.json`, `deploy-to-firebase.sh`, and `sw.js` cache invalidation).
-- **Tier 1.8**: Roster synchronization & bootstrap state parity across `index.html`, `app.js`, and `ksu-system-mode.js`.
+- **Tier 1.8**: Roster synchronization & bootstrap state parity across `index.html` and `app.js`.
 - **Tier 1.9**: Inspector & supervisor session auto-binding in `field.html`.
 - **Tier 1.10**: Production environment domain auto-switch targeting `https://rsd-ksu-default-rtdb.firebaseio.com`.
 

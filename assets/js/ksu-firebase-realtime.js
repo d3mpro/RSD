@@ -17,22 +17,6 @@
 (function() {
     'use strict';
 
-    const isDemoEnvironment = typeof window !== 'undefined' && (
-        window.location.hostname.includes('rsd-go-demo') ||
-        localStorage.getItem('ksumc_system_mode') === 'demo'
-    );
-
-    const DEMO_FIREBASE_CONFIG = {
-        apiKey: "AIzaSyAfK_m1az407rQZOoqbSnGZ1D6nn11Rn6A",
-        authDomain: "rsd-go-demo.firebaseapp.com",
-        projectId: "rsd-go-demo",
-        storageBucket: "rsd-go-demo.firebasestorage.app",
-        messagingSenderId: "145211723666",
-        appId: "1:145211723666:web:9d9de10cfd803f2f2e3b4b",
-        measurementId: "G-5K43RBNLXZ",
-        databaseURL: window.KSU_FIREBASE_RTDB_URL || localStorage.getItem('ksumc_rtdb_url') || "https://rsd-go-demo-default-rtdb.firebaseio.com"
-    };
-
     const PROD_FIREBASE_CONFIG = {
         apiKey: "AIzaSyBXKoswq5Eq7JdenprjUPQkgereD2fcv7s",
         authDomain: "rsd-ksu.firebaseapp.com",
@@ -44,9 +28,9 @@
         databaseURL: window.KSU_FIREBASE_RTDB_URL || localStorage.getItem('ksumc_rtdb_url') || "https://rsd-ksu-default-rtdb.firebaseio.com"
     };
 
-    const FIREBASE_CONFIG = isDemoEnvironment ? DEMO_FIREBASE_CONFIG : PROD_FIREBASE_CONFIG;
+    const FIREBASE_CONFIG = PROD_FIREBASE_CONFIG;
 
-    const PROD_CLEANUP_VERSION = isDemoEnvironment ? 'ksumc_demo_clean_v6_0' : 'ksumc_prod_clean_v7_0_official_launch';
+    const PROD_CLEANUP_VERSION = 'ksumc_prod_clean_v7_0_official_launch';
 
     class KSUFirebaseRealtimeSync {
         constructor() {
@@ -58,12 +42,13 @@
             this.currentUserClaims = null;
             this.isAnonymousAuth = true;
             this.deviceId = this.getOrCreateDeviceId();
-            this.lastResetTimestamp = parseInt(localStorage.getItem('ksumc_shift_log_reset_at') || '0', 10);
+            this.lastResetTimestamp = this.isDemoSandboxUser() ? 0 : parseInt(localStorage.getItem('ksumc_shift_log_reset_at') || '0', 10);
             this.ensureCleanProductionStorage();
             this.init();
         }
 
         ensureCleanProductionStorage() {
+            if (this.isDemoSandboxUser()) return;
             try {
                 const storedVer = localStorage.getItem('ksumc_prod_clean_version');
                 if (storedVer !== PROD_CLEANUP_VERSION) {
@@ -104,6 +89,9 @@
         }
 
         getOrCreateDeviceId() {
+            if (this.isDemoSandboxUser()) {
+                return 'DEV-DEMO-SANDBOX';
+            }
             let id = localStorage.getItem('ksumc_device_id');
             if (!id) {
                 id = 'DEV-' + Math.random().toString(36).substring(2, 9).toUpperCase() + '-' + Date.now().toString(36);
@@ -113,6 +101,11 @@
         }
 
         init() {
+            if (this.isDemoSandboxUser()) {
+                this.isConnected = false;
+                this.updateCloudBadge(false);
+                return;
+            }
             this.setupLockScreenNotificationBridge();
             if (typeof firebase === 'undefined') {
                 this.loadFirebaseSDK().then(() => this.connectDatabase()).catch(err => {
@@ -149,7 +142,28 @@
             });
         }
 
+        isDemoSandboxUser() {
+            if (typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function') {
+                return Boolean(window.KSUAuth.isDemoUser());
+            }
+            try {
+                if (typeof sessionStorage !== 'undefined') {
+                    const raw = sessionStorage.getItem('ksu_active_user');
+                    if (raw) {
+                        const u = JSON.parse(raw);
+                        return Boolean(u && (u.isDemoAccount === true || String(u.username || '').toLowerCase() === 'demo'));
+                    }
+                }
+            } catch (_) {}
+            return false;
+        }
+
         connectDatabase() {
+            if (this.isDemoSandboxUser()) {
+                this.isConnected = false;
+                this.updateCloudBadge(false);
+                return;
+            }
             try {
                 if (!firebase.apps.length) {
                     firebase.initializeApp(FIREBASE_CONFIG);
@@ -163,7 +177,6 @@
                             this.currentAuthUid = user ? user.uid : null;
                             this.isAnonymousAuth = user ? Boolean(user.isAnonymous) : true;
                             if (user) {
-                                console.log('🛡️ [KSU-Firebase-Security] جلسة مصادقة سحابية موثقة (UID):', user.uid);
                                 if (typeof user.getIdTokenResult === 'function') {
                                     user.getIdTokenResult().then((tokenResult) => {
                                         this.currentUserClaims = (tokenResult && tokenResult.claims) ? tokenResult.claims : {};
@@ -182,10 +195,8 @@
                                 this.currentUserClaims = null;
                             }
                         });
-                        if (!auth.currentUser && typeof auth.signInAnonymously === 'function') {
-                            auth.signInAnonymously().catch((authErr) => {
-                                console.log('ℹ️ [KSU-Firebase-Security] نمط مصادقة القواعد:', authErr.code || authErr.message);
-                            });
+                        if (!this.isDemoSandboxUser() && !auth.currentUser && typeof auth.signInAnonymously === 'function') {
+                            auth.signInAnonymously().catch(() => {});
                         }
                     } catch (e) {
                         console.warn('[KSU-Firebase-Security] تنبيه تهيئة المصادقة:', e);
@@ -200,7 +211,6 @@
                     this.isConnected = (snap.val() === true);
                     this.updateCloudBadge(this.isConnected);
                     if (this.isConnected) {
-                        console.log('🟢 [KSU-Firebase] متصل بقاعدة البيانات السحابية اللحظية بنجاح');
                         this.checkAndExecuteCloudTrialPurge().then(() => {
                             this.pushPendingLocalDataToCloud();
                         });
@@ -244,6 +254,12 @@
 
         updateCloudBadge(online) {
             const badges = document.querySelectorAll('#cloud-sync-indicator, .firebase-sync-status');
+            if (this.isDemoSandboxUser()) {
+                badges.forEach(b => {
+                    b.innerHTML = '<i class="fa-solid fa-flask" style="color:#d97706;"></i> وضع تجريبي معزول (بدون مزامنة رسمية)';
+                });
+                return;
+            }
             badges.forEach(b => {
                 b.innerHTML = online
                     ? '<i class="fa-solid fa-cloud-bolt" style="color:#10b981;"></i> مزامنة سحابية لحظية (متصل)'
@@ -253,6 +269,7 @@
 
         // 1. الاستماع لتحديثات الحسابات والرتب والصلاحيات وتعيينات المشرفين لحظياً
         setupUsersListener() {
+            if (this.isDemoSandboxUser()) return;
             if (!this.db) return;
             const usersRef = this.db.ref('users');
 
@@ -348,21 +365,18 @@
 
         // 2. مراقبة حالة النظام وإشعارات التحديث وتصفير السجلات اليومية
         setupStatusMonitor() {
+            if (this.isDemoSandboxUser()) return;
             if (!this.db) return;
             this.db.ref('system_status/lastUpdate').on('value', (snap) => {
                 const info = snap.val();
                 if (!info || info.deviceId === this.deviceId) return;
-                console.log('⚡ [KSU-Firebase] تحديث فوري وارد من جهاز آخر:', info.action);
             });
 
             // الاستماع لأمر تصفير ومزامنة سجل التفتيش اليومي للورديات
             this.db.ref('system_status/shiftLogResetAt').on('value', (snap) => {
                 const resetInfo = snap.val();
                 if (!resetInfo || !resetInfo.timestamp) return;
-                const isDemo = (window.KSUSystemMode && typeof window.KSUSystemMode.isDemo === 'function')
-                    ? window.KSUSystemMode.isDemo()
-                    : (localStorage.getItem('ksumc_system_mode') === 'demo');
-                if (isDemo) return; // حماية وضع الديمو من التصفير التلقائي السحابي
+                if (this.isDemoSandboxUser()) return; // حماية وضع الديمو من التصفير التلقائي السحابي
                 const resetTs = Number(resetInfo.timestamp) || 0;
                 if (resetTs > this.lastResetTimestamp) {
                     this.lastResetTimestamp = resetTs;
@@ -408,6 +422,7 @@
 
         // 3. الاستماع الفوري للجولات التفتيشية، سجل الورديات، تقارير السلامة، وسجل الامتثال لسباهي
         setupOperationalListeners() {
+            if (this.isDemoSandboxUser()) return;
             if (!this.db) return;
 
             // أ) مزامنة الجولات التفتيشية (rounds) - السحابة هي المصدر المعتمد مع حفظ السجلات قيد الرفع
@@ -415,14 +430,6 @@
                 const remoteVal = snapshot.val();
                 const remoteList = this.normalizeFirebaseCollection(remoteVal);
                 const localList = this.safeParseJSON('ksumc_safety_rounds', []);
-                const isDemo = (window.KSUSystemMode && typeof window.KSUSystemMode.isDemo === 'function')
-                    ? window.KSUSystemMode.isDemo()
-                    : (localStorage.getItem('ksumc_system_mode') === 'demo');
-
-                if (isDemo && remoteList.length === 0 && localList.length > 0) {
-                    this.pushCollectionToFirebase('rounds', localList, 'id');
-                    return;
-                }
                 const pendingOffline = this.filterPendingOffline(localList, remoteList);
                 const finalList = pendingOffline.length > 0 ? this.mergeCollectionsById(remoteList, pendingOffline, 'id') : remoteList;
 
@@ -899,6 +906,7 @@
         }
 
         pushCollectionToFirebase(nodeName, list, idKey = 'id') {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || !Array.isArray(list)) return Promise.resolve(false);
             const payload = {};
             list.forEach(item => {
@@ -916,6 +924,7 @@
         }
 
         pushPendingLocalDataToCloud() {
+            if (this.isDemoSandboxUser()) return;
             if (!this.db || !this.isConnected) return;
             // رفع البيانات التي أُنشئت أثناء عدم الاتصال حصراً (_isOfflinePending === true) لمنع إعادة حقن بيانات قديمة
             const collections = [
@@ -1044,6 +1053,7 @@
 
         // 4. رفع قائمة المستخدمين كاملة إلى السحابة
         pushUsersToFirebase(usersArray, actionName = 'update_users') {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || this.isUpdatingFromRemote) return Promise.resolve(false);
             if (!Array.isArray(usersArray)) return Promise.resolve(false);
 
@@ -1069,7 +1079,6 @@
                     updatedBy: (window.state && window.state.currentUser) ? window.state.currentUser.username : 'system'
                 });
             }).then(() => {
-                console.log('✅ [KSU-Firebase] تمت مزامنة المستخدمين والرتب والصلاحيات في السحابة بنجاح:', actionName);
                 return true;
             }).catch(err => {
                 console.error('[KSU-Firebase] فشل رفع التحديث للسحابة:', err);
@@ -1079,6 +1088,7 @@
 
         // 5. تحديث مستخدم واحد أو إضافته لحظياً
         syncSingleUser(userObj, actionName = 'sync_single_user') {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             const users = (window.state && Array.isArray(window.state.users))
                 ? window.state.users
                 : this.getLocalUsers();
@@ -1105,6 +1115,7 @@
         }
 
         deleteUser(userId) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!userId) return Promise.resolve(false);
             let users = this.getLocalUsers();
             users = users.filter(u =>
@@ -1131,6 +1142,7 @@
         }
 
         syncDepartmentTargets(targetsObj) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!targetsObj || typeof targetsObj !== 'object') return Promise.resolve(false);
             localStorage.setItem('ksumc_department_targets', JSON.stringify(targetsObj));
             window.dispatchEvent(new CustomEvent('ksumc_targets_updated', { detail: { targets: targetsObj } }));
@@ -1143,6 +1155,7 @@
 
         // 6. مزامنة جولة تفتيشية أو قائمة جولات
         syncRound(roundData) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!roundData) return Promise.resolve(false);
             const roundKeys = ['ksumc_safety_rounds', 'ksumc_field_rounds', 'ksumc_rounds_registry'];
             this.markLocalPendingState(roundKeys, 'rounds', roundData, true);
@@ -1178,12 +1191,14 @@
         }
 
         syncRoundsList(roundsArray) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || this.isUpdatingFromRemote || !Array.isArray(roundsArray)) return Promise.resolve(false);
             return this.pushCollectionToFirebase('rounds', roundsArray, 'id');
         }
 
         // 7. مزامنة سجل التفتيش اليومي للورديات
         syncShiftLogRecord(record) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!record) return Promise.resolve(false);
             const logKeys = ['ksumc_quality_shift_inspection_logs'];
             this.markLocalPendingState(logKeys, null, record, true);
@@ -1202,12 +1217,14 @@
         }
 
         syncShiftLogs(recordsArray) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || this.isUpdatingFromRemote || !Array.isArray(recordsArray)) return Promise.resolve(false);
             return this.pushCollectionToFirebase('shift_inspection_logs', recordsArray, 'id');
         }
 
         // 8. مزامنة تقارير إدارة السلامة الميدانية (-> H1)
         syncSafetyDeptReport(reportObj) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!reportObj) return Promise.resolve(false);
             const repKeys = ['ksumc_safety_dept_reports'];
             this.markLocalPendingState(repKeys, 'safetyDeptReports', reportObj, true);
@@ -1226,12 +1243,14 @@
         }
 
         syncSafetyDeptReportsList(reportsArray) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || this.isUpdatingFromRemote || !Array.isArray(reportsArray)) return Promise.resolve(false);
             return this.pushCollectionToFirebase('safety_dept_reports', reportsArray, 'id');
         }
 
         // 9. مزامنة سجل الامتثال لسباهي والاعتمادات الرسمية
         syncComplianceRecord(complianceObj) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!complianceObj) return Promise.resolve(false);
             const compKeys = ['ksumc_compliance_registry'];
             this.markLocalPendingState(compKeys, 'complianceRegistry', complianceObj, true);
@@ -1251,6 +1270,7 @@
 
         // 10. مزامنة طلبات فتح الأبواب وتصاريح العمل الساخن (-> Q1)
         syncDoor(doorObj) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!doorObj) return Promise.resolve(false);
             const doorKeys = ['ksumc_safety_doors'];
             this.markLocalPendingState(doorKeys, 'doors', doorObj, true);
@@ -1266,11 +1286,13 @@
         }
 
         syncDoorsList(doorsArray) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || this.isUpdatingFromRemote || !Array.isArray(doorsArray)) return Promise.resolve(false);
             return this.pushCollectionToFirebase('doors', doorsArray, 'id');
         }
 
         syncPermit(permitObj) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!permitObj) return Promise.resolve(false);
             const permitKeys = ['ksumc_safety_permits'];
             this.markLocalPendingState(permitKeys, 'permits', permitObj, true);
@@ -1286,12 +1308,14 @@
         }
 
         syncPermitsList(permitsArray) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || this.isUpdatingFromRemote || !Array.isArray(permitsArray)) return Promise.resolve(false);
             return this.pushCollectionToFirebase('permits', permitsArray, 'id');
         }
 
         // 11. مزامنة تقارير الأكواد، الحوادث السريعة، مخالفات السلامة، مخالفات التدخين، وإجراءات CAPA (-> H1)
         syncAlarm(alarmObj) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!alarmObj) return Promise.resolve(false);
             const alarmKeys = ['ksumc_safety_alarms'];
             this.markLocalPendingState(alarmKeys, 'alarms', alarmObj, true);
@@ -1307,11 +1331,13 @@
         }
 
         syncAlarmsList(alarmsArray) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || this.isUpdatingFromRemote || !Array.isArray(alarmsArray)) return Promise.resolve(false);
             return this.pushCollectionToFirebase('alarms', alarmsArray, 'id');
         }
 
         syncShiftIncident(incObj) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!incObj) return Promise.resolve(false);
             const incKeys = ['ksumc_shift_incidents'];
             this.markLocalPendingState(incKeys, 'shiftIncidents', incObj, true);
@@ -1327,11 +1353,13 @@
         }
 
         syncShiftIncidentsList(incArray) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || this.isUpdatingFromRemote || !Array.isArray(incArray)) return Promise.resolve(false);
             return this.pushCollectionToFirebase('shift_incidents', incArray, 'id');
         }
 
         syncSafetyViolation(violObj) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!violObj) return Promise.resolve(false);
             const violKeys = ['ksumc_safety_violations'];
             this.markLocalPendingState(violKeys, 'safetyViolations', violObj, true);
@@ -1347,11 +1375,13 @@
         }
 
         syncSafetyViolationsList(violArray) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || this.isUpdatingFromRemote || !Array.isArray(violArray)) return Promise.resolve(false);
             return this.pushCollectionToFirebase('safety_violations', violArray, 'id');
         }
 
         syncSmokingViolation(violObj) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!violObj) return Promise.resolve(false);
             const smkKeys = ['ksumc_smoking_violations'];
             this.markLocalPendingState(smkKeys, 'smokingViolations', violObj, true);
@@ -1367,11 +1397,13 @@
         }
 
         syncSmokingViolationsList(violArray) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || this.isUpdatingFromRemote || !Array.isArray(violArray)) return Promise.resolve(false);
             return this.pushCollectionToFirebase('smoking_violations', violArray, 'id');
         }
 
         recordAuditLog(action, details = {}) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             const activeUser = (window.KSUDataBridge && typeof window.KSUDataBridge.getCurrentActiveUser === 'function')
                 ? window.KSUDataBridge.getCurrentActiveUser()
                 : ((window.state && window.state.currentUser) || null);
@@ -1393,6 +1425,7 @@
         }
 
         archiveViolationInCloud(type, id, reason = '') {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             const isSmoking = String(type || '').toLowerCase().includes('smok');
             const activeUser = (window.KSUDataBridge && typeof window.KSUDataBridge.getCurrentActiveUser === 'function')
                 ? window.KSUDataBridge.getCurrentActiveUser()
@@ -1431,6 +1464,7 @@
         }
 
         syncCAPARecord(capaObj) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!capaObj) return Promise.resolve(false);
             const capaKeys = ['ksumc_capa_registry', 'ksumc_capa_records'];
             this.markLocalPendingState(capaKeys, 'capa', capaObj, true);
@@ -1449,12 +1483,14 @@
         }
 
         syncCAPAList(capaArray) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || this.isUpdatingFromRemote || !Array.isArray(capaArray)) return Promise.resolve(false);
             return this.pushCollectionToFirebase('capa_records', capaArray, 'id');
         }
 
         // 12. تصفير ومزامنة سجل التفتيش اليومي للورديات أو مسح جميع الجولات التجريبية سحابياً ومحلياً
         resetDailyShiftLogs(clearAllRounds = false) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (clearAllRounds) {
                 return this.purgeAllTrialOperationalData(true);
             }
@@ -1492,6 +1528,7 @@
 
         // 13. حذف وتصفير جميع الجولات والسجلات التجريبية استعداداً للعمل الحقيقي المعتمد
         purgeAllTrialOperationalData(isManual = false) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (isManual) {
                 const activeUser = (window.KSUDataBridge && typeof window.KSUDataBridge.getCurrentActiveUser === 'function')
                     ? window.KSUDataBridge.getCurrentActiveUser()
@@ -1608,7 +1645,6 @@
             }));
 
             return Promise.all(promises).then(() => {
-                console.log('✅ [KSU-Firebase] تم تطهير جميع الجولات والسجلات التجريبية محلياً وسحابياً استعداداً للعمل الفعلي.');
                 this.refreshAllWorkflowUIs();
                 window.dispatchEvent(new CustomEvent('ksumc_data_updated', { detail: { type: 'purge_all_trial_data' } }));
                 window.dispatchEvent(new CustomEvent('ksumc_notifications_updated', { detail: { list: [], source: 'purge' } }));
@@ -1622,6 +1658,7 @@
         }
 
         notifySystemUpdate(actionName) {
+            if (this.isDemoSandboxUser()) return;
             if (!this.db) return;
             this.db.ref('system_status/lastUpdate').set({
                 action: actionName,
@@ -1633,6 +1670,7 @@
 
         // 14. مزامنة البلاغات الميدانية
         syncIncident(incidentData) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!incidentData) return Promise.resolve(false);
             const incKeys = ['ksumc_incidents'];
             this.markLocalPendingState(incKeys, 'incidents', incidentData, true);
@@ -1648,6 +1686,7 @@
 
         // 15. مزامنة الإشعارات والتوجيهات التنفيذية اللحظية للمفتشين والمشرفين
         syncNotification(notifObj) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!notifObj) return Promise.resolve(false);
             const notifKeys = ['ksumc_notifications'];
             this.markLocalPendingState(notifKeys, 'notifications', notifObj, true);
@@ -1673,11 +1712,13 @@
         }
 
         syncNotificationsList(notifsArray) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || this.isUpdatingFromRemote || !Array.isArray(notifsArray)) return Promise.resolve(false);
             return this.pushCollectionToFirebase('notifications', notifsArray, 'id');
         }
 
         deleteNotificationFromCloud(notifId) {
+            if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!this.db || !notifId) return Promise.resolve(false);
             const key = this.sanitizeFirebaseKey(notifId);
             return this.db.ref('notifications/' + key).remove().then(() => {
@@ -1798,7 +1839,7 @@
         }
 
         setupLockScreenNotificationBridge() {
-            if (typeof window === 'undefined') return;
+            if (typeof window === 'undefined' || this.isDemoSandboxUser()) return;
 
             // 1. تسجيل وتحديث Service Worker لضمان عمل إشعارات شاشة القفل (Lock-Screen Notifications)
             if ('serviceWorker' in navigator) {

@@ -14,7 +14,7 @@
     timeZone: 'Asia/Riyadh',
     locale: 'ar-SA',
     apiBaseUrl: '/safety/api',
-    apiKeyHeader: 'ksu_sec_token_95972_riyadh',
+    apiKeyHeader: (typeof window !== 'undefined' && (window.KSU_AGENT_TOKEN || (window.localStorage && localStorage.getItem('ksu_agent_token')))) || '',
     // رابط خادم وكيل أوراكل للرؤية البصرية (Qwen2.5-VL Agent)
     oracleAgentUrl: (typeof localStorage !== 'undefined' ? localStorage.getItem('ksumc_oracle_agent_url') : null) || 'https://rsdsafety.online',
     // إعدادات نموذج كوين البصري المباشر (OpenRouter / Alibaba DashScope)
@@ -69,8 +69,10 @@
      */
     async fetchCloudKeysSilently() {
       try {
-        const isDemoHost = (typeof window !== 'undefined' && window.location && window.location.hostname.includes('rsd-go-demo'));
-        const defaultRtdb = isDemoHost ? 'https://rsd-go-demo-default-rtdb.firebaseio.com' : 'https://rsd-ksu-default-rtdb.firebaseio.com';
+        if (typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser()) {
+          return;
+        }
+        const defaultRtdb = 'https://rsd-ksu-default-rtdb.firebaseio.com';
         const rtdbUrl = (typeof window !== 'undefined' && window.KSU_FIREBASE_RTDB_URL)
           || (typeof localStorage !== 'undefined' && localStorage.getItem('ksumc_rtdb_url'))
           || defaultRtdb;
@@ -5448,7 +5450,6 @@
 
     // إذا كان المتصفح لا يدعم Web Speech أو على بيئة غير مشفرة كـ iOS WebKit
     if (!SpeechRecognition || !isSecure) {
-      console.log('[KSU-Voice] Web Speech API unavailable or non-HTTPS. Opening Voice Dictation Sheet for mobile keyboard neural mic.');
       openVoiceDictationModal(type);
       return;
     }

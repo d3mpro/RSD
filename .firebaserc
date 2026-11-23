@@ -1,7 +1,6 @@
 {
   "projects": {
     "default": "rsd-ksu",
-    "demo": "rsd-go-demo",
     "prod": "rsd-ksu"
   }
 }

@@ -152,7 +152,11 @@ async function provisionRosterFromRTDB() {
     } catch (err) {
       if (err && err.code === 'auth/user-not-found') {
         const isDev = mappedRole === 'developer' || empId.toLowerCase() === 'dev' || user.id === 'USR-01';
-        const initialPassword = isDev ? 'Kk@122566##' : '123456';
+        const envVarName = isDev ? 'KSU_DEV_INITIAL_PASSWORD' : 'KSU_DEFAULT_INITIAL_PASSWORD';
+        const initialPassword = process.env[envVarName];
+        if (!initialPassword) {
+          throw new Error(`Missing required environment variable ${envVarName} for provisioning user ${empId}`);
+        }
         userRecord = await admin.auth().createUser({
           email: authEmail,
           password: initialPassword,

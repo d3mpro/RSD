@@ -67,7 +67,6 @@
   <script src="assets/js/auth-guard.js?v=6.0"></script>
   <script src="assets/js/ksumc-data-bridge.js?v=6.3.1"></script>
   <script src="assets/js/ksu-firebase-realtime.js?v=6.9.1"></script>
-  <script src="assets/js/ksu-system-mode.js?v=1.2"></script>
 </head>
 
 <body class="bg-[#F4F7FA] font-cairo text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-secondary-fixed selection:text-primary">
@@ -133,259 +132,6 @@
         </button>
       </div>
     </div>
-
-    <!-- Quick Access Section for Demo & Review (حسابات الدخول السريع في الصفحة الرئيسية) -->
-    <section id="quick-access-section" class="w-full bg-white rounded-3xl border border-amber-300 shadow-xl p-5 sm:p-7 space-y-5 animate-in fade-in duration-300">
-      
-      <!-- Section Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
-        <div class="space-y-1">
-          <div class="flex items-center gap-2">
-            <span class="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-800 border border-amber-400/30 text-xs font-black flex items-center gap-1">
-              <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
-              <span>حسابات الدخول السريع المعتمدة (Quick Access Personas)</span>
-            </span>
-            <span class="text-xs text-gray-500 font-semibold">• تجربة فورية بنقرة واحدة - كلمة المرور الموحدة: <code class="text-emerald-700 font-bold bg-emerald-50 px-1 py-0.5 rounded">123456</code></span>
-          </div>
-          <h2 class="text-base sm:text-lg font-black text-[#082B49] flex items-center gap-2">
-            <span class="material-symbols-outlined text-amber-500 text-2xl">flash_on</span>
-            <span>بوابة التقييم والاستعراض السريع للمشروع واللجان</span>
-          </h2>
-          <p class="text-xs text-gray-600 font-medium">
-            اختر أي دور وظيفي لتجربة دورة العمل المتكاملة لمنظومة رصد مباشرة بنقرة واحدة
-          </p>
-        </div>
-
-        </div>
-      </div>
-
-      <!-- 6 Core Personas Grid -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-
-        <!-- Card 1: Safety Specialist (SAF1) -->
-        <div class="rounded-2xl border-2 border-blue-100 hover:border-blue-500 bg-gradient-to-b from-blue-50/50 to-white p-4 flex flex-col justify-between transition-all hover:shadow-md group">
-          <div class="space-y-2.5">
-            <div class="flex items-center justify-between">
-              <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
-                <span class="material-symbols-outlined text-xl">health_and_safety</span>
-              </div>
-              <span class="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-black">أخصائي سلامة</span>
-            </div>
-            <div>
-              <div class="flex items-center justify-between">
-                <h3 class="font-black text-sm text-[#082B49] group-hover:text-blue-700 transition-colors">أخصائي سلامة</h3>
-                <span class="font-mono text-xs font-black text-blue-800 bg-blue-100 px-1.5 py-0.5 rounded">SAF1</span>
-              </div>
-              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">أ. أحمد الأحمري - تقييم المخاطر الميدانية، متابعة الامتثال وإجراءات السلامة</p>
-            </div>
-          </div>
-          <div class="mt-4 pt-2 border-t border-blue-50 flex items-center gap-2">
-            <button 
-              type="button" 
-              onclick="KSUSystemMode.quickLogin('specialist')" 
-              class="flex-1 py-2 px-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
-            >
-              <span>دخول بنقرة واحدة</span>
-              <span class="material-symbols-outlined text-sm">arrow_forward</span>
-            </button>
-            <button 
-              type="button" 
-              onclick="fillLoginForm('SAF1', '123456')" 
-              title="تعبئة بيانات الحساب في نموذج الدخول" 
-              class="p-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-all cursor-pointer"
-            >
-              <span class="material-symbols-outlined text-sm">edit_note</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Card 2: Head of Dept (H2) -->
-        <div class="rounded-2xl border-2 border-purple-100 hover:border-purple-500 bg-gradient-to-b from-purple-50/40 to-white p-4 flex flex-col justify-between transition-all hover:shadow-md group">
-          <div class="space-y-2.5">
-            <div class="flex items-center justify-between">
-              <div class="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-md shadow-purple-500/20 group-hover:scale-105 transition-transform">
-                <span class="material-symbols-outlined text-xl">military_tech</span>
-              </div>
-              <span class="px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 text-[10px] font-black">رئيس القسم</span>
-            </div>
-            <div>
-              <div class="flex items-center justify-between">
-                <h3 class="font-black text-sm text-[#082B49] group-hover:text-purple-700 transition-colors">رئيس القسم</h3>
-                <span class="font-mono text-xs font-black text-purple-800 bg-purple-100 px-1.5 py-0.5 rounded">H2</span>
-              </div>
-              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">أ. مصعب عبدالله آل حماد - إدارة ومتابعة أعمال السلامة واعتماد البلاغات والتقارير</p>
-            </div>
-          </div>
-          <div class="mt-4 pt-2 border-t border-purple-50 flex items-center gap-2">
-            <button 
-              type="button" 
-              onclick="KSUSystemMode.quickLogin('dept_head')" 
-              class="flex-1 py-2 px-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
-            >
-              <span>دخول بنقرة واحدة</span>
-              <span class="material-symbols-outlined text-sm">arrow_forward</span>
-            </button>
-            <button 
-              type="button" 
-              onclick="fillLoginForm('H2', '123456')" 
-              title="تعبئة بيانات الحساب في نموذج الدخول" 
-              class="p-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold transition-all cursor-pointer"
-            >
-              <span class="material-symbols-outlined text-sm">edit_note</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Card 3: General Supervisor (H1) -->
-        <div class="rounded-2xl border-2 border-amber-100 hover:border-amber-500 bg-gradient-to-b from-amber-50/40 to-white p-4 flex flex-col justify-between transition-all hover:shadow-md group">
-          <div class="space-y-2.5">
-            <div class="flex items-center justify-between">
-              <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform">
-                <span class="material-symbols-outlined text-xl">admin_panel_settings</span>
-              </div>
-              <span class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-black">مشرف عام</span>
-            </div>
-            <div>
-              <div class="flex items-center justify-between">
-                <h3 class="font-black text-sm text-[#082B49] group-hover:text-amber-700 transition-colors">المشرف العام</h3>
-                <span class="font-mono text-xs font-black text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded">H1</span>
-              </div>
-              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">أ. حسن إبراهيم دعاك - استلام تقارير الميدان، الأرشفة، والتوجيه الإداري والميداني</p>
-            </div>
-          </div>
-          <div class="mt-4 pt-2 border-t border-amber-50 flex items-center gap-2">
-            <button 
-              type="button" 
-              onclick="KSUSystemMode.quickLogin('head')" 
-              class="flex-1 py-2 px-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
-            >
-              <span>دخول بنقرة واحدة</span>
-              <span class="material-symbols-outlined text-sm">arrow_forward</span>
-            </button>
-            <button 
-              type="button" 
-              onclick="fillLoginForm('H1', '123456')" 
-              title="تعبئة بيانات الحساب في نموذج الدخول" 
-              class="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold transition-all cursor-pointer"
-            >
-              <span class="material-symbols-outlined text-sm">edit_note</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Card 4: Quality (Q1) -->
-        <div class="rounded-2xl border-2 border-emerald-100 hover:border-emerald-500 bg-gradient-to-b from-emerald-50/40 to-white p-4 flex flex-col justify-between transition-all hover:shadow-md group">
-          <div class="space-y-2.5">
-            <div class="flex items-center justify-between">
-              <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                <span class="material-symbols-outlined text-xl">verified</span>
-              </div>
-              <span class="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-black">الجودة والاعتماد</span>
-            </div>
-            <div>
-              <div class="flex items-center justify-between">
-                <h3 class="font-black text-sm text-[#082B49] group-hover:text-emerald-700 transition-colors">مسؤول الجودة</h3>
-                <span class="font-mono text-xs font-black text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">Q1</span>
-              </div>
-              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">أ. علي سليمان الصقري - مطابقة معايير CBAHI FMS، مراجعة الجولات وسجل الامتثال</p>
-            </div>
-          </div>
-          <div class="mt-4 pt-2 border-t border-emerald-50 flex items-center gap-2">
-            <button 
-              type="button" 
-              onclick="KSUSystemMode.quickLogin('quality')" 
-              class="flex-1 py-2 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
-            >
-              <span>دخول بنقرة واحدة</span>
-              <span class="material-symbols-outlined text-sm">arrow_forward</span>
-            </button>
-            <button 
-              type="button" 
-              onclick="fillLoginForm('Q1', '123456')" 
-              title="تعبئة بيانات الحساب في نموذج الدخول" 
-              class="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition-all cursor-pointer"
-            >
-              <span class="material-symbols-outlined text-sm">edit_note</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Card 5: Shift Supervisor (S1) -->
-        <div class="rounded-2xl border-2 border-teal-100 hover:border-teal-500 bg-gradient-to-b from-teal-50/40 to-white p-4 flex flex-col justify-between transition-all hover:shadow-md group">
-          <div class="space-y-2.5">
-            <div class="flex items-center justify-between">
-              <div class="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-md shadow-teal-500/20 group-hover:scale-105 transition-transform">
-                <span class="material-symbols-outlined text-xl">supervisor_account</span>
-              </div>
-              <span class="px-2 py-0.5 rounded-md bg-teal-100 text-teal-800 text-[10px] font-black">مشرف الوردية</span>
-            </div>
-            <div>
-              <div class="flex items-center justify-between">
-                <h3 class="font-black text-sm text-[#082B49] group-hover:text-teal-700 transition-colors">مشرف الوردية</h3>
-                <span class="font-mono text-xs font-black text-teal-800 bg-teal-100 px-1.5 py-0.5 rounded">S1</span>
-              </div>
-              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">أ. ناصر فلاح القحطاني - الوردية 1 (صباحي) - متابعة المفتشين ورفع التقارير الميدانية</p>
-            </div>
-          </div>
-          <div class="mt-4 pt-2 border-t border-teal-50 flex items-center gap-2">
-            <button 
-              type="button" 
-              onclick="KSUSystemMode.quickLogin('supervisor')" 
-              class="flex-1 py-2 px-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
-            >
-              <span>دخول بنقرة واحدة</span>
-              <span class="material-symbols-outlined text-sm">arrow_forward</span>
-            </button>
-            <button 
-              type="button" 
-              onclick="fillLoginForm('S1', '123456')" 
-              title="تعبئة بيانات الحساب في نموذج الدخول" 
-              class="p-2 rounded-xl bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 text-xs font-bold transition-all cursor-pointer"
-            >
-              <span class="material-symbols-outlined text-sm">edit_note</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Card 6: Field Inspector (M1) -->
-        <div class="rounded-2xl border-2 border-indigo-100 hover:border-indigo-500 bg-gradient-to-b from-indigo-50/40 to-white p-4 flex flex-col justify-between transition-all hover:shadow-md group">
-          <div class="space-y-2.5">
-            <div class="flex items-center justify-between">
-              <div class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
-                <span class="material-symbols-outlined text-xl">checklist_rtl</span>
-              </div>
-              <span class="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-black">مفتش الوردية</span>
-            </div>
-            <div>
-              <div class="flex items-center justify-between">
-                <h3 class="font-black text-sm text-[#082B49] group-hover:text-indigo-700 transition-colors">مفتش الوردية</h3>
-                <span class="font-mono text-xs font-black text-indigo-800 bg-indigo-100 px-1.5 py-0.5 rounded">M1</span>
-              </div>
-              <p class="text-[11px] text-gray-500 mt-1 leading-relaxed">أ. عادل خلف العنزي - الوردية 1 (صباحي) - تنفيذ الجولات وتوثيق الملاحظات الميدانية</p>
-            </div>
-          </div>
-          <div class="mt-4 pt-2 border-t border-indigo-50 flex items-center gap-2">
-            <button 
-              type="button" 
-              onclick="KSUSystemMode.quickLogin('inspector')" 
-              class="flex-1 py-2 px-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-sm transition-all cursor-pointer"
-            >
-              <span>دخول بنقرة واحدة</span>
-              <span class="material-symbols-outlined text-sm">arrow_forward</span>
-            </button>
-            <button 
-              type="button" 
-              onclick="fillLoginForm('M1', '123456')" 
-              title="تعبئة بيانات الحساب في نموذج الدخول" 
-              class="p-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold transition-all cursor-pointer"
-            >
-              <span class="material-symbols-outlined text-sm">edit_note</span>
-            </button>
-          </div>
-        </div>
-
-      </div>
-    </section>
 
     <!-- Login Box: Username & Password Authentication -->
     <div id="login-section" class="bg-white rounded-3xl border border-gray-200 shadow-xl p-6 sm:p-9 max-w-md mx-auto w-full transition-all">
@@ -511,7 +257,8 @@
         facility: 'المدينة الطبية',
         department: 'الإدارة العامة للأمن والسلامة - القيادة والأنظمة',
         shift: 'جميع الورديات',
-        password: '123456',
+        passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
+        secondaryHash: '1c67f4b744c0e267d35ccb6399e681b3136656637d547a76ce64d89603917e13',
         status: 'نشط',
         permissions: { all: true, developer: true, fullAccess: true, manageUsers: true, manageBuildings: true }
       },
@@ -529,7 +276,7 @@
         facility: 'المدينة الطبية الجامعية (KSUMC)',
         department: 'إدارة السلامة',
         shift: 'جميع الورديات',
-        password: '123456',
+        passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
         status: 'نشط',
         permissions: { headOfDepartment: true, approveReports: true, conductInspections: true, issuePermits: true, manageBuildings: true }
       },
@@ -547,7 +294,7 @@
         facility: 'مستشفى الملك خالد الجامعي (KKUH)',
         department: 'مستشفى الملك خالد الجامعي (KKUH)',
         shift: 'جميع الورديات',
-        password: '123456',
+        passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
         status: 'نشط',
         permissions: { generalSupervisor: true, approveReports: true, conductInspections: true, issuePermits: true, manageBuildings: true, manageUsers: true }
       },
@@ -565,7 +312,7 @@
         facility: 'مستشفى الملك خالد الجامعي (KKUH)',
         department: 'إدارة السلامة الميدانية',
         shift: 'جميع الورديات',
-        password: '123456',
+        passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
         status: 'نشط',
         permissions: { receiveSafetyReports: true, conductInspections: true, issuePermits: true, approveReports: true }
       },
@@ -582,31 +329,31 @@
         facility: 'مستشفى الملك خالد الجامعي (KKUH)',
         department: 'إدارة الجودة والاعتماد',
         shift: 'جميع الورديات',
-        password: '123456',
+        passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92',
         status: 'نشط',
         permissions: { qualityAudit: true, receiveFieldInspections: true, approveReports: true }
       },
       // مشرفو الورديات (S1, S2, S3)
-      { id: 'USR-SH1-201', empId: 'S1', employeeId: 'S1', altEmpId: 'KSU-SH1-201', username: 'S1', name: 'أ. ناصر فلاح القحطاني', role: 'مشرف الوردية الأولى (صباحي)', roleCategory: 'shift_supervisor', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', password: '123456', status: 'نشط', permissions: { approveReports: true, conductInspections: true, issuePermits: true } },
-      { id: 'USR-SH2-301', empId: 'S2', employeeId: 'S2', altEmpId: 'KSU-SH2-301', username: 'S2', name: 'أ. أحمد عبدالله الأكلبي', role: 'مشرف الوردية الثانية (مسائي)', roleCategory: 'shift_supervisor', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 2 (مسائي)', password: '123456', status: 'نشط', permissions: { approveReports: true, conductInspections: true, issuePermits: true } },
-      { id: 'USR-SH3-401', empId: 'S3', employeeId: 'S3', altEmpId: 'KSU-SH3-401', username: 'S3', name: 'أ. سيف عبدالكريم مكرمي', role: 'مشرف الوردية الثالثة (ليلي)', roleCategory: 'shift_supervisor', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 3 (ليلي)', password: '123456', status: 'نشط', permissions: { approveReports: true, conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH1-201', empId: 'S1', employeeId: 'S1', altEmpId: 'KSU-SH1-201', username: 'S1', name: 'أ. ناصر فلاح القحطاني', role: 'مشرف الوردية الأولى (صباحي)', roleCategory: 'shift_supervisor', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { approveReports: true, conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH2-301', empId: 'S2', employeeId: 'S2', altEmpId: 'KSU-SH2-301', username: 'S2', name: 'أ. أحمد عبدالله الأكلبي', role: 'مشرف الوردية الثانية (مسائي)', roleCategory: 'shift_supervisor', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 2 (مسائي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { approveReports: true, conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH3-401', empId: 'S3', employeeId: 'S3', altEmpId: 'KSU-SH3-401', username: 'S3', name: 'أ. سيف عبدالكريم مكرمي', role: 'مشرف الوردية الثالثة (ليلي)', roleCategory: 'shift_supervisor', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 3 (ليلي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { approveReports: true, conductInspections: true, issuePermits: true } },
       // مفتشو الوردية الأولى (M1 إلى M7 - صباحي)
-      { id: 'USR-SH1-202', empId: 'M1', employeeId: 'M1', altEmpId: 'KSU-SH1-202', username: 'M1', name: 'أ. عادل خلف العنزي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
-      { id: 'USR-SH1-203', empId: 'M2', employeeId: 'M2', altEmpId: 'KSU-SH1-203', username: 'M2', name: 'أ. عبدالله إبراهيم الدامغ', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
-      { id: 'USR-SH1-204', empId: 'M3', employeeId: 'M3', altEmpId: 'KSU-SH1-204', username: 'M3', name: 'أ. صالح محمد العريف', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
-      { id: 'USR-SH1-205', empId: 'M4', employeeId: 'M4', altEmpId: 'KSU-SH1-205', username: 'M4', name: 'أ. عادل عاضة الشلوي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
-      { id: 'USR-SH1-206', empId: 'M5', employeeId: 'M5', altEmpId: 'KSU-SH1-206', username: 'M5', name: 'أ. مشعان خلف العنزي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
-      { id: 'USR-SH1-207', empId: 'M6', employeeId: 'M6', altEmpId: 'KSU-SH1-207', username: 'M6', name: 'أ. ياسر قينان الزهراني', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
-      { id: 'USR-SH1-208', empId: 'M7', employeeId: 'M7', altEmpId: 'KSU-SH1-208', username: 'M7', name: 'أ. محمد سعود الصقري', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH1-202', empId: 'M1', employeeId: 'M1', altEmpId: 'KSU-SH1-202', username: 'M1', name: 'أ. عادل خلف العنزي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH1-203', empId: 'M2', employeeId: 'M2', altEmpId: 'KSU-SH1-203', username: 'M2', name: 'أ. عبدالله إبراهيم الدامغ', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH1-204', empId: 'M3', employeeId: 'M3', altEmpId: 'KSU-SH1-204', username: 'M3', name: 'أ. صالح محمد العريف', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH1-205', empId: 'M4', employeeId: 'M4', altEmpId: 'KSU-SH1-205', username: 'M4', name: 'أ. عادل عاضة الشلوي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH1-206', empId: 'M5', employeeId: 'M5', altEmpId: 'KSU-SH1-206', username: 'M5', name: 'أ. مشعان خلف العنزي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH1-207', empId: 'M6', employeeId: 'M6', altEmpId: 'KSU-SH1-207', username: 'M6', name: 'أ. ياسر قينان الزهراني', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH1-208', empId: 'M7', employeeId: 'M7', altEmpId: 'KSU-SH1-208', username: 'M7', name: 'أ. محمد سعود الصقري', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 1 (صباحي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
       // مفتشو الوردية الثانية (M8 إلى M11 - مسائي)
-      { id: 'USR-SH2-302', empId: 'M8', employeeId: 'M8', altEmpId: 'KSU-SH2-302', username: 'M8', name: 'أ. أحمد قاسم أبو عيشة', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 2 (مسائي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
-      { id: 'USR-SH2-303', empId: 'M9', employeeId: 'M9', altEmpId: 'KSU-SH2-303', username: 'M9', name: 'أ. عبدالرحمن حسين كعبي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 2 (مسائي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
-      { id: 'USR-SH2-304', empId: 'M10', employeeId: 'M10', altEmpId: 'KSU-SH2-304', username: 'M10', name: 'أ. محمد علي الربعي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 2 (مسائي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
-      { id: 'USR-SH2-305', empId: 'M11', employeeId: 'M11', altEmpId: 'KSU-SH2-305', username: 'M11', name: 'أ. سلطان علي العاصم', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 2 (مسائي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH2-302', empId: 'M8', employeeId: 'M8', altEmpId: 'KSU-SH2-302', username: 'M8', name: 'أ. أحمد قاسم أبو عيشة', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 2 (مسائي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH2-303', empId: 'M9', employeeId: 'M9', altEmpId: 'KSU-SH2-303', username: 'M9', name: 'أ. عبدالرحمن حسين كعبي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 2 (مسائي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH2-304', empId: 'M10', employeeId: 'M10', altEmpId: 'KSU-SH2-304', username: 'M10', name: 'أ. محمد علي الربعي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 2 (مسائي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH2-305', empId: 'M11', employeeId: 'M11', altEmpId: 'KSU-SH2-305', username: 'M11', name: 'أ. سلطان علي العاصم', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 2 (مسائي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
       // مفتشو الوردية الثالثة (M12 إلى M14 - ليلي)
-      { id: 'USR-SH3-402', empId: 'M12', employeeId: 'M12', altEmpId: 'KSU-SH3-402', username: 'M12', name: 'أ. عبدالرحمن الأحمري', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 3 (ليلي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
-      { id: 'USR-SH3-403', empId: 'M13', employeeId: 'M13', altEmpId: 'KSU-SH3-403', username: 'M13', name: 'أ. فواز حمد العازمي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 3 (ليلي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
-      { id: 'USR-SH3-404', empId: 'M14', employeeId: 'M14', altEmpId: 'KSU-SH3-404', username: 'M14', name: 'أ. سليمان سالم العنزي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 3 (ليلي)', password: '123456', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } }
+      { id: 'USR-SH3-402', empId: 'M12', employeeId: 'M12', altEmpId: 'KSU-SH3-402', username: 'M12', name: 'أ. عبدالرحمن الأحمري', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 3 (ليلي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH3-403', empId: 'M13', employeeId: 'M13', altEmpId: 'KSU-SH3-403', username: 'M13', name: 'أ. فواز حمد العازمي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 3 (ليلي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } },
+      { id: 'USR-SH3-404', empId: 'M14', employeeId: 'M14', altEmpId: 'KSU-SH3-404', username: 'M14', name: 'أ. سليمان سالم العنزي', role: 'مفتش سلامة ميداني', roleCategory: 'field_inspector', portal: 'field', facility: 'مستشفى الملك خالد الجامعي (KKUH)', shift: 'الوردية 3 (ليلي)', passwordHash: '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', status: 'نشط', permissions: { conductInspections: true, issuePermits: true } }
     ];
 
     function handleFormLogin(e) {
@@ -640,7 +387,7 @@
           }
 
           // التحقق السحابي اللحظي من Firebase في حال تسجيل الدخول من جهاز جديد
-          if (!user && window.ksuFirebaseSync && window.ksuFirebaseSync.db) {
+          if (!user && username.trim().toLowerCase() !== 'demo' && window.ksuFirebaseSync && window.ksuFirebaseSync.db) {
             try {
               const snap = await window.ksuFirebaseSync.db.ref('users').once('value');
               const cloudVal = snap.val();
@@ -663,38 +410,14 @@
             }
           }
 
-          // Fallback authenticator (ضمان الدخول المباشر بالاسم أو الرقم الوظيفي بنسبة 100%)
-          if (!user) {
-            const cleanId = username.trim().toLowerCase();
-            const cleanPass = password.trim();
-            const norm = (s) => (s || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').toLowerCase().trim();
-            const cleanIdNorm = norm(cleanId);
-
-            const found = KSU_BOOTSTRAP_ACCOUNTS.find(u => {
-              const uUname = (u.username || '').toLowerCase();
-              const uEmp = (u.empId || u.employeeId || '').toLowerCase();
-              const uEmail = (u.email || '').toLowerCase();
-              const emailPrefix = uEmail.split('@')[0];
-              const uNameNorm = norm(u.name);
-              const matchDev = (cleanId === 'dev' || cleanId === 'admin' || cleanId === 'alsaqri' || cleanId === '95972') && (u.id === 'USR-01' || u.empId === 'DEV' || u.empId === '95972' || u.roleCategory === 'developer');
-              const matchEmpNumber = uEmp.endsWith(cleanId) || cleanId.endsWith(uEmp.replace('ksu-', ''));
-              const matchName = cleanIdNorm.length >= 3 && uNameNorm.includes(cleanIdNorm);
-              return uUname === cleanId || uEmp === cleanId || uEmail === cleanId || emailPrefix === cleanId || matchDev || matchName || matchEmpNumber;
-            });
-
-            if (found) {
-              const isDev = found.id === 'USR-01' || found.roleCategory === 'developer';
-              const validPass = isDev
-                ? (cleanPass === 'Kk@122566##' || cleanPass.toLowerCase() === 'kk@122566##' || cleanPass === found.password)
-                : (cleanPass === found.password || cleanPass === 'ksu123' || cleanPass === '123456' || cleanPass === found.empId);
-              if (validPass) {
-                user = found;
-              }
-            }
+          // Fallback authenticator via KSUAuth (SHA-256 passwordHash)
+          if (!user && username.trim().toLowerCase() !== 'demo' && window.KSUAuth && typeof window.KSUAuth.authenticate === 'function') {
+            user = window.KSUAuth.authenticate(username, password);
           }
 
           // مصادقة Firebase الحقيقية (Email/Password + Custom Claims) مع ربط الرقم الوظيفي تلقائياً
-          if (typeof firebase !== 'undefined' && typeof firebase.auth === 'function') {
+          const isDemoLogin = Boolean(window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser(user));
+          if (!isDemoLogin && username.trim().toLowerCase() !== 'demo' && typeof firebase !== 'undefined' && typeof firebase.auth === 'function') {
             try {
               const typedLower = username.trim().toLowerCase();
               let resolvedAuthEmail = '';
@@ -847,7 +570,6 @@
       const user = window.KSUAuth ? window.KSUAuth.getUser() : null;
       const banner = document.getElementById('logged-in-banner');
       const loginSection = document.getElementById('login-section');
-      const quickSection = document.getElementById('quick-access-section');
       const statusArea = document.getElementById('user-status-area');
 
       const urlParams = new URLSearchParams(window.location.search);
@@ -857,20 +579,9 @@
       }
       const forceLogin = urlParams.get('login') === '1' || urlParams.get('switch') === '1';
 
-      const isDemo = (window.KSUSystemMode && typeof window.KSUSystemMode.isDemo === 'function')
-        ? window.KSUSystemMode.isDemo()
-        : (window.location.hostname.includes('rsd-go-demo') || localStorage.getItem('ksumc_system_mode') === 'demo');
-
       if (user && !forceLogin) {
         if (banner) banner.classList.remove('hidden');
         if (loginSection) loginSection.classList.add('hidden');
-        if (quickSection) {
-          if (isDemo) {
-            quickSection.classList.remove('hidden');
-          } else {
-            quickSection.classList.add('hidden');
-          }
-        }
 
         document.getElementById('banner-user-name').textContent = user.name;
         document.getElementById('banner-user-role').textContent = user.role;
@@ -889,49 +600,6 @@
         if (banner) banner.classList.add('hidden');
         if (loginSection) loginSection.classList.remove('hidden');
         if (statusArea) statusArea.innerHTML = '';
-        if (quickSection) {
-          if (isDemo) {
-            quickSection.classList.remove('hidden');
-          } else {
-            quickSection.classList.add('hidden');
-          }
-        }
-      }
-      updateSystemModeUI();
-    }
-
-    function fillLoginForm(username, password) {
-      const usernameInput = document.getElementById('input-username');
-      const passwordInput = document.getElementById('input-password');
-      if (usernameInput) {
-        usernameInput.value = username || '';
-        usernameInput.focus();
-      }
-      if (passwordInput) {
-        passwordInput.value = password || '';
-      }
-      const alertEl = document.getElementById('login-alert');
-      if (alertEl) alertEl.classList.add('hidden');
-
-      const loginSection = document.getElementById('login-section');
-      if (loginSection && window.innerWidth < 768) {
-        loginSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
-
-    function updateSystemModeUI() {
-      const isDemo = (window.KSUSystemMode && typeof window.KSUSystemMode.isDemo === 'function')
-        ? window.KSUSystemMode.isDemo()
-        : (window.location.hostname.includes('rsd-go-demo') || localStorage.getItem('ksumc_system_mode') === 'demo');
-
-      const quickSection = document.getElementById('quick-access-section');
-
-      if (quickSection) {
-        if (isDemo) {
-          quickSection.classList.remove('hidden');
-        } else {
-          quickSection.classList.add('hidden');
-        }
       }
     }
 
@@ -962,7 +630,6 @@
       } catch (e) {}
 
       checkCurrentSession();
-      window.addEventListener('ksu_mode_changed', updateSystemModeUI);
     });
   </script>
 </body>

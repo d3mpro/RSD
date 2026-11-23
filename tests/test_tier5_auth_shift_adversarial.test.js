@@ -5,7 +5,7 @@
  * Role: Challenger 1 (critic & specialist)
  * Mandate: Empirically and adversarially challenge:
  *   1. Full combinatorial matrix of short username logins (case, whitespace, fuzzing)
- *   2. Strict official Arabic name matching for all 22 accounts from accounts-credentials-a4.html
+ *   2. Strict official Arabic name matching for all 22 canonical accounts
  *   3. Authentication security under malicious / injection / boundary payloads
  *   4. Strict shift isolation boundaries in canSupervisorApproveRound (cross-shift matrix)
  *   5. Firebase RTDB passwordless serialization & security rule compliance
@@ -23,13 +23,11 @@ const vm = require('node:vm');
 const REPO_ROOT = path.resolve(__dirname, '..');
 const AUTH_GUARD_PATH = path.join(REPO_ROOT, 'assets/js/auth-guard.js');
 const APP_JS_PATH = path.join(REPO_ROOT, 'assets/js/app.js');
-const CREDENTIALS_A4_PATH = path.join(REPO_ROOT, 'accounts-credentials-a4.html');
 const FIREBASE_SYNC_PATH = path.join(REPO_ROOT, 'assets/js/ksu-firebase-realtime.js');
 const DATABASE_RULES_PATH = path.join(REPO_ROOT, 'database.rules.json');
 
 const authGuardSource = fs.readFileSync(AUTH_GUARD_PATH, 'utf8');
 const appJsSource = fs.readFileSync(APP_JS_PATH, 'utf8');
-const credentialsA4Source = fs.readFileSync(CREDENTIALS_A4_PATH, 'utf8');
 const firebaseSyncSource = fs.readFileSync(FIREBASE_SYNC_PATH, 'utf8');
 const databaseRulesJson = JSON.parse(fs.readFileSync(DATABASE_RULES_PATH, 'utf8'));
 
@@ -132,21 +130,32 @@ function createAppApprovalSandbox(customState = {}) {
   };
 }
 
-// Extract Ground-Truth Roster directly from accounts-credentials-a4.html
+// Canonical 22-account official roster (H2..M14)
 function extractGroundTruthRoster() {
-  const roster = [];
-  const rowRegex = /<tr>\s*<td><span class="username-code">([^<]+)<\/span><\/td>\s*<td><strong>([^<]+)<\/strong><\/td>\s*<td>([^<]+)<\/td>\s*<td><span class="badge-shift[^"]*">([^<]+)<\/span><\/td>\s*<td><span class="portal-link">([^<]+)<\/span><\/td>/g;
-  let match;
-  while ((match = rowRegex.exec(credentialsA4Source)) !== null) {
-    roster.push({
-      code: match[1].trim(),
-      name: match[2].trim(),
-      roleTitle: match[3].trim(),
-      shiftLabel: match[4].trim(),
-      portal: match[5].trim()
-    });
-  }
-  return roster;
+  return [
+    { code: 'H2', name: 'أ. مصعب عبدالله آل حماد', roleTitle: 'رئيس القسم', shiftLabel: 'الإدارة', portal: 'head.html' },
+    { code: 'H1', name: 'أ. حسن إبراهيم دعاك', roleTitle: 'المشرف العام', shiftLabel: 'الإدارة', portal: 'head.html' },
+    { code: 'SAF1', name: 'أ. أحمد الأحمري', roleTitle: 'أخصائي سلامة', shiftLabel: 'الإدارة', portal: 'head.html' },
+    { code: 'Q1', name: 'أ. علي سليمان الصقري', roleTitle: 'الجودة والاعتماد', shiftLabel: 'الإدارة', portal: 'quality.html' },
+    { code: 'DEV', name: 'أ. علي سليمان الصقري', roleTitle: 'مطور النظام', shiftLabel: 'الإدارة', portal: 'admin.html' },
+    { code: 'S1', name: 'أ. ناصر فلاح القحطاني', roleTitle: 'مشرف الوردية', shiftLabel: 'الوردية 1', portal: 'field.html' },
+    { code: 'S2', name: 'أ. أحمد عبدالله الأكلبي', roleTitle: 'مشرف الوردية', shiftLabel: 'الوردية 2', portal: 'field.html' },
+    { code: 'S3', name: 'أ. سيف عبدالكريم مكرمي', roleTitle: 'مشرف الوردية', shiftLabel: 'الوردية 3', portal: 'field.html' },
+    { code: 'M1', name: 'أ. عادل خلف العنزي', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 1', portal: 'field.html' },
+    { code: 'M2', name: 'أ. عبدالله إبراهيم الدامغ', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 1', portal: 'field.html' },
+    { code: 'M3', name: 'أ. صالح محمد العريف', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 1', portal: 'field.html' },
+    { code: 'M4', name: 'أ. عادل عاضة الشلوي', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 1', portal: 'field.html' },
+    { code: 'M5', name: 'أ. مشعان خلف العنزي', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 1', portal: 'field.html' },
+    { code: 'M6', name: 'أ. ياسر قينان الزهراني', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 1', portal: 'field.html' },
+    { code: 'M7', name: 'أ. محمد سعود الصقري', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 1', portal: 'field.html' },
+    { code: 'M8', name: 'أ. أحمد قاسم أبو عيشة', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 2', portal: 'field.html' },
+    { code: 'M9', name: 'أ. عبدالرحمن حسين كعبي', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 2', portal: 'field.html' },
+    { code: 'M10', name: 'أ. محمد علي الربعي', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 2', portal: 'field.html' },
+    { code: 'M11', name: 'أ. سلطان علي العاصم', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 2', portal: 'field.html' },
+    { code: 'M12', name: 'أ. عبدالرحمن الأحمري', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 3', portal: 'field.html' },
+    { code: 'M13', name: 'أ. فواز حمد العازمي', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 3', portal: 'field.html' },
+    { code: 'M14', name: 'أ. سليمان سالم العنزي', roleTitle: 'مفتش ميداني', shiftLabel: 'الوردية 3', portal: 'field.html' }
+  ];
 }
 
 // =============================================================================

@@ -1851,6 +1851,5 @@ if (typeof INITIAL_ASSETS !== "undefined" && Array.isArray(INITIAL_ASSETS)) {
   const newFM200 = KSU_FM200_ASSETS.filter(a => !existingFM200Ids.has(a.id));
   if (newFM200.length > 0) {
     INITIAL_ASSETS.push(...newFM200);
-    console.log("[FM200] تم إضافة", newFM200.length, "نظام FM-200 إلى قاعدة الأصول");
   }
 }
