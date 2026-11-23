@@ -118,16 +118,34 @@ test('prepareNewRoundFromVision maps submodes accurately to round checklist type
   assert.equal(rDef.floor, '');
 });
 
-test('ksu-ai-client.js renders standalone quick scan action buttons when no round active', () => {
+test('ksu-ai-client.js removes obsolete quick scan buttons and preserves standalone helper functions', () => {
   const clientCode = fs.readFileSync(aiClientPath, 'utf8');
 
-  // Must reference standalone dispatch functions
-  assert.ok(clientCode.includes('openViolationFromAI'), 'ksu-ai-client.js must define or call openViolationFromAI');
-  assert.ok(clientCode.includes('startRoundFromAI'), 'ksu-ai-client.js must define or call startRoundFromAI');
+  // Must preserve standalone dispatch helper functions
+  assert.ok(clientCode.includes('openViolationFromAI'), 'ksu-ai-client.js must define openViolationFromAI');
+  assert.ok(clientCode.includes('startRoundFromAI'), 'ksu-ai-client.js must define startRoundFromAI');
 
-  // Must have action labels
-  assert.ok(clientCode.includes('إنشاء بلاغ مخالفة فوري'), 'ksu-ai-client.js must include instant violation button text');
-  assert.ok(clientCode.includes('بدء جولة جديدة لهذا الموقع'), 'ksu-ai-client.js must include start new round button text');
+  // Must NOT include the 3 removed button IDs anywhere
+  assert.ok(!clientCode.includes('btn-vision-instant-violation'), 'ksu-ai-client.js must not include #btn-vision-instant-violation');
+  assert.ok(!clientCode.includes('btn-vision-start-round'), 'ksu-ai-client.js must not include #btn-vision-start-round');
+  assert.ok(!clientCode.includes('btn-vision-dispatch-wo'), 'ksu-ai-client.js must not include #btn-vision-dispatch-wo');
+
+  // Extract the Direct 1-Click Action Bar markup
+  const actionBarStart = clientCode.indexOf('<!-- Direct 1-Click Action Bar -->');
+  assert.ok(actionBarStart !== -1, 'ksu-ai-client.js must contain Direct 1-Click Action Bar');
+  const actionBarEnd = clientCode.indexOf('resultsArea.classList.remove', actionBarStart);
+  const actionBarHtml = clientCode.slice(actionBarStart, actionBarEnd);
+
+  // Must NOT include the 3 removed button labels in the action bar
+  assert.ok(!actionBarHtml.includes('إنشاء بلاغ مخالفة فوري'), 'Action bar must not include removed instant violation button text');
+  assert.ok(!actionBarHtml.includes('بدء جولة جديدة لهذا الموقع'), 'Action bar must not include removed start round button text');
+  assert.ok(!actionBarHtml.includes('إصدار وتوجيه طلب صيانة آلي'), 'Action bar must not include removed work order dispatch button text');
+
+  // Must include redesigned action bar labels and handlers
+  assert.ok(actionBarHtml.includes('اعتماد ورفع المخالفة'), 'Action bar must include approve & upload button text');
+  assert.ok(actionBarHtml.includes('بث تنبيه لغرفة العمليات'), 'Action bar must include hazard alert button text');
+  assert.ok(actionBarHtml.includes('طباعة كارت الفحص'), 'Action bar must include print inspection card button text');
+  assert.ok(actionBarHtml.includes('openVisualInspectionCardWindow()'), 'Action bar must include openVisualInspectionCardWindow() button');
 });
 
 test('openViolationFromAI pre-fills violation modal inputs, closes vision modal, and opens violation modal', () => {

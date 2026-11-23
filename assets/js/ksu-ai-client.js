@@ -2965,12 +2965,12 @@
         </div>
 
         <!-- Footer -->
-        <div class="px-5 py-3 bg-slate-100 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 shrink-0">
+        <div class="px-5 py-3 bg-slate-100 border-t border-slate-200 flex items-center justify-between gap-3 text-xs text-slate-500 shrink-0">
           <div class="flex items-center gap-2">
             <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span class="font-bold text-slate-700">محرك الرؤية البصرية متصل ومطابق لمعايير سباهي (CBAHI FMS)</span>
           </div>
-          <button onclick="document.getElementById('ksu-ai-vision-modal').remove()" class="px-4 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-200 font-bold transition-all cursor-pointer">إغلاق</button>
+          <button onclick="document.getElementById('ksu-ai-vision-modal').remove()" class="min-h-[38px] px-4 py-2 shrink-0 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-200 font-bold transition-all cursor-pointer">إغلاق</button>
         </div>
       </div>
     `;
@@ -3629,43 +3629,30 @@
       </div>
 
       <!-- Direct 1-Click Action Bar -->
-      <div class="p-3 rounded-2xl bg-slate-100 border border-slate-200 flex flex-wrap items-center justify-between gap-2">
-        <div class="flex flex-wrap items-center gap-2">
-          ${isRoundActive ? `
-            <button type="button" onclick="applyVisionToActiveRound()" id="btn-apply-vision-round" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95 animate-pulse" title="تطبيق نتائج الفحص البصري على الأصل وتحديث بنود الجولة الحالية آلياً">
-              <span class="material-symbols-outlined text-base text-amber-300">task_alt</span>
-              <span>✅ تطبيق وتعبئة بنود الجولة آلياً</span>
-            </button>
-          ` : `
-            <button type="button" onclick="openViolationFromAI()" id="btn-vision-instant-violation" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800 text-white font-black text-xs shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95" title="إنشاء بلاغ مخالفة فوري وتحويل المعاينة البصرية لبلاغ معتمد">
-              <span class="material-symbols-outlined text-base text-amber-300">warning</span>
-              <span>🚨 إنشاء بلاغ مخالفة فوري</span>
-            </button>
-            <button type="button" onclick="startRoundFromAI()" id="btn-vision-start-round" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-black text-xs shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95" title="بدء جولة تفتيش جديدة لهذا الموقع مع ضبط نوع الفحص">
-              <span class="material-symbols-outlined text-base text-cyan-200">add_task</span>
-              <span>📋 بدء جولة جديدة لهذا الموقع</span>
-            </button>
-          `}
-          <button type="button" onclick="approveAndUploadVisualViolation()" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-700 hover:from-orange-700 hover:to-amber-800 text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95" title="اعتماد المخالفة وحفظ كارت الفحص بصيغة PDF في سجلات الأرشيف تلقائياً">
-            <span class="material-symbols-outlined text-base">verified</span>
+      <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col gap-2.5">
+        ${isRoundActive ? `
+          <button type="button" onclick="applyVisionToActiveRound()" id="btn-apply-vision-round" class="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-bold text-xs sm:text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]" title="تطبيق نتائج الفحص البصري على الأصل وتحديث بنود الجولة الحالية آلياً">
+            <span class="material-symbols-outlined text-[18px] text-amber-300">task_alt</span>
+            <span>تطبيق وتعبئة بنود الجولة آلياً</span>
+          </button>
+        ` : ''}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <button type="button" onclick="approveAndUploadVisualViolation()" class="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#082B49] to-[#004B87] hover:from-[#00162B] hover:to-[#003B6B] text-white font-bold text-xs sm:text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]" title="اعتماد المخالفة وحفظ كارت الفحص بصيغة PDF في سجلات الأرشيف تلقائياً">
+            <span class="material-symbols-outlined text-[18px] text-amber-300">verified</span>
             <span>اعتماد ورفع المخالفة</span>
           </button>
-          <button type="button" onclick="window.KSUIntegrations ? window.KSUIntegrations.dispatchWorkOrderFromVision() : alert('جاري تحميل محرك الربط...')" id="btn-vision-dispatch-wo" class="px-4 py-2.5 rounded-xl ${d.work_order_number ? 'bg-gradient-to-r from-emerald-600 to-teal-700' : 'bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-800 hover:to-indigo-900'} text-white font-bold text-xs shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95" title="إصدار وحجز رقم طلب صيانة آلي لدى إدارة الصيانة وإدراجه فوراً في الـ CAPA">
-            <span class="material-symbols-outlined text-base">handyman</span>
-            <span id="btn-vision-dispatch-text">${d.work_order_number ? `✅ طلب صيانة: <strong>#${d.work_order_number}</strong>` : '🛠️ إصدار وتوجيه طلب صيانة آلي'}</span>
-          </button>
-          <button type="button" onclick="broadcastVisualHazardAlert()" class="px-3.5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer transition-all">
-            <span class="material-symbols-outlined text-base">emergency_share</span>
-            <span>🚨 بث تنبيه لغرفة العمليات</span>
+          <button type="button" onclick="broadcastVisualHazardAlert()" class="w-full min-h-[44px] px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]">
+            <span class="material-symbols-outlined text-[18px]">emergency_share</span>
+            <span>بث تنبيه لغرفة العمليات</span>
           </button>
         </div>
-        <div class="flex items-center gap-1.5">
-          <button type="button" onclick="printVisualInspectionCard()" class="px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95 transition-all">
-            <span class="material-symbols-outlined text-base text-[#004B87]">print</span>
+        <div class="flex items-stretch gap-2">
+          <button type="button" onclick="printVisualInspectionCard()" class="flex-1 min-h-[42px] px-4 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 shadow-sm cursor-pointer transition-all active:scale-[0.98]">
+            <span class="material-symbols-outlined text-[18px] text-[#004B87]">print</span>
             <span>طباعة كارت الفحص</span>
           </button>
-          <button type="button" onclick="openVisualInspectionCardWindow()" title="فتح كرت الفحص في نافذة جديدة أو تصدير PDF" class="px-2.5 py-2.5 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer shadow-sm active:scale-95 transition-all">
-            <span class="material-symbols-outlined text-base text-slate-600">open_in_new</span>
+          <button type="button" onclick="openVisualInspectionCardWindow()" title="فتح كرت الفحص في نافذة جديدة أو تصدير PDF" aria-label="فتح كرت الفحص في نافذة جديدة أو تصدير PDF" class="w-11 min-h-[42px] shrink-0 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 flex items-center justify-center shadow-sm cursor-pointer transition-all active:scale-[0.98]">
+            <span class="material-symbols-outlined text-[18px]">open_in_new</span>
           </button>
         </div>
       </div>
