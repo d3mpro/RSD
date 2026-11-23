@@ -150,8 +150,18 @@
               <p class="text-xs text-slate-400 mt-1">أدخل مفتاحاً واحداً أو عدة مفاتيح (مفتاح في كل سطر أو مفصولة بفاصلة). عند نفاد حصة أي مفتاح (429) ينتقل النظام صامتاً للمفتاح التالي.</p>
             </div>
             <span class="text-[11px] font-bold text-cyan-300 bg-cyan-950/70 border border-cyan-500/30 px-3 py-1 rounded-xl self-start sm:self-center shrink-0">
-              سلسلة النماذج: 2.5 Flash ➔ 2.0 Flash ➔ 2.0 Flash Lite
+              سلسلة النماذج (2026): 3.5 Flash-Lite ➔ 3.8 Flash ➔ 2.5 Flash-Lite
             </span>
+          </div>
+
+          <div class="p-3 rounded-2xl bg-cyan-950/30 border border-cyan-500/20 text-[11px] text-cyan-100/90 leading-relaxed flex items-start gap-2.5">
+            <span class="material-symbols-outlined text-cyan-400 text-base shrink-0 mt-0.5">shield</span>
+            <div>
+              <strong class="text-white">درع حماية الحصة (Quota-Shield) مفعّل تلقائياً:</strong>
+              يتم ضغط الصور، منع تكرار الفحص لنفس الصورة (كاش فوري بدون استهلاك API)، وتهدئة أي مفتاح/نموذج يصل لحد 429 تلقائياً.
+              <span class="text-amber-300 font-bold">ملاحظة مهمة لمضاعفة الحصة المجانية:</span>
+              حصة Google Gemini تُحسب لكل <strong>مشروع Google Cloud</strong> وليس لكل مفتاح؛ لذا لمضاعفة الحصة اليومية أضف مفاتيح من <strong>مشاريع منفصلة</strong> في Google AI Studio.
+            </div>
           </div>
 
           <div>
@@ -475,13 +485,14 @@
           const controller = new AbortController();
           const timer = setTimeout(() => controller.abort(), 10000);
           
-          const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${k}`;
+          const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${k}`;
           const res = await fetch(testUrl, {
             method: 'POST',
             signal: controller.signal,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: 'ping' }] }]
+              contents: [{ parts: [{ text: 'ping' }] }],
+              generationConfig: { maxOutputTokens: 4 }
             })
           });
           clearTimeout(timer);
@@ -583,6 +594,7 @@
       const joinedKeys = keys.join(', ');
       localStorage.setItem('ksumc_gemini_api_keys', joinedKeys);
       localStorage.setItem('ksumc_gemini_api_key', joinedKeys);
+      localStorage.removeItem('ksumc_gemini_cooldowns');
       if (rawQwen) {
         localStorage.setItem('ksumc_qwen_api_key', rawQwen);
         localStorage.setItem('ksumc_qwen_api_keys', rawQwen);

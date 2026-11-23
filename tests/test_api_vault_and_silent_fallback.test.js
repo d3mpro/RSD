@@ -64,20 +64,20 @@ test('3. Inspector UI Purity: No API Key Settings or Alerts in field.html or adm
   assert.ok(!adminHtml.includes('ksumc_gemini_api_key'), 'admin.html must not expose API key input fields');
 });
 
-// 4. Verify Multi-Model Silent Fallback & Key Rotation in ksu-ai-client.js
-test('4. Multi-Model Silent Fallback Chain in ksu-ai-client.js', (t) => {
+// 4. Verify Multi-Model Silent Fallback & Quota-Shield in ksu-ai-client.js
+test('4. Multi-Model Silent Fallback Chain (2026 Active Models) & Quota-Shield in ksu-ai-client.js', (t) => {
   const ksuClientJs = fs.readFileSync(path.join(__dirname, '../assets/js/ksu-ai-client.js'), 'utf8');
 
-  // Model hierarchy check
-  assert.ok(ksuClientJs.includes('gemini-2.5-flash'), 'Must support gemini-2.5-flash');
-  assert.ok(ksuClientJs.includes('gemini-2.0-flash'), 'Must support gemini-2.0-flash');
-  assert.ok(ksuClientJs.includes('gemini-2.0-flash-lite'), 'Must support gemini-2.0-flash-lite');
+  // Active 2026 model hierarchy check (no retired gemini-2.0-flash / gemini-2.0-flash-lite)
+  assert.ok(ksuClientJs.includes("MODELS_HIERARCHY: ["), 'Must define MODELS_HIERARCHY array on KSUAI');
+  assert.ok(ksuClientJs.includes("'gemini-3.5-flash-lite'"), 'MODELS_HIERARCHY must start with gemini-3.5-flash-lite');
+  assert.ok(ksuClientJs.includes("'gemini-3.8-flash'"), 'MODELS_HIERARCHY must include gemini-3.8-flash');
+  assert.ok(ksuClientJs.includes("'gemini-2.5-flash-lite'"), 'MODELS_HIERARCHY must include gemini-2.5-flash-lite');
 
-  // Multi-model array hierarchy
-  assert.ok(ksuClientJs.includes("MODELS_HIERARCHY = ["), 'Must define MODELS_HIERARCHY array');
-  assert.ok(ksuClientJs.includes("'gemini-2.5-flash'"), 'MODELS_HIERARCHY must start with 2.5 flash');
-  assert.ok(ksuClientJs.includes("'gemini-2.0-flash'"), 'MODELS_HIERARCHY must include 2.0 flash');
-  assert.ok(ksuClientJs.includes("'gemini-2.0-flash-lite'"), 'MODELS_HIERARCHY must include 2.0 flash-lite');
+  // Quota-Shield capabilities
+  assert.ok(ksuClientJs.includes('_computeVisionCacheKey'), 'Must implement image fingerprint caching');
+  assert.ok(ksuClientJs.includes('_isGeminiCoolingDown'), 'Must implement 429/401/404 cooldown circuit-breaker');
+  assert.ok(ksuClientJs.includes('getQuotaShieldStats'), 'Must expose Quota-Shield telemetry');
 
   // Background silent cloud key synchronization
   assert.ok(ksuClientJs.includes('fetchCloudKeysSilently'), 'Must define fetchCloudKeysSilently');
@@ -88,12 +88,12 @@ test('4. Multi-Model Silent Fallback Chain in ksu-ai-client.js', (t) => {
   assert.ok(ksuClientJs.includes('compressImageForAI'), 'Must define compressImageForAI');
 });
 
-// 5. Functional Simulation: Silent Multi-Model Failover & Collage Creation
+// 5. Functional Simulation: Silent Multi-Model Failover & Key Rotation
 test('5. Functional Simulation: Multi-Model Failover and Key Rotation Logic', async (t) => {
   const modelsTried = [];
   const keysTried = [];
   const fakeKeys = ['KEY_A', 'KEY_B'];
-  const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+  const MODELS = ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash-lite'];
 
   let successModel = null;
   let keyIdx = 0;
@@ -107,18 +107,11 @@ test('5. Functional Simulation: Multi-Model Failover and Key Rotation Logic', as
       const curKey = fakeKeys[(keyIdx++) % fakeKeys.length];
       keysTried.push({ model: curModel, key: curKey });
 
-      // Simulate: gemini-2.5-flash hits Quota 429 on all keys
-      if (curModel === 'gemini-2.5-flash') {
-        // Quota 429 -> silently continues to next key/model
-        continue;
+      if (curModel === 'gemini-3.5-flash-lite') {
+        continue; // Quota 429 -> silently continues
       }
-
-      // Simulate: gemini-2.0-flash Key A fails with 503, Key B succeeds!
-      if (curModel === 'gemini-2.0-flash') {
-        if (curKey === 'KEY_A') {
-          continue; // 503
-        }
-        // Key B succeeds!
+      if (curModel === 'gemini-3.8-flash') {
+        if (curKey === 'KEY_A') continue; // 503
         successModel = curModel;
         modelPassed = true;
         break;
@@ -127,7 +120,143 @@ test('5. Functional Simulation: Multi-Model Failover and Key Rotation Logic', as
     if (modelPassed) break;
   }
 
-  assert.equal(successModel, 'gemini-2.0-flash', 'Should successfully recover using gemini-2.0-flash');
-  assert.deepEqual(modelsTried, ['gemini-2.5-flash', 'gemini-2.0-flash'], 'Should have evaluated models in strict priority order');
-  assert.ok(keysTried.length >= 3, 'Should have silently rotated through keys across model hierarchy');
+  assert.equal(successModel, 'gemini-3.8-flash', 'Should successfully recover using gemini-3.8-flash');
+  assert.deepEqual(modelsTried, ['gemini-3.5-flash-lite', 'gemini-3.8-flash'], 'Should evaluate active models in strict priority order');
+  assert.ok(keysTried.length >= 3, 'Should silently rotate through keys across model hierarchy');
 });
+
+// Helper to run ksu-ai-client.js in a clean VM sandbox
+function createQuotaShieldSandbox(customFetch) {
+  const vm = require('node:vm');
+  const store = new Map();
+  const localStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+    clear: () => store.clear()
+  };
+  const sandbox = {
+    console,
+    setTimeout: () => 1,
+    clearTimeout: () => {},
+    setInterval: () => 1,
+    clearInterval: () => {},
+    AbortController,
+    Intl,
+    Date,
+    Math,
+    JSON,
+    Promise,
+    Map,
+    Set,
+    Array,
+    Object,
+    String,
+    Number,
+    Boolean,
+    RegExp,
+    Error,
+    URL,
+    localStorage,
+    sessionStorage: localStorage,
+    navigator: { userAgent: 'NodeTest', onLine: true },
+    location: { hostname: 'localhost', protocol: 'http:', href: 'http://localhost/field.html' },
+    fetch: customFetch
+  };
+  sandbox.window = sandbox;
+  sandbox.self = sandbox;
+  sandbox.globalThis = sandbox;
+  const ctx = vm.createContext(sandbox);
+  const code = fs.readFileSync(path.join(__dirname, '../assets/js/ksu-ai-client.js'), 'utf8');
+  vm.runInContext(code, ctx);
+  return ctx;
+}
+
+// 6. Runtime Verification: Image Fingerprint Cache, 429 Cooldown Circuit-Breaker & Prompt Deduplication
+test('6. Quota-Shield Runtime: Image cache prevents duplicate API calls, 429 cooldown skips exhausted pairs, and prompt is not duplicated', async () => {
+  const fetchCalls = [];
+  const validPayload = JSON.stringify({
+    status: 'غير مطابق',
+    pattern: 'emergency_exit',
+    confidence: 96,
+    risk: 'عالي',
+    title: 'إعاقة باب مخرج الطوارئ بكراتين',
+    summary: 'وجود كراتين مكدسة أمام باب مخرج الطوارئ تعيق الإخلاء.',
+    observations: ['كراتين مكدسة أمام الباب'],
+    capa_actions: ['إزالة الكراتين فوراً'],
+    directive: 'تحرير مخرج الطوارئ فوراً'
+  });
+
+  const mockFetch = async (url, opts) => {
+    if (url.includes('system_config/ai_keys.json')) {
+      return { ok: false, status: 404, json: async () => null };
+    }
+    const parsedBody = opts && opts.body ? JSON.parse(opts.body) : null;
+    fetchCalls.push({ url, body: parsedBody });
+
+    // First model gemini-3.5-flash-lite hits 429 on key_1, succeeds on gemini-3.8-flash!
+    if (url.includes('gemini-3.5-flash-lite') && url.includes('key=key_1')) {
+      return {
+        ok: false,
+        status: 429,
+        headers: { get: () => '65' },
+        text: async () => 'RESOURCE_EXHAUSTED: per minute quota exceeded'
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: validPayload }] } }]
+      })
+    };
+  };
+
+  const ctx = createQuotaShieldSandbox(mockFetch);
+  ctx.window.KSUAI.saveAgentConfig({ geminiApiKeys: 'key_1' });
+
+  // Call 1: hits 429 on gemini-3.5-flash-lite, automatically fails over to gemini-3.8-flash
+  const res1 = await ctx.window.KSUAI.analyzeInspectionImage({
+    image: 'data:image/jpeg;base64,AAAA1111',
+    submode: 'emergency_exit',
+    building: 'المستشفى'
+  });
+  assert.equal(res1.success, true);
+  assert.equal(res1.source, 'Google gemini-3.8-flash Vision');
+  assert.equal(fetchCalls.length, 2, 'Should try 3.5-flash-lite (429) then succeed on 3.8-flash');
+
+  // Verify prompt deduplication & token cap
+  const firstReqBody = fetchCalls[0].body;
+  const sysText = firstReqBody.systemInstruction.parts[0].text;
+  const userText = firstReqBody.contents[0].parts.find(p => p.text).text;
+  assert.ok(sysText.includes('كبير مفتشي السلامة'), 'System instruction must carry VISION_SYSTEM_PROMPT');
+  assert.ok(!userText.includes('كبير مفتشي السلامة'), 'User prompt must NOT duplicate VISION_SYSTEM_PROMPT');
+  assert.equal(firstReqBody.generationConfig.maxOutputTokens, 700, 'Must cap maxOutputTokens to save quota');
+  assert.equal(firstReqBody.generationConfig.thinkingConfig.thinkingLevel, 'MINIMAL', '3.5-flash-lite should use MINIMAL thinking');
+
+  // Call 2: EXACT SAME IMAGE -> 0 API calls (served from local fingerprint cache!)
+  const res2 = await ctx.window.KSUAI.analyzeInspectionImage({
+    image: 'data:image/jpeg;base64,AAAA1111',
+    submode: 'emergency_exit',
+    building: 'المستشفى'
+  });
+  assert.equal(res2.success, true);
+  assert.equal(res2.cached, true, 'Second identical call must be served from cache');
+  assert.equal(fetchCalls.length, 2, 'Cached call must make ZERO additional API requests');
+
+  // Call 3: DIFFERENT IMAGE -> must SKIP cooling-down (gemini-3.5-flash-lite, key_1) and go straight to gemini-3.8-flash!
+  const res3 = await ctx.window.KSUAI.analyzeInspectionImage({
+    image: 'data:image/jpeg;base64,BBBB2222',
+    submode: 'extinguisher',
+    building: 'العيادات'
+  });
+  assert.equal(res3.success, true);
+  assert.equal(res3.source, 'Google gemini-3.8-flash Vision');
+  assert.equal(fetchCalls.length, 3, 'Cooldown circuit-breaker must skip rate-limited 3.5-flash-lite in 1 call');
+  assert.ok(fetchCalls[2].url.includes('gemini-3.8-flash'), 'Call 3 must go straight to healthy gemini-3.8-flash');
+
+  const stats = ctx.window.KSUAI.getQuotaShieldStats();
+  assert.equal(stats.cacheHits, 1, 'Must record 1 cache hit');
+  assert.ok(stats.cooldownSkips >= 1, 'Must record at least 1 cooldown skip');
+});
+

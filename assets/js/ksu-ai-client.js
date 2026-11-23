@@ -15,8 +15,8 @@
     locale: 'ar-SA',
     apiBaseUrl: '/safety/api',
     apiKeyHeader: (typeof window !== 'undefined' && (window.KSU_AGENT_TOKEN || (window.localStorage && localStorage.getItem('ksu_agent_token')))) || '',
-    // رابط خادم وكيل أوراكل للرؤية البصرية (Qwen2.5-VL Agent)
-    oracleAgentUrl: (typeof localStorage !== 'undefined' ? localStorage.getItem('ksumc_oracle_agent_url') : null) || 'https://rsdsafety.online',
+    // تم إلغاء خادم أوراكل الافتراضي — يبقى فارغاً إلا إذا تم ضبط رابط مخصص يدوياً
+    oracleAgentUrl: (typeof localStorage !== 'undefined' ? localStorage.getItem('ksumc_oracle_agent_url') : null) || '',
     // إعدادات نموذج كوين البصري المباشر (OpenRouter / Alibaba DashScope)
     qwenApiBaseUrl: (typeof localStorage !== 'undefined' ? localStorage.getItem('ksumc_qwen_base_url') : null) || 'https://openrouter.ai/api/v1/chat/completions',
     qwenApiKey: (typeof localStorage !== 'undefined' ? (localStorage.getItem('ksumc_qwen_api_key') || localStorage.getItem('ksumc_qwen_api_keys') || '') : ''),
@@ -24,6 +24,154 @@
     // مفتاح أو عدة مفاتيح Gemini مفصولة بفاصلة للتدوير التلقائي (قراءة ديناميكية نظيفة بدون مفتاح تالف افتراضي)
     geminiApiKey: (typeof localStorage !== 'undefined' ? (localStorage.getItem('ksumc_gemini_api_key') || localStorage.getItem('ksumc_gemini_api_keys') || '') : ''),
     _geminiKeyIdx: 0,
+    // سلسلة نماذج Gemini النشطة (2026) — لكل نموذج حصة يومية/دقيقة مستقلة (RPD/RPM)
+    // تم استبدال gemini-2.0-flash و gemini-2.0-flash-lite المتوقفة و gemini-2.5-flash المنتهية قريباً
+    MODELS_HIERARCHY: [
+      'gemini-3.5-flash-lite',
+      'gemini-3.8-flash',
+      'gemini-2.5-flash-lite'
+    ],
+    _visionCache: new Map(),
+    _visionInFlight: new Map(),
+    _geminiCooldowns: new Map(),
+    _quotaStats: { cacheHits: 0, coalescedHits: 0, cooldownSkips: 0 },
+
+    /**
+     * بصمة سريعة وحتمية (FNV-1a) لتفادي تكرار طلبات الـ API لنفس الصورة
+     */
+    _hashString(str) {
+      const s = String(str || '');
+      let h = 2166136261;
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return (h >>> 0).toString(16);
+    },
+
+    /**
+     * حساب مفتاح التخزين المؤقت (Cache Key) لصورة وسياق الفحص الميداني
+     */
+    _computeVisionCacheKey({ images, checklistType, submode, itemLabel, building, floor, notes }) {
+      const imgParts = (images || []).filter(Boolean).map(img => {
+        const s = String(img);
+        const len = s.length;
+        const head = s.slice(0, 128);
+        const mid = len > 256 ? s.slice(Math.floor(len / 2) - 64, Math.floor(len / 2) + 64) : '';
+        const tail = len > 128 ? s.slice(-128) : '';
+        return `${len}:${this._hashString(head + mid + tail)}`;
+      });
+      const ctx = [checklistType || '', submode || '', itemLabel || '', building || '', floor || '', notes || ''].join('|');
+      return `${imgParts.join(',')}::${this._hashString(ctx)}`;
+    },
+
+    /**
+     * تحميل فترات التهدئة (Cooldowns) المحفوظة للمفاتيح/النماذج عند استنفاد الحصة
+     */
+    _loadGeminiCooldowns() {
+      const now = Date.now();
+      if (this._geminiCooldowns.size === 0 && typeof localStorage !== 'undefined') {
+        try {
+          const raw = localStorage.getItem('ksumc_gemini_cooldowns');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            for (const [k, exp] of Object.entries(parsed || {})) {
+              if (typeof exp === 'number' && exp > now) {
+                this._geminiCooldowns.set(k, exp);
+              }
+            }
+          }
+        } catch (_) {}
+      }
+      for (const [k, exp] of this._geminiCooldowns.entries()) {
+        if (exp <= now) this._geminiCooldowns.delete(k);
+      }
+    },
+
+    _persistGeminiCooldowns() {
+      if (typeof localStorage === 'undefined') return;
+      try {
+        const obj = {};
+        const now = Date.now();
+        for (const [k, exp] of this._geminiCooldowns.entries()) {
+          if (exp > now) obj[k] = exp;
+        }
+        localStorage.setItem('ksumc_gemini_cooldowns', JSON.stringify(obj));
+      } catch (_) {}
+    },
+
+    _isGeminiCoolingDown(model, key) {
+      this._loadGeminiCooldowns();
+      const now = Date.now();
+      const kHash = this._hashString(key);
+      const checks = [`${model}::${kHash}`, `key::${kHash}`, `model::${model}`];
+      return checks.some(id => (this._geminiCooldowns.get(id) || 0) > now);
+    },
+
+    _markGeminiCooldown(model, key, status, errText = '', retryAfterHeader = null) {
+      const now = Date.now();
+      const kHash = this._hashString(key);
+      if (status === 429) {
+        const isDaily = /per\s*day|daily|rpd|requestsperday/i.test(String(errText || ''));
+        let waitMs = isDaily ? 15 * 60 * 1000 : 65 * 1000;
+        const retrySec = Number(retryAfterHeader);
+        if (!isNaN(retrySec) && retrySec > 0 && retrySec <= 3600) {
+          waitMs = Math.max(waitMs, retrySec * 1000);
+        }
+        this._geminiCooldowns.set(`${model}::${kHash}`, now + waitMs);
+      } else if (status === 401 || status === 403) {
+        this._geminiCooldowns.set(`key::${kHash}`, now + 10 * 60 * 1000);
+      } else if (status === 404) {
+        this._geminiCooldowns.set(`model::${model}`, now + 30 * 60 * 1000);
+      }
+      this._persistGeminiCooldowns();
+    },
+
+    /**
+     * إعدادات التوليد المخصصة لكل نموذج لتقليل التوكنز ومنع استنزاف الحصة وزمن الاستجابة
+     */
+    _buildGeminiGenerationConfig(model, { expectJson = true, maxOutputTokens = 700 } = {}) {
+      const cfg = { maxOutputTokens };
+      if (expectJson) cfg.responseMimeType = 'application/json';
+      if (model.startsWith('gemini-3.5-flash-lite')) {
+        cfg.temperature = 0.15;
+        cfg.thinkingConfig = { thinkingLevel: 'MINIMAL' };
+      } else if (model.startsWith('gemini-3.8-flash')) {
+        cfg.thinkingConfig = { thinkingLevel: 'LOW' };
+      } else if (model.startsWith('gemini-2.5-')) {
+        cfg.temperature = 0.15;
+        cfg.thinkingConfig = { thinkingBudget: 0 };
+      } else {
+        cfg.temperature = 0.15;
+      }
+      return cfg;
+    },
+
+    /**
+     * إحصائيات درع حماية الحصة (Quota-Shield Telemetry)
+     */
+    getQuotaShieldStats() {
+      this._loadGeminiCooldowns();
+      return {
+        cacheHits: this._quotaStats.cacheHits,
+        coalescedHits: this._quotaStats.coalescedHits,
+        cooldownSkips: this._quotaStats.cooldownSkips,
+        cachedEntries: this._visionCache.size,
+        activeCooldowns: this._geminiCooldowns.size,
+        modelsHierarchy: [...this.MODELS_HIERARCHY]
+      };
+    },
+
+    /**
+     * تصفير الكاش وفترات التهدئة عند تحديث المفاتيح من الخزينة
+     */
+    resetQuotaShield() {
+      this._visionCache.clear();
+      this._geminiCooldowns.clear();
+      if (typeof localStorage !== 'undefined') {
+        try { localStorage.removeItem('ksumc_gemini_cooldowns'); } catch (_) {}
+      }
+    },
 
     /**
      * تنظيف وفلترة مفاتيح الـ API وإزالة المسافات والأحرف غير الصالحة والمفاتيح التالفة
@@ -138,6 +286,7 @@
           localStorage.setItem('ksumc_gemini_api_key', this.geminiApiKey);
           localStorage.setItem('ksumc_gemini_api_keys', this.geminiApiKey);
         }
+        if (typeof this.resetQuotaShield === 'function') this.resetQuotaShield();
       }
     },
 
@@ -580,7 +729,7 @@
 
     /**
      * 1. التدقيق البصري الذكي للصور والمخالفات الميدانية
-     * (الأولوية المباشرة: Google Gemini 2.5 Flash Vision السحابي المباشر -> Qwen2.5-VL -> وكيل أوراكل -> جسر الفايربيس -> المحرك الاسترشادي الخبير)
+     * (الأولوية المباشرة: كاش البصمة المحلي -> Google Gemini Vision 2026 مع درع الحصة -> Qwen2.5-VL -> وكيل أوراكل -> جسر الفايربيس)
      */
     async analyzeInspectionImage({ image, images, checklistType, itemLabel, facility, building, floor, notes, submode }) {
       const onProgress = arguments[0] && arguments[0].onProgress;
@@ -600,165 +749,205 @@
         }
       }
 
-      const payload = {
-        image: allImages[0] || '',
-        checklistType: checklistType || 'general',
-        submode: submode || undefined,
-        itemLabel: itemLabel || '',
-        facility: facility || 'المدينة الطبية (KSUMC)',
-        building: building || '',
-        floor: floor || '',
-        notes: notes || ''
-      };
-      if (allImages.length > 1) {
-        payload.images = allImages;
+      // درع الحصة — الطبقة 1: فحص الكاش ببصمة الصورة والسياق (0 استهلاك API عند تكرار الفحص)
+      const cacheKey = this._computeVisionCacheKey({
+        images: allImages,
+        checklistType,
+        submode,
+        itemLabel,
+        building,
+        floor,
+        notes
+      });
+      const cachedEntry = this._visionCache.get(cacheKey);
+      if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+        this._quotaStats.cacheHits++;
+        if (typeof onProgress === 'function') onProgress('تم استرجاع نتيجة التحليل البصري من الذاكرة المحلية الفورية...');
+        return {
+          ...cachedEntry.result,
+          cached: true,
+          data: cachedEntry.result.data ? { ...cachedEntry.result.data } : null
+        };
+      }
+      if (cachedEntry) {
+        this._visionCache.delete(cacheKey);
       }
 
-      // في حال وجود أكثر من صورة، دمجها في صورة مجمعة واحدة ذكية (Collage Grid) لا تتجاوز 300KB لتسريع الرد وتوفير التوكنز
-      let visionInputImages = allImages;
-      if (allImages.length > 1 && typeof createInspectionCollage === 'function' && typeof document !== 'undefined') {
-        try {
-          const collageImg = await createInspectionCollage(allImages, 800, 0.7);
-          if (collageImg) {
-            visionInputImages = [collageImg];
+      // درع الحصة — الطبقة 2: دمج الطلبات المتزامنة المتطابقة لمنع النقر المزدوج من مضاعفة الاستهلاك
+      if (this._visionInFlight.has(cacheKey)) {
+        this._quotaStats.coalescedHits++;
+        return this._visionInFlight.get(cacheKey);
+      }
+
+      const saveToCache = (resultObj) => {
+        if (resultObj && resultObj.success && resultObj.data) {
+          if (this._visionCache.size >= 30) {
+            const oldestKey = this._visionCache.keys().next().value;
+            if (oldestKey) this._visionCache.delete(oldestKey);
           }
-        } catch (_) {
-          visionInputImages = allImages;
-        }
-      }
-
-      const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com') || window.location.protocol === 'file:';
-
-      // جلب المفاتيح المركزية سحابياً من Firebase في الخلفية إن لم تكن محملة
-      let geminiKeys = this.getGeminiKeys();
-      if (!geminiKeys.length) {
-        await this.fetchCloudKeysSilently();
-        geminiKeys = this.getGeminiKeys();
-      }
-
-      // المسار 1 (الأولوية القصوى والسريعة المعتمدة): الاستدعاء المباشر لمحرك Google Gemini Vision مع التدرج الصامت
-      if (geminiKeys.length > 0) {
-        try {
-          if (typeof onProgress === 'function') onProgress('جاري التحليل البصري الذكي ورصد المخالفة عبر Gemini Vision...');
-          const geminiRes = await this.callGeminiDirectly({
-            images: visionInputImages,
-            checklistType,
-            submode,
-            itemLabel,
-            facility,
-            building,
-            floor,
-            notes,
-            onProgress
+          this._visionCache.set(cacheKey, {
+            expiresAt: Date.now() + 30 * 60 * 1000,
+            result: {
+              ...resultObj,
+              data: { ...resultObj.data }
+            }
           });
-          if (geminiRes && geminiRes.success) {
-            geminiRes.data = this.applyStaticReferenceMapping(geminiRes.data, submode || checklistType);
-            geminiRes.data.ai_engine_source = geminiRes.source || 'Google Gemini Vision';
-            return geminiRes;
-          }
-        } catch (geminiErr) {
-          console.warn('[KSUAI] Gemini multi-model fallback chain exhausted, switching silently to alternate providers:', geminiErr.message);
         }
-      }
-
-      // المسار 2: الاتصال المباشر بنموذج كوين البصري (Qwen2.5-VL) كخط دفاع أخير عند توفر مفتاحه
-      let qwenKeys = this.getQwenKeys();
-      if (!qwenKeys.length) {
-        await this.fetchCloudKeysSilently();
-        qwenKeys = this.getQwenKeys();
-      }
-      if (qwenKeys.length > 0) {
-        try {
-          if (typeof onProgress === 'function') onProgress('جاري التحليل السحابي عبر محرك Qwen2.5-VL الاحتياطي...');
-          const qwenRes = await this.callQwenDirectly({
-            images: visionInputImages,
-            checklistType,
-            submode,
-            itemLabel,
-            facility,
-            building,
-            floor,
-            notes
-          });
-          if (qwenRes && qwenRes.success) {
-            qwenRes.data = this.applyStaticReferenceMapping(qwenRes.data, submode || checklistType);
-            return qwenRes;
-          }
-        } catch (qwenErr) {
-          console.warn('[KSUAI] Direct Qwen2.5-VL API failed, trying backend agent:', qwenErr.message);
-        }
-      }
-
-      // المسار 3: الاتصال المباشر بوكيل أوراكل (مع مهلة تكيفية كافية 90 ثانية لمعالج CPU)
-      const hasOracleAgent = Boolean(this.oracleAgentUrl) || !isFirebase;
-      if (hasOracleAgent) {
-        let progressTimer = null;
-        try {
-          if (typeof onProgress === 'function') onProgress('جاري الفحص المباشر عبر وكيل الرؤية البصرية...');
-          if (typeof onProgress === 'function') {
-            let step = 0;
-            const steps = [
-              'المعالج البصري يقوم بتحليل تفاصيل الصورة والمطابقة الهندسية...',
-              'جاري فحص معايير السلامة واستخراج الملاحظات والإجراءات التصحيحية (CAPA)...',
-              'جاري استكمال التقرير المعتمد وتوثيق الحالة ميدانياً...'
-            ];
-            progressTimer = setInterval(() => {
-              if (step < steps.length) {
-                onProgress(steps[step++]);
-              }
-            }, 12000);
-          }
-
-          const res = await this.request('/ai/analyze-inspection-image', {
-            method: 'POST',
-            body: JSON.stringify(payload)
-          }, 90000);
-
-          if (progressTimer) clearInterval(progressTimer);
-
-          if (res && res.success && res.data) {
-            res.data = this.applyStaticReferenceMapping(res.data, submode || checklistType);
-            res.data.ai_engine_source = res.source || res.provider_used || 'Oracle Qwen2.5-VL Agent';
-            return res;
-          }
-        } catch (serverErr) {
-          console.warn('[KSUAI] Oracle Vision Agent unreachable or timed out:', serverErr.message);
-        } finally {
-          if (progressTimer) clearInterval(progressTimer);
-        }
-      }
-
-      // المسار 4: جسر الفايربيس اللحظي (Firebase RTDB Bridge)
-      if (isFirebase) {
-        try {
-          if (typeof onProgress === 'function') onProgress('جاري فحص جسر الفايربيس اللحظي...');
-          const bridgeRes = await this.dispatchViaFirebaseBridge('analyze-inspection-image', payload, 60000);
-          if (bridgeRes && bridgeRes.success && bridgeRes.data) {
-            bridgeRes.data = this.applyStaticReferenceMapping(bridgeRes.data, submode || checklistType);
-            bridgeRes.data.ai_engine_source = bridgeRes.source || 'Oracle Ollama (via Firebase Bridge)';
-            return bridgeRes;
-          }
-        } catch (bridgeErr) {
-          console.warn('[KSUAI] Firebase RTDB Bridge notice:', bridgeErr.message);
-        }
-      }
-
-      // المسار 5 (الشفافية الكاملة): الإشعار الصادق الصريح عند انقطاع كافة مزودي الذكاء الاصطناعي
-      const honestFailureMsg = 'تعذر الاتصال بخادم الذكاء الاصطناعي أو استغرق الفحص وقتاً أطول من المتوقع، يرجى إعادة المحاولة أو التحقق من الاتصال';
-      const offlineSaveMsg = 'تعذر الاتصال بخادم الرؤية البصرية، تم حفظ الصورة في المسودات المحلية لمزامنتها لاحقاً';
-      if (typeof onProgress === 'function') onProgress(honestFailureMsg);
-
-      return {
-        success: false,
-        status: 'فشل الاتصال',
-        error: honestFailureMsg,
-        message: honestFailureMsg,
-        user_message: offlineSaveMsg,
-        error_code: 'ERR_ALL_PROVIDERS_UNREACHABLE',
-        stage: 'inference',
-        offline_draft_ready: true,
-        data: null
+        return resultObj;
       };
+
+      const runPipeline = async () => {
+        const payload = {
+          image: allImages[0] || '',
+          checklistType: checklistType || 'general',
+          submode: submode || undefined,
+          itemLabel: itemLabel || '',
+          facility: facility || 'المدينة الطبية (KSUMC)',
+          building: building || '',
+          floor: floor || '',
+          notes: notes || ''
+        };
+        if (allImages.length > 1) {
+          payload.images = allImages;
+        }
+
+        // في حال وجود أكثر من صورة، دمجها في صورة مجمعة واحدة ذكية (Collage Grid) لا تتجاوز 300KB لتسريع الرد وتوفير التوكنز
+        let visionInputImages = allImages;
+        if (allImages.length > 1 && typeof createInspectionCollage === 'function' && typeof document !== 'undefined') {
+          try {
+            const collageImg = await createInspectionCollage(allImages, 800, 0.7);
+            if (collageImg) {
+              visionInputImages = [collageImg];
+            }
+          } catch (_) {
+            visionInputImages = allImages;
+          }
+        }
+
+        const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com') || window.location.protocol === 'file:';
+
+        // جلب المفاتيح المركزية سحابياً من Firebase في الخلفية إن لم تكن محملة
+        let geminiKeys = this.getGeminiKeys();
+        if (!geminiKeys.length) {
+          await this.fetchCloudKeysSilently();
+          geminiKeys = this.getGeminiKeys();
+        }
+
+        // المسار 1 (الأولوية القصوى والسريعة المعتمدة): الاستدعاء المباشر لمحرك Google Gemini Vision مع التدرج الصامت ودرع الحصة
+        if (geminiKeys.length > 0) {
+          try {
+            if (typeof onProgress === 'function') onProgress('جاري التحليل البصري الذكي ورصد المخالفة عبر Gemini Vision...');
+            const geminiRes = await this.callGeminiDirectly({
+              images: visionInputImages,
+              checklistType,
+              submode,
+              itemLabel,
+              facility,
+              building,
+              floor,
+              notes,
+              onProgress
+            });
+            if (geminiRes && geminiRes.success) {
+              geminiRes.data = this.applyStaticReferenceMapping(geminiRes.data, submode || checklistType);
+              geminiRes.data.ai_engine_source = geminiRes.source || 'Google Gemini Vision';
+              return saveToCache(geminiRes);
+            }
+          } catch (geminiErr) {
+            console.warn('[KSUAI] Gemini multi-model fallback chain exhausted, switching silently to alternate providers:', geminiErr.message);
+          }
+        }
+
+        // المسار 2: الاتصال المباشر بنموذج كوين البصري (Qwen2.5-VL) كخط دفاع احتياطي عند توفر مفتاحه
+        let qwenKeys = this.getQwenKeys();
+        if (!qwenKeys.length) {
+          await this.fetchCloudKeysSilently();
+          qwenKeys = this.getQwenKeys();
+        }
+        if (qwenKeys.length > 0) {
+          try {
+            if (typeof onProgress === 'function') onProgress('جاري التحليل السحابي عبر محرك Qwen2.5-VL الاحتياطي...');
+            const qwenRes = await this.callQwenDirectly({
+              images: visionInputImages,
+              checklistType,
+              submode,
+              itemLabel,
+              facility,
+              building,
+              floor,
+              notes
+            });
+            if (qwenRes && qwenRes.success) {
+              qwenRes.data = this.applyStaticReferenceMapping(qwenRes.data, submode || checklistType);
+              return saveToCache(qwenRes);
+            }
+          } catch (qwenErr) {
+            console.warn('[KSUAI] Direct Qwen2.5-VL API failed, trying backend agent:', qwenErr.message);
+          }
+        }
+
+        // المسار 3 (اختياري): لا يُستدعى إلا إذا تم ضبط رابط خادم مخصص صراحةً (تم إلغاء خادم أوراكل الافتراضي)
+        const hasCustomAgent = Boolean(this.oracleAgentUrl);
+        if (hasCustomAgent) {
+          let progressTimer = null;
+          try {
+            if (typeof onProgress === 'function') onProgress('جاري الفحص المباشر عبر وكيل الرؤية البصرية...');
+            if (typeof onProgress === 'function') {
+              let step = 0;
+              const steps = [
+                'المعالج البصري يقوم بتحليل تفاصيل الصورة والمطابقة الهندسية...',
+                'جاري فحص معايير السلامة واستخراج الملاحظات والإجراءات التصحيحية (CAPA)...',
+                'جاري استكمال التقرير المعتمد وتوثيق الحالة ميدانياً...'
+              ];
+              progressTimer = setInterval(() => {
+                if (step < steps.length) {
+                  onProgress(steps[step++]);
+                }
+              }, 12000);
+            }
+
+            const res = await this.request('/ai/analyze-inspection-image', {
+              method: 'POST',
+              body: JSON.stringify(payload)
+            }, 90000);
+
+            if (progressTimer) clearInterval(progressTimer);
+
+            if (res && res.success && res.data) {
+              res.data = this.applyStaticReferenceMapping(res.data, submode || checklistType);
+              res.data.ai_engine_source = res.source || res.provider_used || 'Custom Vision Agent';
+              return saveToCache(res);
+            }
+          } catch (serverErr) {
+            console.warn('[KSUAI] Custom Vision Agent unreachable or timed out:', serverErr.message);
+          } finally {
+            if (progressTimer) clearInterval(progressTimer);
+          }
+        }
+
+        // المسار 4 (الشفافية الكاملة): الإشعار الصادق الصريح عند تعذر مزودي السحابة (Gemini / Qwen)
+        const honestFailureMsg = 'تعذر الاتصال بخادم الذكاء الاصطناعي أو استغرق الفحص وقتاً أطول من المتوقع، يرجى إعادة المحاولة أو التحقق من الاتصال';
+        const offlineSaveMsg = 'تعذر الاتصال بخادم الرؤية البصرية، تم حفظ الصورة في المسودات المحلية لمزامنتها لاحقاً';
+        if (typeof onProgress === 'function') onProgress(honestFailureMsg);
+
+        return {
+          success: false,
+          status: 'فشل الاتصال',
+          error: honestFailureMsg,
+          message: honestFailureMsg,
+          user_message: offlineSaveMsg,
+          error_code: 'ERR_ALL_PROVIDERS_UNREACHABLE',
+          stage: 'inference',
+          offline_draft_ready: true,
+          data: null
+        };
+      };
+
+      const pending = runPipeline().finally(() => {
+        this._visionInFlight.delete(cacheKey);
+      });
+      this._visionInFlight.set(cacheKey, pending);
+      return pending;
     },
 
     /**
@@ -771,7 +960,7 @@
       const contextHint = (notes || itemLabel || building)
         ? `\nسياق الموقع: المنشأة: ${facility || 'المدينة الطبية (KSUMC)'} | المبنى: ${building || ''} | الدور: ${floor || ''} | الموقع: ${itemLabel || ''} | ملاحظة المفتش: ${notes || ''}`
         : '';
-      const promptText = `${this.VISION_SYSTEM_PROMPT}${contextHint}`;
+      const promptText = `حلل الصورة الميدانية بدقة وأخرج JSON فقط وفق تعليمات النظام.${contextHint}`;
 
       const contentList = [];
       for (const img of (images || [])) {
@@ -816,7 +1005,7 @@
     },
 
     /**
-     * الاستدعاء السحابي المباشر لـ Google Gemini مع التدرج الصامت بين النماذج (2.5-Flash -> 2.0-Flash -> 2.0-Flash-Lite) وتدوير المفاتيح
+     * الاستدعاء السحابي المباشر لـ Google Gemini مع التدرج الصامت (3.5-Flash-Lite -> 3.8-Flash -> 2.5-Flash-Lite) ودرع الحصة وتدوير المفاتيح
      */
     async callGeminiDirectly({ images, checklistType, submode, itemLabel, facility, building, floor, notes, onProgress }) {
       let keys = this.getGeminiKeys();
@@ -849,7 +1038,7 @@
         });
       }
 
-      // تحسين موجه النظام واختصار المعايير حسب الفئة المختارة لتقليل التوكنات وتسريع الاستجابة
+      // تحسين موجه النظام واختصار المعايير حسب الفئة المختارة بدون تكرار النص لتوفير 50% من التوكنز
       const sub = submode || checklistType || 'general';
       let focusedStandardText = '';
       if (sub === 'hazard' || sub === 'electrical_devices') {
@@ -865,40 +1054,45 @@
       const contextHint = (notes || itemLabel || building)
         ? `\nسياق الموقع الميداني: المنشأة: ${facility || 'المدينة الطبية (KSUMC)'} | المبنى: ${building || ''} | الدور: ${floor || ''} | الموقع: ${itemLabel || ''} | ملاحظة المفتش: ${notes || ''}`
         : '';
-      const promptText = `${this.VISION_SYSTEM_PROMPT}${focusedStandardText}${contextHint}`;
-      parts.push({ text: promptText });
+      // إرسال موجه مختصر فقط في user part لأن VISION_SYSTEM_PROMPT موجود بالفعل في systemInstruction
+      parts.push({ text: `افحص الصورة الميدانية وأخرج النتيجة بصيغة JSON فقط وفق التعليمات.${contextHint}` });
 
-      const reqBodyStr = JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: `${this.VISION_SYSTEM_PROMPT}${focusedStandardText}` }]
-        },
-        contents: [{ parts }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.15
-        }
-      });
+      const systemInstruction = {
+        parts: [{ text: `${this.VISION_SYSTEM_PROMPT}${focusedStandardText}` }]
+      };
 
-      // سلسلة النماذج بالترتيب الصارم لضمان عدم توقف الخدمة (لكل نموذج كوتا وحصة مستقلة)
-      const MODELS_HIERARCHY = [
-        'gemini-2.5-flash',
-        'gemini-2.0-flash',
-        'gemini-2.0-flash-lite'
-      ];
+      // سلسلة النماذج النشطة (لكل نموذج كوتا وحصة يومية/دقيقة مستقلة)
+      const MODELS_HIERARCHY = (Array.isArray(this.MODELS_HIERARCHY) && this.MODELS_HIERARCHY.length)
+        ? this.MODELS_HIERARCHY
+        : ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash-lite'];
 
       let lastErr = null;
+      let networkUnreachable = false;
 
       for (let mIdx = 0; mIdx < MODELS_HIERARCHY.length; mIdx++) {
+        if (networkUnreachable) break;
         const currentModel = MODELS_HIERARCHY[mIdx];
-        if (mIdx > 0 && typeof onProgress === 'function') {
-          onProgress(`جاري الفحص المتقدم ومطابقة المعايير الهندسية...`);
-        }
+        const reqBodyStr = JSON.stringify({
+          systemInstruction,
+          contents: [{ parts }],
+          generationConfig: this._buildGeminiGenerationConfig(currentModel, { expectJson: true, maxOutputTokens: 700 })
+        });
 
-        // تدوير المفاتيح لكل نموذج
+        let triedModel = false;
+        // تدوير المفاتيح لكل نموذج مع تخطي المفاتيح/النماذج الموجودة في فترة التهدئة (Cooldown)
         for (let attempt = 0; attempt < keys.length; attempt++) {
           const geminiKey = keys[(this._geminiKeyIdx++) % keys.length];
+          if (this._isGeminiCoolingDown(currentModel, geminiKey)) {
+            this._quotaStats.cooldownSkips++;
+            continue;
+          }
+
+          if (!triedModel && mIdx > 0 && typeof onProgress === 'function') {
+            onProgress('جاري الفحص المتقدم ومطابقة المعايير الهندسية...');
+          }
+          triedModel = true;
+
           const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${geminiKey}`;
-          
           const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
           const timer = controller ? setTimeout(() => controller.abort(), 16000) : null;
 
@@ -913,8 +1107,11 @@
 
             if (!resp.ok) {
               const errRaw = await resp.text();
+              const retryAfter = resp.headers && typeof resp.headers.get === 'function' ? resp.headers.get('retry-after') : null;
+              this._markGeminiCooldown(currentModel, geminiKey, resp.status, errRaw, retryAfter);
               lastErr = new Error(`Gemini ${currentModel} HTTP ${resp.status}: ${errRaw.slice(0, 100)}`);
-              // التبديل الصامت التلقائي للمفتاح التالي فوراً
+              // عند عدم وجود النموذج (404) ننتقل مباشرة للنموذج التالي بدون إضاعة بقية المفاتيح عليه
+              if (resp.status === 404) break;
               continue;
             }
 
@@ -937,7 +1134,11 @@
           } catch (err) {
             if (timer) clearTimeout(timer);
             lastErr = err;
-            // عند انتهاء المهلة أو خطأ اتصال، انتقل للمفتاح أو النموذج التالي صامتاً
+            // كسر فوري عند انقطاع الشبكة أو جدار الحماية (AbortError / TypeError) لمنع مضاعفة الانتظار
+            if (err && (err.name === 'AbortError' || err.name === 'TypeError')) {
+              networkUnreachable = true;
+              break;
+            }
             continue;
           }
         }
@@ -947,11 +1148,73 @@
     },
 
     /**
+     * مساعد مشترك لطلبات Gemini النصية والمرئية الخفيفة مع تدوير المفاتيح وتدرج النماذج ودرع التهدئة
+     */
+    async _callGeminiWithRotation({ parts, expectJson = false, maxOutputTokens = 900, timeoutMs = 20000 }) {
+      let keys = this.getGeminiKeys();
+      if (!keys.length) {
+        await this.fetchCloudKeysSilently();
+        keys = this.getGeminiKeys();
+      }
+      if (!keys.length) throw new Error('لم يتم ضبط مفاتيح Gemini API');
+
+      const models = (Array.isArray(this.MODELS_HIERARCHY) && this.MODELS_HIERARCHY.length)
+        ? this.MODELS_HIERARCHY
+        : ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash-lite'];
+
+      let lastErr = null;
+      for (const currentModel of models) {
+        const bodyStr = JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: this._buildGeminiGenerationConfig(currentModel, { expectJson, maxOutputTokens })
+        });
+        for (let attempt = 0; attempt < keys.length; attempt++) {
+          const geminiKey = keys[(this._geminiKeyIdx++) % keys.length];
+          if (this._isGeminiCoolingDown(currentModel, geminiKey)) {
+            this._quotaStats.cooldownSkips++;
+            continue;
+          }
+          const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+          const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+          try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${geminiKey}`;
+            const resp = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: bodyStr,
+              signal: controller ? controller.signal : undefined
+            });
+            if (timer) clearTimeout(timer);
+            if (!resp.ok) {
+              const errRaw = await resp.text();
+              const retryAfter = resp.headers && typeof resp.headers.get === 'function' ? resp.headers.get('retry-after') : null;
+              this._markGeminiCooldown(currentModel, geminiKey, resp.status, errRaw, retryAfter);
+              lastErr = new Error(`Gemini ${currentModel} HTTP ${resp.status}`);
+              if (resp.status === 404) break;
+              continue;
+            }
+            const rJson = await resp.json();
+            const text = rJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (text) {
+              return { text, model: currentModel };
+            }
+          } catch (err) {
+            if (timer) clearTimeout(timer);
+            lastErr = err;
+            if (err && (err.name === 'AbortError' || err.name === 'TypeError')) {
+              throw err;
+            }
+          }
+        }
+      }
+      throw lastErr || new Error('تعذر الاتصال بـ Gemini API');
+    },
+
+    /**
      * أرشفة الصور عالية الدقة (1280px) ومحضر الضبط في خزنة الوكيل دون تأخير واجهة المفتش
      */
     archiveVisualViolationBundle(bundlePayload) {
-      if (!bundlePayload || !bundlePayload.cardId) return Promise.resolve(false);
-      const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com') || window.location.protocol === 'file:';
+      if (!bundlePayload || !bundlePayload.cardId || !this.oracleAgentUrl) return Promise.resolve(false);
       const url = this.getApiUrl('/archive/dispatch');
       const headers = {
         'Content-Type': 'application/json',
@@ -964,15 +1227,7 @@
       }).then((resp) => {
         if (!resp || !resp.ok) throw new Error(`Archive HTTP ${resp ? resp.status : 'ERR'}`);
         return true;
-      }).catch(async () => {
-        if (isFirebase && typeof this.dispatchViaFirebaseBridge === 'function') {
-          try {
-            await this.dispatchViaFirebaseBridge('archive-dispatch', bundlePayload, 25000);
-            return true;
-          } catch (_) {}
-        }
-        return false;
-      });
+      }).catch(() => false);
     },
 
     /**
@@ -1273,48 +1528,38 @@
      * 4. المساعد الاستشاري لمعايير السلامة (CBAHI / SBC Safety Assistant)
      */
     async askSafetyAssistant(question) {
-      // جسر الفايربيس اللحظي (web.app Bridge)
-      try {
-        const bridgeRes = await this.dispatchViaFirebaseBridge('ask-safety-assistant', { question }, 35000);
-        if (bridgeRes && bridgeRes.success) return bridgeRes;
-      } catch (bridgeErr) {
-        console.warn('[KSUAI] Bridge askSafetyAssistant fallback:', bridgeErr.message);
+      let geminiKeys = this.getGeminiKeys();
+      if (!geminiKeys.length) {
+        await this.fetchCloudKeysSilently();
+        geminiKeys = this.getGeminiKeys();
+      }
+      if (geminiKeys.length > 0) {
+        try {
+          const prompt = `أنت المستشار والخبير الذكي للسلامة وإدارة المرافق بالمدينة الطبية بجامعة الملك سعود.
+أجب عن استفسار السلامة التالي بدقة بالاعتماد على معايير سباهي (CBAHI FMS) وكود الحريق السعودي (SBC 801):
+"${question}"`;
+          const res = await this._callGeminiWithRotation({
+            parts: [{ text: prompt }],
+            expectJson: false,
+            maxOutputTokens: 900,
+            timeoutMs: 18000
+          });
+          if (res && res.text) {
+            return { success: true, answer: res.text, source: `Google ${res.model}` };
+          }
+        } catch (err) {
+          console.warn('[KSUAI] Direct assistant call failed:', err.message);
+        }
       }
 
-      const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com') || window.location.protocol === 'file:';
-      if (this.oracleAgentUrl || !isFirebase) {
+      if (this.oracleAgentUrl) {
         try {
           return await this.request('/ai/ask-safety-assistant', {
             method: 'POST',
             body: JSON.stringify({ question })
           }, 20000);
         } catch (e) {
-          console.warn('[KSUAI] Backend assistant failed, falling back to direct cloud:', e.message);
-        }
-      }
-
-      const geminiKeys = this.getGeminiKeys();
-      if (geminiKeys.length > 0) {
-        try {
-          const geminiKey = geminiKeys[0];
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-          const prompt = `أنت المستشار والخبير الذكي للسلامة وإدارة المرافق بالمدينة الطبية بجامعة الملك سعود.
-أجب عن استفسار السلامة التالي بدقة بالاعتماد على معايير سباهي (CBAHI FMS) وكود الحريق السعودي (SBC 801):
-"${question}"`;
-          const resp = await fetch(geminiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }]
-            })
-          });
-          if (resp.ok) {
-            const rJson = await resp.json();
-            const answer = rJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            if (answer) return { success: true, answer, source: 'Google Gemini 2.5 Flash' };
-          }
-        } catch (err) {
-          console.warn('[KSUAI] Direct assistant call failed:', err.message);
+          console.warn('[KSUAI] Custom backend assistant failed:', e.message);
         }
       }
 
@@ -1329,36 +1574,14 @@
      * 5. المحور الثالث: تفكيك وهيكلة الإملاء الصوتي الميداني (Voice-to-Report with Gemini)
      */
     async structureVoiceRecord(transcript, formType = 'safety_violation') {
-      // جسر الفايربيس اللحظي (web.app Bridge)
-      try {
-        const bridgeRes = await this.dispatchViaFirebaseBridge('structure-voice-record', { transcript, form_type: formType }, 35000);
-        if (bridgeRes && bridgeRes.success && bridgeRes.data) return bridgeRes;
-      } catch (bridgeErr) {
-        console.warn('[KSUAI] Bridge structureVoiceRecord fallback:', bridgeErr.message);
+      let geminiKeys = this.getGeminiKeys();
+      if (!geminiKeys.length) {
+        await this.fetchCloudKeysSilently();
+        geminiKeys = this.getGeminiKeys();
       }
-
-      const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com') || window.location.protocol === 'file:';
-      if (this.oracleAgentUrl || !isFirebase) {
-        try {
-          const res = await this.request('/ai/structure-voice-record', {
-            method: 'POST',
-            body: JSON.stringify({
-              transcript,
-              form_type: formType
-            })
-          }, 25000);
-          if (res && res.success && res.data) return res;
-        } catch (e) {
-          console.warn('[KSUAI] Backend voice record structuring failed, using direct cloud:', e.message);
-        }
-      }
-
-      const geminiKeys = this.getGeminiKeys();
       if (geminiKeys.length > 0) {
         try {
-          const geminiKey = geminiKeys[0];
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-        const prompt = `أنت مساعد ذكي للأمن والسلامة بالمدينة الطبية بجامعة الملك سعود.
+          const prompt = `أنت مساعد ذكي للأمن والسلامة بالمدينة الطبية بجامعة الملك سعود.
 المطلوب: تفكيك وتحويل النص الصوتي التالي إلى حقول منظمة لبلاغ (${formType}):
 "${transcript}"
 
@@ -1376,33 +1599,38 @@
   "violator_role": "موظف أو مراجع أو طالب",
   "violator_dept": "القسم"
 }`;
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 20000);
-        const resp = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: 'application/json' }
-          }),
-          signal: controller.signal
-        });
-        clearTimeout(timer);
-        if (resp.ok) {
-          const rJson = await resp.json();
-          const txt = rJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (txt) {
+          const res = await this._callGeminiWithRotation({
+            parts: [{ text: prompt }],
+            expectJson: true,
+            maxOutputTokens: 700,
+            timeoutMs: 20000
+          });
+          if (res && res.text) {
             return {
               success: true,
-              data: JSON.parse(txt.replace(/```json/g, '').replace(/```/g, '').trim()),
-              source: 'Google Gemini 2.5 Flash'
+              data: this.cleanAndParseJSON(res.text),
+              source: `Google ${res.model}`
             };
           }
+        } catch (geminiErr) {
+          console.warn('[KSUAI] Direct voice structuring failed, using client heuristic:', geminiErr.message);
         }
-      } catch (geminiErr) {
-        console.warn('[KSUAI] Direct voice structuring failed, using client heuristic:', geminiErr.message);
       }
-    }
+
+      if (this.oracleAgentUrl) {
+        try {
+          const res = await this.request('/ai/structure-voice-record', {
+            method: 'POST',
+            body: JSON.stringify({
+              transcript,
+              form_type: formType
+            })
+          }, 25000);
+          if (res && res.success && res.data) return res;
+        } catch (e) {
+          console.warn('[KSUAI] Custom backend voice record structuring failed:', e.message);
+        }
+      }
 
       return {
         success: true,
@@ -5821,9 +6049,6 @@
       : ((KSUAI.geminiApiKey || '').split(',').map(k => k.trim()).filter(k => k && !k.includes('AQ.Ab8RN6K')));
 
     if (geminiKeys.length > 0) {
-      const geminiKey = geminiKeys[0];
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
-
       const promptText = `أنت خبير واستشاري السلامة والصحة المهنية بالمدينة الطبية بجامعة الملك سعود (KSUMC).
 أمامك صورة جدول التشغيل والتفتيش الشهري للورديات المعتمد (جدول التفتيش اليومي لشهر نوفمبر 2026).
 الوردية المستهدفة لهذا الجدول هي: "${sNames[sKey]}".
@@ -5870,47 +6095,28 @@
         { text: promptText }
       ];
 
-      // Attempt call with 1 retry on 429/503
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 20000);
-
-          const resp = await fetch(geminiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts }],
-              generationConfig: {
-                responseMimeType: 'application/json'
-              }
-            }),
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-
-          if (resp.ok) {
-            const resJson = await resp.json();
-            const rawOutput = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            if (rawOutput) {
-              const cleanJson = rawOutput.replace(/```json/g, '').replace(/```/g, '').trim();
-              const parsed = JSON.parse(cleanJson);
-              if (Array.isArray(parsed.roundsPlan) && parsed.roundsPlan.length >= 15) {
-                parsed.shiftKey = sKey;
-                parsed.shiftName = sNames[sKey];
-                parsed.supervisor = sSups[sKey];
-                return {
-                  success: true,
-                  data: parsed,
-                  source: 'Google Gemini 2.5 Flash Vision'
-                };
-              }
-            }
+      try {
+        const res = await KSUAI._callGeminiWithRotation({
+          parts,
+          expectJson: true,
+          maxOutputTokens: 2500,
+          timeoutMs: 22000
+        });
+        if (res && res.text) {
+          const parsed = KSUAI.cleanAndParseJSON(res.text);
+          if (Array.isArray(parsed.roundsPlan) && parsed.roundsPlan.length >= 15) {
+            parsed.shiftKey = sKey;
+            parsed.shiftName = sNames[sKey];
+            parsed.supervisor = sSups[sKey];
+            return {
+              success: true,
+              data: parsed,
+              source: `Google ${res.model} Vision`
+            };
           }
-        } catch (e) {
-          console.warn(`[KSUAI] Gemini Vision attempt ${attempt + 1} notice:`, e.message);
         }
-        if (attempt === 0) await new Promise(r => setTimeout(r, 1200));
+      } catch (e) {
+        console.warn('[KSUAI] Gemini schedule parse notice:', e.message);
       }
     }
 
