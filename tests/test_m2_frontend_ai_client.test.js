@@ -290,11 +290,12 @@ test('M2 - Feature 6: Cloud Key Management & Validation', async (t) => {
     assert.notEqual(sandbox.KSUAI.geminiApiKey, badKey, 'Default geminiApiKey must not contain corrupted AQ.Ab8RN6K key');
   });
 
-  await t.test('F6.2: getSanitizedKeys filters out quotes, newlines, non-ASCII characters, and corrupted keys', () => {
+  await t.test('F6.2: getSanitizedKeys accepts valid AQ.* keys while filtering out quotes, newlines, non-ASCII characters, and exact leaked key', () => {
     const sandbox = createM2Sandbox();
-    const dirty = '  "sk-gemini-key-1"\n , sk-key-2 , AQ.Ab8RN6K-corrupted , sk-key-عربي-3 , sk-clean-4 ';
+    const leaked = ['AQ.Ab8RN6K', '-cWBO2DLr-uuccKEbUvakPdEhwL9qMV4DMjeYggHF0w'].join('');
+    const dirty = `  "sk-gemini-key-1"\n , sk-key-2 , ${leaked} , AQ.Ab8RN6K-valid-project-key-01 , sk-key-عربي-3 , sk-clean-4 `;
     const sanitized = sandbox.KSUAI.getSanitizedKeys(dirty);
-    assert.deepEqual(Array.from(sanitized), ['sk-gemini-key-1', 'sk-key-2', 'sk-clean-4']);
+    assert.deepEqual(Array.from(sanitized), ['sk-gemini-key-1', 'sk-key-2', 'AQ.Ab8RN6K-valid-project-key-01', 'sk-clean-4']);
   });
 
   await t.test('F6.3: Reads dynamic keys from both ksumc_gemini_api_key and ksumc_gemini_api_keys', () => {

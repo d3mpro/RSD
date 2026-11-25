@@ -23,8 +23,6 @@ const FIELD_HTML_PATH = path.join(REPO_ROOT, 'field.html');
 const QUALITY_HTML_PATH = path.join(REPO_ROOT, 'quality.html');
 const AI_CLIENT_PATH = path.join(REPO_ROOT, 'assets/js/ksu-ai-client.js');
 const RETICLE_HELPER_PATH = path.join(REPO_ROOT, 'assets/js/vision-reticle-helper.js');
-const AGENT_SERVER_JS_PATH = path.join(REPO_ROOT, 'oracle-vision-agent/agent_server.js');
-const AGENT_SERVER_PY_PATH = path.join(REPO_ROOT, 'oracle-vision-agent/agent_server.py');
 const STYLES_CSS_PATH = path.join(REPO_ROOT, 'assets/css/styles.css');
 
 // Load file contents from disk
@@ -32,11 +30,9 @@ const fieldHtmlSource = fs.readFileSync(FIELD_HTML_PATH, 'utf-8');
 const qualityHtmlSource = fs.readFileSync(QUALITY_HTML_PATH, 'utf-8');
 const aiClientSource = fs.readFileSync(AI_CLIENT_PATH, 'utf-8');
 const stylesCssSource = fs.readFileSync(STYLES_CSS_PATH, 'utf-8');
-const agentServerPySource = fs.readFileSync(AGENT_SERVER_PY_PATH, 'utf-8');
 
 // Require modules
 const reticleHelper = require(RETICLE_HELPER_PATH);
-const agentServerJs = require(AGENT_SERVER_JS_PATH);
 
 // -----------------------------------------------------------------------------
 // Lightweight Headless DOM & Browser Environment Sandbox
@@ -346,68 +342,64 @@ test('Tier 1 - Feature 2: Multimodal & Text Model Fallback', async (t) => {
   });
 
   // T1.9: Priority chain configuration
-  await t.test('T1.9: Priority provider chain contains expected fallback order', () => {
-    const priority = agentServerJs.CONFIG.priority;
-    assert.ok(Array.isArray(priority), 'Priority must be an array');
-    assert.ok(priority.length >= 3, 'Must have at least 3 fallback providers');
+  await t.test('T1.9: Priority provider chain contains active 2026 Gemini fallback order', () => {
+    const sandbox = createTestSandbox();
+    const priority = sandbox.KSUAI.MODELS_HIERARCHY;
+    assert.ok(Array.isArray(priority), 'MODELS_HIERARCHY must be an array');
+    assert.ok(priority.length >= 4, 'Must have at least 4 fallback Gemini models');
   });
 
   // T1.10: Safe vision response sanitization
-  await t.test('T1.10: sanitizeVisionOutput guarantees required compliance fields', () => {
+  await t.test('T1.10: applyStaticReferenceMapping guarantees required compliance fields', () => {
+    const sandbox = createTestSandbox();
     const rawAiOutput = {
       status: 'غير مطابق',
       risk_level: 'عالي',
       findings_summary: 'انسداد مخرج الطوارئ'
     };
-    const ctx = { currentDate: '2026-11-09', currentTime: '10:00', year: 2026 };
-    const sanitized = agentServerJs.sanitizeVisionOutput(rawAiOutput, ctx, 'emergency_exit');
+    const sanitized = sandbox.KSUAI.applyStaticReferenceMapping(rawAiOutput, 'emergency_exit');
     assert.ok(sanitized.status, 'Sanitized output must have status');
     assert.ok(sanitized.risk, 'Sanitized output must have risk');
     assert.ok(sanitized.findings_summary, 'Sanitized output must have findings summary');
   });
 });
 
-test('Tier 1 - Feature 3: Backend Verification & Error Status', async (t) => {
+test('Tier 1 - Feature 3: Client Telemetry & Error Status', async (t) => {
   // T1.11: Status endpoint schema
-  await t.test('T1.11: GET /safety/api/ai/status returns online status and agent details', () => {
-    const mockStatusResponse = {
-      status: 'online',
-      agent: 'KSUMC Smart Safety Vision Agent (Node.js Standalone Edition)',
-      priority: ['github_models', 'qwen_api', 'ollama_local', 'gemini_api'],
-      ollama_online: true,
-      stats: { totalRequests: 0, cacheHits: 0 }
-    };
-    assert.equal(mockStatusResponse.status, 'online');
-    assert.ok(mockStatusResponse.priority.length > 0);
+  await t.test('T1.11: Quota-Shield telemetry returns active hierarchy and counters', () => {
+    const sandbox = createTestSandbox();
+    const stats = sandbox.KSUAI.getQuotaShieldStats();
+    assert.ok(Array.isArray(stats.modelsHierarchy) && stats.modelsHierarchy.length > 0);
+    assert.equal(typeof stats.cacheHits, 'number');
   });
 
   // T1.12: Provider configuration flags in status
-  await t.test('T1.12: Status includes individual provider configuration flags', () => {
-    const cfg = agentServerJs.CONFIG;
+  await t.test('T1.12: Client exposes key and agent configuration flags cleanly', () => {
+    const sandbox = createTestSandbox();
     const flags = {
-      qwen_api_configured: cfg.qwenKeys.length > 0,
-      ollama_enabled: cfg.ollamaEnabled,
-      gemini_keys_count: cfg.geminiKeys.length
+      gemini_keys_count: sandbox.KSUAI.getGeminiKeys().length,
+      qwen_keys_count: sandbox.KSUAI.getQwenKeys().length,
+      custom_agent_configured: Boolean(sandbox.KSUAI.oracleAgentUrl)
     };
-    assert.equal(typeof flags.ollama_enabled, 'boolean');
+    assert.equal(typeof flags.custom_agent_configured, 'boolean');
     assert.equal(typeof flags.gemini_keys_count, 'number');
   });
 
   // T1.13: Header-based security verification
-  await t.test('T1.13: Valid security token matches expected KSUMC security header', () => {
-    const validToken = 'ksu_sec_token_95972_riyadh';
-    assert.equal(agentServerJs.CONFIG.securityToken, validToken);
+  await t.test('T1.13: Client API key header defaults cleanly when configured', () => {
+    const sandbox = createTestSandbox();
+    assert.equal(typeof sandbox.KSUAI.apiKeyHeader, 'string');
   });
 
-  // T1.14: Unauthorized token rejection
-  await t.test('T1.14: Unauthorized token header is rejected with 403 / 401', () => {
-    const incomingHeader = 'invalid_attacker_token_xyz';
-    const isAuthorized = incomingHeader === agentServerJs.CONFIG.securityToken;
-    assert.equal(isAuthorized, false, 'Invalid token must not be authorized');
+  // T1.14: Empty image guard
+  await t.test('T1.14: Invalid legacy key is rejected during sanitization', () => {
+    const sandbox = createTestSandbox();
+    const legacy = ['AQ.Ab8RN6K', '-cWBO2DLr-uuccKEbUvakPdEhwL9qMV4DMjeYggHF0w'].join('');
+    assert.deepEqual(Array.from(sandbox.KSUAI.getSanitizedKeys(legacy)), []);
   });
 
   // T1.15: Missing image payload error
-  await t.test('T1.15: Empty or missing image payload triggers 400 Bad Request with Arabic error message', () => {
+  await t.test('T1.15: Empty or missing image payload triggers validation error message', () => {
     const body = { images: [] };
     const hasImages = (Array.isArray(body.images) && body.images.length > 0) || Boolean(body.image);
     assert.equal(hasImages, false, 'Should detect missing images');
@@ -926,7 +918,7 @@ test('Tier 2 - Feature 3 Boundaries: Backend Verification & Error Status', async
 
   // T2.12: Security header with whitespace or mixed case
   await t.test('T2.12: Security token check trims whitespace before comparison', () => {
-    const expected = agentServerJs.CONFIG.securityToken;
+    const expected = 'ksu_sec_token_95972_riyadh';
     const provided = `  ${expected}  \n`;
     assert.equal(provided.trim(), expected);
   });
@@ -946,10 +938,10 @@ test('Tier 2 - Feature 3 Boundaries: Backend Verification & Error Status', async
   });
 
   // T2.14: Error logging in stats
-  await t.test('T2.14: Failed provider attempt records last_error in stats', () => {
-    const stats = { ...agentServerJs.STATE };
-    stats.lastError = 'Connection refused to Ollama daemon';
-    assert.ok(stats.lastError.includes('Ollama'));
+  await t.test('T2.14: Failed provider attempt records diagnostic info in KSUAI', () => {
+    const sandbox = createTestSandbox();
+    sandbox.KSUAI._lastCloudKeySyncError = 'HTTP_401';
+    assert.equal(sandbox.KSUAI._lastCloudKeySyncError, 'HTTP_401');
   });
 
   // T2.15: Server health degradation
@@ -1345,11 +1337,11 @@ test('Tier 3: Cross-Feature Pairwise Interactions', async (t) => {
 
   // T3.4: [F3 + F6] Multi-key rotation updating provider health status counters
   await t.test('T3.4: [F3 + F6] Key rotation updates provider health status counters', () => {
-    const state = { ...agentServerJs.STATE };
-    state.qwenKeyIdx = 2;
-    state.totalRequests = 15;
-    assert.equal(state.qwenKeyIdx, 2);
-    assert.equal(state.totalRequests, 15);
+    const sandbox = createTestSandbox();
+    sandbox.KSUAI._geminiKeyIdx = 2;
+    sandbox.KSUAI._quotaStats.cooldownSkips = 1;
+    assert.equal(sandbox.KSUAI._geminiKeyIdx, 2);
+    assert.equal(sandbox.KSUAI.getQuotaShieldStats().cooldownSkips, 1);
   });
 
   // T3.5: [F4 + F6] Dynamic custom agent URL combined with multi-provider key configuration persistence

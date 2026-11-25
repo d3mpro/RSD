@@ -17,7 +17,7 @@
 (function() {
     'use strict';
 
-    const PROD_FIREBASE_CONFIG = {
+    const PROD_FIREBASE_CONFIG = (typeof window !== 'undefined' && window.PROD_FIREBASE_CONFIG) || {
         apiKey: "AIzaSyBXKoswq5Eq7JdenprjUPQkgereD2fcv7s",
         authDomain: "rsd-ksu.firebaseapp.com",
         projectId: "rsd-ksu",
@@ -117,8 +117,14 @@
         }
 
         loadFirebaseSDK() {
-            return new Promise((resolve, reject) => {
-                if (typeof firebase !== 'undefined' && firebase.database) {
+            if (typeof firebase !== 'undefined' && firebase.database && typeof firebase.auth === 'function') {
+                return Promise.resolve();
+            }
+            if (this._sdkLoadPromise) {
+                return this._sdkLoadPromise;
+            }
+            this._sdkLoadPromise = new Promise((resolve, reject) => {
+                if (typeof firebase !== 'undefined' && firebase.database && typeof firebase.auth === 'function') {
                     return resolve();
                 }
                 const appScript = document.createElement('script');
@@ -130,16 +136,23 @@
                         const dbScript = document.createElement('script');
                         dbScript.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js';
                         dbScript.onload = () => resolve();
-                        dbScript.onerror = reject;
+                        dbScript.onerror = (err) => {
+                            this._sdkLoadPromise = null;
+                            reject(err);
+                        };
                         document.head.appendChild(dbScript);
                     };
                     authScript.onload = loadDb;
                     authScript.onerror = loadDb;
                     document.head.appendChild(authScript);
                 };
-                appScript.onerror = reject;
+                appScript.onerror = (err) => {
+                    this._sdkLoadPromise = null;
+                    reject(err);
+                };
                 document.head.appendChild(appScript);
             });
+            return this._sdkLoadPromise;
         }
 
         isDemoSandboxUser() {
@@ -173,9 +186,18 @@
                 if (typeof firebase.auth === 'function') {
                     try {
                         const auth = firebase.auth();
+                        let initialAuthResolved = false;
+                        this._authStateResolved = false;
                         auth.onAuthStateChanged((user) => {
                             this.currentAuthUid = user ? user.uid : null;
                             this.isAnonymousAuth = user ? Boolean(user.isAnonymous) : true;
+                            if (!initialAuthResolved) {
+                                initialAuthResolved = true;
+                                this._authStateResolved = true;
+                                if (!user && !this.isDemoSandboxUser() && typeof auth.signInAnonymously === 'function') {
+                                    auth.signInAnonymously().catch(() => {});
+                                }
+                            }
                             if (user) {
                                 if (typeof user.getIdTokenResult === 'function') {
                                     user.getIdTokenResult().then((tokenResult) => {
@@ -195,9 +217,6 @@
                                 this.currentUserClaims = null;
                             }
                         });
-                        if (!this.isDemoSandboxUser() && !auth.currentUser && typeof auth.signInAnonymously === 'function') {
-                            auth.signInAnonymously().catch(() => {});
-                        }
                     } catch (e) {
                         console.warn('[KSU-Firebase-Security] تنبيه تهيئة المصادقة:', e);
                     }

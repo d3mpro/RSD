@@ -15,6 +15,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="assets/js/ksu-firebase-config.js?v=8.0.0"></script>
   
   <style>
     body {
@@ -113,18 +116,23 @@
       <!-- Top Alert / Status Banner -->
       <div class="p-4 sm:p-5 rounded-3xl bg-slate-950/80 border border-slate-800 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+          <div id="cloud-status-icon-wrap" class="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0">
             <span class="material-symbols-outlined text-2xl">cloud_sync</span>
           </div>
           <div>
-            <h3 class="text-sm font-black text-white flex items-center gap-2">
-              <span>المزامنة السحابية الصامتة مفعلة</span>
+            <h3 class="text-sm font-black text-white flex flex-wrap items-center gap-2">
+              <span id="vault-sync-heading">حالة المزامنة السحابية الصامتة</span>
               <span id="badge-key-count" class="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">0 مفاتيح نشطة</span>
+              <span id="firebase-auth-badge" class="px-2.5 py-0.5 rounded-full bg-amber-950/80 text-amber-300 text-[10px] font-bold border border-amber-500/40">جاري فحص مصادقة Firebase...</span>
             </h3>
-            <p class="text-xs text-slate-400 mt-0.5">يتم توزيع المفاتيح تلقائياً في الخلفية لجميع أجهزة المفتشين بالمدينة الطبية فور الحفظ</p>
+            <p id="firebase-auth-status-text" class="text-xs text-slate-400 mt-0.5">يتم توزيع المفاتيح سحابياً لأجهزة المفتشين عند الاتصال بحساب المطور/المسؤول (DEV/admin)</p>
           </div>
         </div>
-        <div class="flex items-center gap-2 self-end sm:self-center">
+        <div class="flex items-center gap-2 self-end sm:self-center flex-wrap">
+          <button type="button" id="btn-fb-signout" onclick="handleFirebaseVaultSignOut()" class="hidden px-3 py-1.5 rounded-xl bg-slate-900 border border-amber-500/40 hover:bg-slate-800 text-amber-300 text-xs font-bold transition-all flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">logout</span>
+            <span>تبديل حساب Firebase</span>
+          </button>
           <button type="button" onclick="openChangePasswordModal()" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:bg-slate-800 text-slate-300 text-xs font-bold transition-all flex items-center gap-1">
             <span class="material-symbols-outlined text-sm">key</span>
             <span>تغيير كلمة المرور</span>
@@ -134,6 +142,32 @@
             <span>قفل الخزينة</span>
           </button>
         </div>
+      </div>
+
+      <!-- Firebase DEV/admin Inline Auth Banner (Shown when not signed in with admin/developer role) -->
+      <div id="firebase-inline-signin-panel" class="hidden p-4 sm:p-5 rounded-3xl bg-amber-950/30 border border-amber-500/40 shadow-xl space-y-3">
+        <div class="flex items-start gap-3">
+          <span class="material-symbols-outlined text-amber-400 text-2xl shrink-0 mt-0.5">admin_panel_settings</span>
+          <div class="space-y-1">
+            <h4 class="text-sm font-black text-amber-200">مطلوب مصادقة Firebase (DEV / admin) لتفعيل الحفظ السحابي المركزي</h4>
+            <p id="firebase-inline-signin-desc" class="text-xs text-slate-300 leading-relaxed">قواعد الأمان تمنع الكتابة أو القراءة من الخزينة السحابية بدون جلسة مطور أو مسؤول موثقة. سجّل الدخول بحساب <strong class="text-white">DEV</strong> أو <strong class="text-white">admin</strong> هنا مباشرة (أو من البوابة الرئيسية) لمزامنة المفاتيح لجميع المفتشين.</p>
+          </div>
+        </div>
+        <form id="firebase-vault-login-form" onsubmit="handleFirebaseVaultSignIn(event)" class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 pt-1">
+          <div class="sm:col-span-5">
+            <input type="text" id="fb-auth-identifier" autocomplete="username" placeholder="الرقم الوظيفي (DEV) أو البريد الإلكتروني..." value="DEV" class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-xs font-semibold focus:outline-none focus:border-amber-400" />
+          </div>
+          <div class="sm:col-span-4">
+            <input type="password" id="fb-auth-password" autocomplete="current-password" placeholder="كلمة مرور Firebase لحساب DEV/admin..." required class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 text-xs font-semibold focus:outline-none focus:border-amber-400" />
+          </div>
+          <div class="sm:col-span-3">
+            <button type="submit" id="btn-fb-signin" class="w-full py-2.5 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95">
+              <span class="material-symbols-outlined text-base">login</span>
+              <span>ربط حساب Firebase</span>
+            </button>
+          </div>
+        </form>
+        <p id="fb-signin-error" class="hidden text-xs text-rose-300 font-bold"></p>
       </div>
 
       <!-- Main Vault Controls -->
@@ -147,10 +181,10 @@
                 <span class="material-symbols-outlined text-cyan-400 text-xl">view_in_ar</span>
                 <span>مفاتيح Google Gemini API (تدوير تلقائي للحصة)</span>
               </h4>
-              <p class="text-xs text-slate-400 mt-1">أدخل مفتاحاً واحداً أو عدة مفاتيح (مفتاح في كل سطر أو مفصولة بفاصلة). عند نفاد حصة أي مفتاح (429) ينتقل النظام صامتاً للمفتاح التالي.</p>
+              <p class="text-xs text-slate-400 mt-1">أدخل مفتاحاً واحداً أو عدة مفاتيح (`AQ.Ab8...` أو `AIza...` في كل سطر أو مفصولة بفاصلة أو مسافة). عند نفاد حصة أي مفتاح (429) ينتقل النظام صامتاً للمفتاح التالي.</p>
             </div>
             <span class="text-[11px] font-bold text-cyan-300 bg-cyan-950/70 border border-cyan-500/30 px-3 py-1 rounded-xl self-start sm:self-center shrink-0">
-              سلسلة النماذج (2026): 3.5 Flash-Lite ➔ 3.8 Flash ➔ 2.5 Flash-Lite
+              سلسلة النماذج (2026): 3.5 Flash-Lite ➔ 3.1 Flash-Lite ➔ 3.6 Flash ➔ 3.8 Flash ➔ 4 Hydrogen
             </span>
           </div>
 
@@ -169,12 +203,12 @@
               id="txt-gemini-keys" 
               rows="5" 
               dir="ltr"
-              placeholder="AIzaSy...&#10;AIzaSy...&#10;AIzaSy..." 
+              placeholder="AQ.Ab8...&#10;AQ.Ab8...&#10;AIza..." 
               class="w-full p-4 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 text-xs font-mono leading-relaxed"
             ></textarea>
             <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 mt-1.5 px-1">
               <span id="gemini-keys-stats">عدد المفاتيح المدخلة: 0</span>
-              <span class="text-slate-500">يتم تنظيف المفاتيح تلقائياً وإزالة المسافات والأحرف غير الصالحة</span>
+              <span class="text-slate-500">يتم تنظيف المفاتيح تلقائياً وإزالة المسافات والأحرف غير المرئية</span>
             </div>
           </div>
 
@@ -197,6 +231,10 @@
 
           <!-- Dynamic Verification Badges Container -->
           <div id="keys-health-list" class="space-y-2 pt-2"></div>
+          <div id="verify-save-reminder" class="hidden p-3 rounded-2xl bg-amber-950/40 border border-amber-500/40 text-xs text-amber-200 font-bold flex items-center gap-2">
+            <span class="material-symbols-outlined text-amber-400 text-lg shrink-0">info</span>
+            <span>تنبيه: فحص المفاتيح للتحقق فقط ولا يحفظها تلقائياً — اضغط على زر «حفظ مركزي لجميع المفتشين» أدناه لتفعيلها ومزامنتها.</span>
+          </div>
         </div>
 
         <!-- 2. Fallback Provider: OpenRouter / Qwen2.5-VL -->
@@ -235,23 +273,26 @@
         </div>
 
         <!-- 3. Centralized Save Bar -->
-        <div class="p-5 rounded-3xl bg-gradient-to-r from-[#001E36] via-[#003B6B] to-[#004B87] border border-cyan-500/30 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div>
-            <h4 class="text-sm font-black text-white flex items-center gap-2">
-              <span class="material-symbols-outlined text-emerald-400 text-xl">database</span>
-              <span>حفظ ومزامنة مركزية لقاعدة البيانات السحابية</span>
-            </h4>
-            <p class="text-xs text-blue-100 mt-0.5">سيتم حفظ المفاتيح مباشرة في Firebase RTDB لتعمل على هواتف وأجهزة جميع المفتشين فوراً وبصمت تام.</p>
+        <div class="p-5 rounded-3xl bg-slate-950/95 border border-cyan-500/40 shadow-2xl space-y-3">
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <h4 class="text-sm font-black text-white flex items-center gap-2">
+                <span class="material-symbols-outlined text-emerald-400 text-xl">database</span>
+                <span>حفظ ومزامنة مركزية لقاعدة البيانات السحابية</span>
+              </h4>
+              <p class="text-xs text-slate-300 mt-0.5">سيتم حفظ المفاتيح في المتصفح ومزامنتها في Firebase RTDB لتعمل على هواتف وأجهزة جميع المفتشين فوراً وبصمت تام.</p>
+            </div>
+            <button 
+              type="button" 
+              id="btn-save-cloud" 
+              onclick="saveCentralizedKeys()" 
+              class="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50 cursor-pointer active:scale-95 transition-all shrink-0"
+            >
+              <span class="material-symbols-outlined text-xl">save</span>
+              <span>حفظ مركزي لجميع المفتشين</span>
+            </button>
           </div>
-          <button 
-            type="button" 
-            id="btn-save-cloud" 
-            onclick="saveCentralizedKeys()" 
-            class="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50 cursor-pointer active:scale-95 transition-all"
-          >
-            <span class="material-symbols-outlined text-xl">save</span>
-            <span>حفظ مركزي لجميع المفتشين</span>
-          </button>
+          <div id="cloud-sync-status-alert" class="hidden p-3.5 rounded-2xl text-xs font-bold leading-relaxed"></div>
         </div>
 
       </div>
@@ -287,8 +328,8 @@
   </div>
 
   <!-- Toast Notification -->
-  <div id="vault-toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[10000] px-5 py-3 rounded-2xl bg-slate-900 border border-emerald-500 text-emerald-300 text-xs font-bold shadow-2xl flex items-center gap-2 transition-all">
-    <span class="material-symbols-outlined text-lg">check_circle</span>
+  <div id="vault-toast" class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[10000] px-5 py-3 rounded-2xl bg-slate-900 border border-emerald-500 text-emerald-300 text-xs font-bold shadow-2xl flex items-center gap-2 transition-all max-w-md">
+    <span id="vault-toast-icon" class="material-symbols-outlined text-lg">check_circle</span>
     <span id="vault-toast-text">تمت العملية بنجاح</span>
   </div>
 
@@ -302,8 +343,303 @@
     const FIREBASE_RTDB_BASE = 'https://rsd-ksu-default-rtdb.firebaseio.com';
     const SYSTEM_CONFIG_AI_KEYS_URL = `${FIREBASE_RTDB_BASE}/system_config/ai_keys.json`;
     const SYSTEM_CONFIG_AUTH_URL = `${FIREBASE_RTDB_BASE}/system_config/admin_auth.json`;
+    const LEGACY_LEAKED_KEY_SHA256 = 'dc8cfed5d7c07c7460c23aa660b75d2349d2a20b863fa6c40c98f23b17a90b12';
+    const ADMIN_AUTH_ROLES = ['admin', 'developer'];
+    const PROD_FIREBASE_CONFIG = window.PROD_FIREBASE_CONFIG || window.KSU_FIREBASE_CONFIG || null;
 
     let activeKeysList = [];
+    let currentFirebaseUser = null;
+    let currentFirebaseRole = '';
+    let isFirebaseAdminAuthorized = false;
+    let firebaseAuthReadyPromise = Promise.resolve(null);
+
+    function sha256Hex(str) {
+      function rightRotate(value, amount) { return (value >>> amount) | (value << (32 - amount)); }
+      let i, j, result = '', words = [];
+      const utf8 = unescape(encodeURIComponent(str || ''));
+      const bitLen = utf8.length * 8;
+      const hash = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+      const k = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+      ];
+      const w = [];
+      for (i = 0; i < utf8.length; i++) { words[i >> 2] |= (utf8.charCodeAt(i) & 0xff) << ((3 - (i % 4)) * 8); }
+      words[bitLen >> 5] |= 0x80 << (24 - (bitLen % 32));
+      words[(((bitLen + 64) >> 9) << 4) + 15] = bitLen;
+      for (i = 0; i < words.length; i += 16) {
+        let a = hash[0], b = hash[1], c = hash[2], d = hash[3], e = hash[4], f = hash[5], g = hash[6], h = hash[7];
+        for (j = 0; j < 64; j++) {
+          if (j < 16) w[j] = words[j + i] | 0;
+          else {
+            const s0 = rightRotate(w[j - 15], 7) ^ rightRotate(w[j - 15], 18) ^ (w[j - 15] >>> 3);
+            const s1 = rightRotate(w[j - 2], 17) ^ rightRotate(w[j - 2], 19) ^ (w[j - 2] >>> 10);
+            w[j] = (w[j - 16] + s0 + w[j - 7] + s1) | 0;
+          }
+          const t1 = (h + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)) + ((e & f) ^ (~e & g)) + k[j] + w[j]) | 0;
+          const t2 = ((rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+          h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+        }
+        hash[0] = (hash[0] + a) | 0; hash[1] = (hash[1] + b) | 0; hash[2] = (hash[2] + c) | 0; hash[3] = (hash[3] + d) | 0;
+        hash[4] = (hash[4] + e) | 0; hash[5] = (hash[5] + f) | 0; hash[6] = (hash[6] + g) | 0; hash[7] = (hash[7] + h) | 0;
+      }
+      for (i = 0; i < 8; i++) {
+        for (j = 3; j >= 0; j--) {
+          const byte = (hash[i] >> (j * 8)) & 255;
+          result += (byte < 16 ? '0' : '') + byte.toString(16);
+        }
+      }
+      return result;
+    }
+
+    function fnv1aHash(str) {
+      const s = String(str || '');
+      let h = 2166136261;
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return (h >>> 0).toString(16);
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function clearCooldownsForKey(key) {
+      try {
+        const raw = localStorage.getItem('ksumc_gemini_cooldowns');
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return;
+        const kHash = fnv1aHash(key);
+        let changed = false;
+        for (const k of Object.keys(parsed)) {
+          if (k === `key::${kHash}` || k.endsWith(`::${kHash}`)) {
+            delete parsed[k];
+            changed = true;
+          }
+        }
+        if (changed) {
+          if (Object.keys(parsed).length === 0) {
+            localStorage.removeItem('ksumc_gemini_cooldowns');
+          } else {
+            localStorage.setItem('ksumc_gemini_cooldowns', JSON.stringify(parsed));
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 0. Firebase App & Auth Integration
+    function resolveVaultAuthEmail(identifier) {
+      const clean = String(identifier || '').trim().toLowerCase();
+      if (!clean) return '';
+      if (clean.includes('@')) return clean;
+      if (clean === 'dev' || clean === 'admin' || clean === 'alsaqri' || clean === '95972') {
+        return 'aalsaqri@ksu.edu.sa';
+      }
+      const alias = clean.replace(/[^a-z0-9._-]+/g, '');
+      return alias ? `${alias}@rsd-ksu.local` : '';
+    }
+
+    function updateFirebaseAuthUI() {
+      const badge = document.getElementById('firebase-auth-badge');
+      const statusText = document.getElementById('firebase-auth-status-text');
+      const iconWrap = document.getElementById('cloud-status-icon-wrap');
+      const signinPanel = document.getElementById('firebase-inline-signin-panel');
+      const signoutBtn = document.getElementById('btn-fb-signout');
+
+      if (isFirebaseAdminAuthorized && currentFirebaseUser) {
+        if (badge) {
+          badge.className = 'px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 text-[10px] font-bold border border-emerald-500/40';
+          badge.textContent = 'متصل بـ Firebase (DEV/admin)';
+        }
+        if (statusText) {
+          const emailLabel = currentFirebaseUser.email || 'DEV';
+          statusText.textContent = `متصل بـ Firebase (DEV/admin) • ${emailLabel} (${currentFirebaseRole}) — المزامنة السحابية مفعلة`;
+        }
+        if (iconWrap) {
+          iconWrap.className = 'w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center shrink-0';
+        }
+        if (signinPanel) signinPanel.classList.add('hidden');
+        if (signoutBtn) signoutBtn.classList.remove('hidden');
+      } else {
+        if (badge) {
+          badge.className = 'px-2.5 py-0.5 rounded-full bg-amber-950/80 text-amber-300 text-[10px] font-bold border border-amber-500/40';
+          badge.textContent = currentFirebaseUser && !currentFirebaseUser.isAnonymous
+            ? `حساب غير مخول (${currentFirebaseRole || 'بدون صلاحية'})`
+            : 'Firebase غير متصل (حفظ محلي فقط)';
+        }
+        if (statusText) {
+          statusText.textContent = 'المزامنة السحابية لـ RTDB تتطلب تسجيل دخول Firebase بحساب DEV أو admin أدناه';
+        }
+        if (iconWrap) {
+          iconWrap.className = 'w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0';
+        }
+        if (signinPanel) signinPanel.classList.remove('hidden');
+        if (signoutBtn) {
+          if (currentFirebaseUser && !currentFirebaseUser.isAnonymous) {
+            signoutBtn.classList.remove('hidden');
+          } else {
+            signoutBtn.classList.add('hidden');
+          }
+        }
+      }
+    }
+
+    function initVaultFirebaseAuth() {
+      if (typeof firebase === 'undefined' || typeof firebase.auth !== 'function') {
+        updateFirebaseAuthUI();
+        return;
+      }
+      try {
+        if ((!firebase.apps || !firebase.apps.length) && PROD_FIREBASE_CONFIG) {
+          firebase.initializeApp(PROD_FIREBASE_CONFIG);
+        }
+        const auth = firebase.auth();
+        let firstResolved = false;
+        firebaseAuthReadyPromise = new Promise((resolve) => {
+          const fallbackTimer = setTimeout(() => {
+            if (!firstResolved) {
+              firstResolved = true;
+              updateFirebaseAuthUI();
+              resolve(currentFirebaseUser);
+            }
+          }, 2500);
+
+          auth.onAuthStateChanged(async (user) => {
+            currentFirebaseUser = user || null;
+            currentFirebaseRole = '';
+            isFirebaseAdminAuthorized = false;
+
+            if (user && !user.isAnonymous && typeof user.getIdTokenResult === 'function') {
+              try {
+                const tokenRes = await user.getIdTokenResult();
+                const claims = (tokenRes && tokenRes.claims) ? tokenRes.claims : {};
+                currentFirebaseRole = String(claims.role || '').trim().toLowerCase();
+                isFirebaseAdminAuthorized = ADMIN_AUTH_ROLES.includes(currentFirebaseRole);
+              } catch (_) {}
+            }
+
+            updateFirebaseAuthUI();
+            if (!firstResolved) {
+              firstResolved = true;
+              clearTimeout(fallbackTimer);
+              resolve(currentFirebaseUser);
+            }
+            if (isFirebaseAdminAuthorized && sessionStorage.getItem('ksumc_vault_unlocked') === 'true') {
+              loadCentralizedKeys();
+            }
+          });
+        });
+      } catch (err) {
+        console.warn('[Vault Firebase Init]', err);
+        updateFirebaseAuthUI();
+      }
+    }
+
+    async function getAdminFirebaseIdToken() {
+      await firebaseAuthReadyPromise;
+      if (typeof firebase === 'undefined' || typeof firebase.auth !== 'function') return null;
+      const user = firebase.auth().currentUser;
+      if (!user || user.isAnonymous) return null;
+      try {
+        const tokenRes = await user.getIdTokenResult();
+        const role = String(tokenRes?.claims?.role || '').trim().toLowerCase();
+        if (!ADMIN_AUTH_ROLES.includes(role)) return null;
+        return tokenRes.token || (await user.getIdToken());
+      } catch (_) {
+        return null;
+      }
+    }
+
+    async function handleFirebaseVaultSignIn(e) {
+      if (e) e.preventDefault();
+      const idInput = document.getElementById('fb-auth-identifier');
+      const passInput = document.getElementById('fb-auth-password');
+      const errEl = document.getElementById('fb-signin-error');
+      const btn = document.getElementById('btn-fb-signin');
+
+      const email = resolveVaultAuthEmail(idInput ? idInput.value : 'DEV');
+      const password = passInput ? passInput.value : '';
+
+      if (errEl) errEl.classList.add('hidden');
+      if (!email || !password) {
+        if (errEl) {
+          errEl.textContent = 'يرجى إدخال الرقم الوظيفي (DEV) أو البريد الإلكتروني وكلمة المرور.';
+          errEl.classList.remove('hidden');
+        }
+        return;
+      }
+      if (typeof firebase === 'undefined' || typeof firebase.auth !== 'function') {
+        if (errEl) {
+          errEl.textContent = 'حزمة Firebase SDK غير محملة بعد، تأكد من اتصال الإنترنت.';
+          errEl.classList.remove('hidden');
+        }
+        return;
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></span> <span>جاري التحقق...</span>';
+      }
+
+      try {
+        const cred = await firebase.auth().signInWithEmailAndPassword(email, password);
+        const tokenRes = await cred.user.getIdTokenResult(true);
+        const role = String(tokenRes?.claims?.role || '').trim().toLowerCase();
+        if (!ADMIN_AUTH_ROLES.includes(role)) {
+          await firebase.auth().signOut().catch(() => {});
+          if (errEl) {
+            errEl.textContent = `الحساب (${email}) لا يملك صلاحية admin أو developer (الدور الحالي: ${role || 'غير محدد'}).`;
+            errEl.classList.remove('hidden');
+          }
+        } else {
+          currentFirebaseUser = cred.user;
+          currentFirebaseRole = role;
+          isFirebaseAdminAuthorized = true;
+          if (passInput) passInput.value = '';
+          updateFirebaseAuthUI();
+          showToast('تم ربط حساب Firebase (DEV/admin) بنجاح وتفعيل المزامنة السحابية');
+          await loadCentralizedKeys();
+        }
+      } catch (err) {
+        if (errEl) {
+          const code = err?.code || '';
+          errEl.textContent = code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials'
+            ? 'كلمة مرور Firebase لحساب DEV/admin غير صحيحة.'
+            : `تعذر تسجيل الدخول إلى Firebase (${code || err.message})`;
+          errEl.classList.remove('hidden');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-symbols-outlined text-base">login</span> <span>ربط حساب Firebase</span>';
+        }
+      }
+    }
+
+    async function handleFirebaseVaultSignOut() {
+      if (typeof firebase !== 'undefined' && typeof firebase.auth === 'function') {
+        await firebase.auth().signOut().catch(() => {});
+      }
+      currentFirebaseUser = null;
+      currentFirebaseRole = '';
+      isFirebaseAdminAuthorized = false;
+      updateFirebaseAuthUI();
+      showToast('تم فصل جلسة Firebase الحالية، يمكنك تسجيل الدخول بحساب DEV/admin الآن', 'warning');
+    }
 
     // 1. Password & Auth Management
     function getStoredAdminPassword() {
@@ -351,6 +687,7 @@
       const dash = document.getElementById('vault-dashboard');
       if (gate) gate.classList.add('hidden');
       if (dash) dash.classList.remove('hidden');
+      updateFirebaseAuthUI();
     }
 
     function lockVault() {
@@ -395,17 +732,48 @@
         return;
       }
 
+      const passwordHash = sha256Hex(newP);
       localStorage.setItem('ksumc_vault_admin_password', newP);
-      try {
-        await fetch(SYSTEM_CONFIG_AUTH_URL, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: newP, updatedAt: Date.now() })
-        });
-      } catch (_) {}
+      localStorage.setItem('ksumc_vault_admin_password_hash', passwordHash);
+
+      let cloudSynced = false;
+      const idToken = await getAdminFirebaseIdToken();
+      if (idToken) {
+        try {
+          const resp = await fetch(`${SYSTEM_CONFIG_AUTH_URL}?auth=${encodeURIComponent(idToken)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ passwordHash, updatedAt: Date.now() })
+          });
+          cloudSynced = Boolean(resp && resp.ok);
+        } catch (_) {}
+      }
 
       closeChangePasswordModal();
-      showToast('تم تحديث كلمة مرور المسؤول بنجاح');
+      if (cloudSynced) {
+        showToast('تم تحديث كلمة مرور المسؤول وحفظ التجزئة المشفرة سحابياً بنجاح');
+      } else {
+        showToast('تم تحديث كلمة المرور محلياً فقط — يلزم تسجيل دخول Firebase (DEV/admin) للمزامنة السحابية', 'warning');
+      }
+    }
+
+    function setCloudStatusAlert(message, tone = 'info') {
+      const el = document.getElementById('cloud-sync-status-alert');
+      if (!el) return;
+      if (!message) {
+        el.classList.add('hidden');
+        el.textContent = '';
+        return;
+      }
+      if (tone === 'success') {
+        el.className = 'p-3.5 rounded-2xl bg-emerald-950/60 border border-emerald-500/50 text-emerald-200 text-xs font-bold leading-relaxed';
+      } else if (tone === 'error' || tone === 'warning') {
+        el.className = 'p-3.5 rounded-2xl bg-rose-950/70 border border-amber-500/60 text-amber-200 text-xs font-bold leading-relaxed';
+      } else {
+        el.className = 'p-3.5 rounded-2xl bg-slate-900 border border-slate-700 text-slate-300 text-xs font-bold leading-relaxed';
+      }
+      el.textContent = message;
+      el.classList.remove('hidden');
     }
 
     // 2. Fetch Keys from Cloud Database or Local
@@ -413,23 +781,32 @@
       let geminiRaw = localStorage.getItem('ksumc_gemini_api_keys') || localStorage.getItem('ksumc_gemini_api_key') || '';
       let qwenRaw = localStorage.getItem('ksumc_qwen_api_key') || '';
 
-      try {
-        const resp = await fetch(SYSTEM_CONFIG_AI_KEYS_URL);
-        if (resp.ok) {
-          const cloudConfig = await resp.json();
-          if (cloudConfig) {
-            if (cloudConfig.gemini_api_keys) {
-              geminiRaw = cloudConfig.gemini_api_keys;
-            } else if (Array.isArray(cloudConfig.gemini_keys) && cloudConfig.gemini_keys.length) {
-              geminiRaw = cloudConfig.gemini_keys.join('\n');
+      const idToken = await getAdminFirebaseIdToken();
+      if (idToken) {
+        try {
+          const resp = await fetch(`${SYSTEM_CONFIG_AI_KEYS_URL}?auth=${encodeURIComponent(idToken)}`);
+          if (resp.ok) {
+            const cloudConfig = await resp.json();
+            if (cloudConfig) {
+              if (cloudConfig.gemini_api_keys) {
+                geminiRaw = cloudConfig.gemini_api_keys;
+              } else if (Array.isArray(cloudConfig.gemini_keys) && cloudConfig.gemini_keys.length) {
+                geminiRaw = cloudConfig.gemini_keys.join('\n');
+              }
+              if (cloudConfig.qwen_api_key !== undefined) {
+                qwenRaw = cloudConfig.qwen_api_key || '';
+              }
+              setCloudStatusAlert('تمت قراءة أحدث مفاتيح الخزينة من Firebase RTDB بنجاح.', 'success');
             }
-            if (cloudConfig.qwen_api_key) {
-              qwenRaw = cloudConfig.qwen_api_key;
-            }
+          } else {
+            setCloudStatusAlert(`تعذرت قراءة المفاتيح من Firebase RTDB (HTTP ${resp.status}) — يتم عرض النسخة المحلية فقط.`, 'warning');
           }
+        } catch (err) {
+          console.warn('Firebase RTDB read notice:', err);
+          setCloudStatusAlert('تعذر الاتصال بـ Firebase RTDB حالياً — يتم عرض النسخة المحلية فقط.', 'warning');
         }
-      } catch (err) {
-        console.warn('Firebase RTDB read notice:', err);
+      } else {
+        setCloudStatusAlert('يتم عرض المفاتيح المخزنة محلياً في هذا المتصفح فقط. للمزامنة والقراءة السحابية، سجّل دخول Firebase بحساب DEV أو admin أعلاه.', 'warning');
       }
 
       const txtGemini = document.getElementById('txt-gemini-keys');
@@ -440,11 +817,23 @@
     }
 
     function parseInputKeys(raw) {
-      if (!raw) return [];
-      return raw
-        .split(/[\n,]/)
-        .map(k => k.trim())
-        .filter(k => k && !k.includes('AQ.Ab8RN6K') && /^[\x20-\x7E]+$/.test(k));
+      if (!raw || typeof raw !== 'string') return [];
+      const cleaned = raw
+        .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '')
+        .replace(/\u00A0/g, ' ')
+        .replace(/["']/g, '');
+      const seen = new Set();
+      const result = [];
+      for (const token of cleaned.split(/[\s,;]+/)) {
+        const k = token.trim();
+        if (!k) continue;
+        if (!/^[\x21-\x7E]+$/.test(k)) continue;
+        if (sha256Hex(k) === LEGACY_LEAKED_KEY_SHA256) continue;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        result.push(k);
+      }
+      return result;
     }
 
     function updateStats() {
@@ -459,81 +848,155 @@
 
     document.getElementById('txt-gemini-keys')?.addEventListener('input', updateStats);
 
-    // 3. Instant Key Verification
+    async function probeGenerateModel(key, modelName) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
+      try {
+        const bodyObj = {
+          contents: [{ parts: [{ text: 'ping' }] }],
+          generationConfig: { maxOutputTokens: 16 }
+        };
+        if (modelName.startsWith('gemini-3.5') || modelName.startsWith('gemini-3.1') || modelName.startsWith('gemini-3.6')) {
+          bodyObj.generationConfig.thinkingConfig = { thinkingLevel: 'MINIMAL' };
+        }
+        const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(key)}`;
+        const res = await fetch(testUrl, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyObj)
+        });
+        clearTimeout(timer);
+        let errJson = null;
+        if (!res.ok) {
+          try {
+            errJson = await res.json();
+          } catch (_) {}
+        }
+        return { ok: res.ok, status: res.status, model: modelName, errJson };
+      } catch (err) {
+        clearTimeout(timer);
+        throw err;
+      }
+    }
+
+    function formatGoogleErrorSummary(errJson, rawKey) {
+      const errObj = errJson?.error || errJson || {};
+      const errStatus = errObj.status ? String(errObj.status) : '';
+      let msg = errObj.message ? String(errObj.message) : '';
+      if (rawKey && msg) msg = msg.split(rawKey).join('***');
+      if (msg.length > 120) msg = msg.slice(0, 117) + '...';
+      return { errStatus, shortMsg: msg };
+    }
+
+    // 3. Instant Key Verification (Models List + Lightweight Generate Probe)
     async function verifyAllGeminiKeys() {
       const raw = document.getElementById('txt-gemini-keys')?.value || '';
       const keys = parseInputKeys(raw);
       const listEl = document.getElementById('keys-health-list');
       const spinner = document.getElementById('verify-spinner');
       const btn = document.getElementById('btn-verify-keys');
+      const saveReminder = document.getElementById('verify-save-reminder');
 
       if (!keys.length) {
-        alert('يرجى إدخال مفتاح Gemini واحد على الأقل قبل الفحص.');
+        alert('يرجى إدخال مفتاح Gemini واحد صالح على الأقل قبل الفحص.');
         return;
       }
 
       if (spinner) spinner.classList.remove('hidden');
       if (btn) btn.disabled = true;
       if (listEl) listEl.innerHTML = '';
+      if (saveReminder) saveReminder.classList.add('hidden');
+
+      let anyHealthy = false;
+      const probeModels = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.6-flash'];
 
       for (let i = 0; i < keys.length; i++) {
         const k = keys[i];
         const masked = k.substring(0, 6) + '...' + k.substring(k.length - 4);
-        
         let statusHtml = '';
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 10000);
-          
-          const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${k}`;
-          const res = await fetch(testUrl, {
-            method: 'POST',
-            signal: controller.signal,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: 'ping' }] }],
-              generationConfig: { maxOutputTokens: 4 }
-            })
-          });
-          clearTimeout(timer);
 
-          if (res.ok) {
+        try {
+          // Step A: Zero-quota metadata probe (/v1beta/models)
+          const listCtrl = new AbortController();
+          const listTimer = setTimeout(() => listCtrl.abort(), 10000);
+          const modelsResp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(k)}`, {
+            method: 'GET',
+            signal: listCtrl.signal
+          });
+          clearTimeout(listTimer);
+
+          let modelsCount = 0;
+          let modelsErrJson = null;
+          if (modelsResp.ok) {
+            try {
+              const mData = await modelsResp.json();
+              modelsCount = Array.isArray(mData?.models) ? mData.models.length : 0;
+            } catch (_) {}
+          } else {
+            try { modelsErrJson = await modelsResp.json(); } catch (_) {}
+          }
+
+          if (!modelsResp.ok && (modelsResp.status === 400 || modelsResp.status === 401 || modelsResp.status === 403)) {
+            const { errStatus, shortMsg } = formatGoogleErrorSummary(modelsErrJson, k);
+            const detailText = [errStatus, shortMsg].filter(Boolean).join(' — ');
             statusHtml = `
-              <div class="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between text-xs">
-                <span class="font-mono text-emerald-300">مفتاح [${i + 1}]: ${masked}</span>
-                <span class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-bold flex items-center gap-1">
-                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                  <span>صالح ونشط (200 OK)</span>
-                </span>
-              </div>
-            `;
-          } else if (res.status === 429) {
-            statusHtml = `
-              <div class="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/40 flex items-center justify-between text-xs">
-                <span class="font-mono text-amber-300">مفتاح [${i + 1}]: ${masked}</span>
-                <span class="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-bold flex items-center gap-1">
-                  <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-                  <span>نفدت الحصة مؤقتاً (429 Quota Exhausted)</span>
+              <div class="p-3 rounded-xl bg-rose-950/40 border border-rose-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <span class="font-mono text-rose-300">مفتاح [${i + 1}]: ${escapeHtml(masked)}</span>
+                <span class="px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-200 font-bold">
+                  مرفوض أو مقيد (HTTP ${modelsResp.status}${detailText ? `: ${escapeHtml(detailText)}` : ''})
                 </span>
               </div>
             `;
           } else {
-            statusHtml = `
-              <div class="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 flex items-center justify-between text-xs">
-                <span class="font-mono text-rose-300">مفتاح [${i + 1}]: ${masked}</span>
-                <span class="px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 font-bold flex items-center gap-1">
-                  <span class="w-2 h-2 rounded-full bg-rose-400"></span>
-                  <span>مفتاح غير صالح أو محظور (HTTP ${res.status})</span>
-                </span>
-              </div>
-            `;
+            // Step B: Lightweight generation probe with automatic fallback across active Lite/Flash models
+            let genRes = null;
+            for (const mName of probeModels) {
+              genRes = await probeGenerateModel(k, mName);
+              if (genRes.ok) break;
+              if (![429, 503, 404, 500].includes(genRes.status)) break;
+            }
+
+            if (genRes && genRes.ok) {
+              anyHealthy = true;
+              clearCooldownsForKey(k);
+              statusHtml = `
+                <div class="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <span class="font-mono text-emerald-300">مفتاح [${i + 1}]: ${escapeHtml(masked)}</span>
+                  <span class="px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-300 font-bold flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <span>صالح ونشط (200 OK • ${escapeHtml(genRes.model)}${modelsCount ? ` • ${modelsCount} نموذج` : ''})</span>
+                  </span>
+                </div>
+              `;
+            } else {
+              const st = genRes ? genRes.status : modelsResp.status;
+              const { errStatus, shortMsg } = formatGoogleErrorSummary(genRes?.errJson || modelsErrJson, k);
+              const detailText = [errStatus, shortMsg].filter(Boolean).join(' — ');
+              const isQuotaOrTransient = st === 429 || st === 503 || st === 500;
+              const toneBg = isQuotaOrTransient ? 'bg-amber-950/40 border-amber-500/40' : 'bg-rose-950/40 border-rose-500/40';
+              const toneText = isQuotaOrTransient ? 'text-amber-200' : 'text-rose-200';
+              const labelPrefix = st === 429
+                ? 'المفتاح موثق ولكن الحصة مستنفدة مؤقتاً'
+                : (st === 503 || st === 500
+                    ? 'المفتاح موثق ولكن خادم Google مزدحم مؤقتاً'
+                    : 'فشل فحص التوليد');
+              statusHtml = `
+                <div class="p-3 rounded-xl ${toneBg} border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <span class="font-mono ${toneText}">مفتاح [${i + 1}]: ${escapeHtml(masked)}</span>
+                  <span class="px-2.5 py-1 rounded-md bg-slate-900/70 ${toneText} font-bold">
+                    ${labelPrefix} (HTTP ${st}${detailText ? `: ${escapeHtml(detailText)}` : ''})
+                  </span>
+                </div>
+              `;
+            }
           }
         } catch (err) {
           statusHtml = `
-            <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-between text-xs">
-              <span class="font-mono text-slate-300">مفتاح [${i + 1}]: ${masked}</span>
-              <span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 font-bold">
-                تأخر في الاستجابة أو انقطاع شبكة (${err.name === 'AbortError' ? 'مهلة 10ث' : err.message})
+            <div class="p-3 rounded-xl bg-slate-900 border border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+              <span class="font-mono text-slate-300">مفتاح [${i + 1}]: ${escapeHtml(masked)}</span>
+              <span class="px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 font-bold">
+                تأخر في الاستجابة أو انقطاع شبكة (${err.name === 'AbortError' ? 'مهلة 12ث' : escapeHtml(err.message)})
               </span>
             </div>
           `;
@@ -544,6 +1007,9 @@
         }
       }
 
+      if (anyHealthy && saveReminder) {
+        saveReminder.classList.remove('hidden');
+      }
       if (spinner) spinner.classList.add('hidden');
       if (btn) btn.disabled = false;
     }
@@ -579,13 +1045,13 @@
       } catch (err) {
         if (badgeEl) badgeEl.innerHTML = `
           <div class="p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-300">
-            تعذر الاتصال بخادم OpenRouter: ${err.message}
+            تعذر الاتصال بخادم OpenRouter: ${escapeHtml(err.message)}
           </div>
         `;
       }
     }
 
-    // 4. Centralized Save
+    // 4. Centralized Save (Authenticated RTDB PUT + Honest Failure Reporting)
     async function saveCentralizedKeys() {
       const rawGemini = document.getElementById('txt-gemini-keys')?.value || '';
       const rawQwen = document.getElementById('txt-qwen-key')?.value.trim() || '';
@@ -598,6 +1064,9 @@
       if (rawQwen) {
         localStorage.setItem('ksumc_qwen_api_key', rawQwen);
         localStorage.setItem('ksumc_qwen_api_keys', rawQwen);
+      } else {
+        localStorage.removeItem('ksumc_qwen_api_key');
+        localStorage.removeItem('ksumc_qwen_api_keys');
       }
 
       const payload = {
@@ -615,17 +1084,28 @@
       }
 
       let cloudSuccess = false;
-      try {
-        const resp = await fetch(SYSTEM_CONFIG_AI_KEYS_URL, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        if (resp.ok) {
-          cloudSuccess = true;
+      let failureDetail = '';
+      const idToken = await getAdminFirebaseIdToken();
+
+      if (!idToken) {
+        failureDetail = 'لم يتم تسجيل الدخول في Firebase بحساب DEV أو admin';
+      } else {
+        try {
+          const resp = await fetch(`${SYSTEM_CONFIG_AI_KEYS_URL}?auth=${encodeURIComponent(idToken)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (resp && resp.ok) {
+            cloudSuccess = true;
+          } else {
+            const status = resp ? resp.status : 'ERR';
+            failureDetail = `HTTP ${status} (مرفوض من قواعد Firebase RTDB)`;
+          }
+        } catch (err) {
+          console.warn('Cloud sync error:', err);
+          failureDetail = `خطأ شبكة (${err.message || 'غير متصل'})`;
         }
-      } catch (err) {
-        console.warn('Cloud sync error:', err);
       }
 
       if (btnSave) {
@@ -633,31 +1113,42 @@
         btnSave.innerHTML = '<span class="material-symbols-outlined text-xl">save</span> <span>حفظ مركزي لجميع المفتشين</span>';
       }
 
+      const saveReminder = document.getElementById('verify-save-reminder');
+      if (saveReminder) saveReminder.classList.add('hidden');
       updateStats();
+
       if (cloudSuccess) {
-        showToast('تم حفظ ومزامنة المفاتيح سحابياً في قاعدة البيانات لجميع المفتشين بنجاح!');
+        setCloudStatusAlert(`✅ تم حفظ (${keys.length}) مفاتيح محلياً ومزامنتها سحابياً في Firebase RTDB لجميع المفتشين بنجاح.`, 'success');
+        showToast('تم حفظ ومزامنة المفاتيح سحابياً في قاعدة البيانات لجميع المفتشين بنجاح!', 'success');
       } else {
-        showToast('تم حفظ المفاتيح محلياً بنجاح (وتأكيد التخزين المشترك)');
+        const warnMsg = `⚠️ تم حفظ المفاتيح في هذا المتصفح فقط — فشلت المزامنة السحابية لباقي الأجهزة (${failureDetail}). يرجى تسجيل الدخول بحساب Firebase (DEV / admin) أعلاه ثم إعادة الضغط على الحفظ المركزي.`;
+        setCloudStatusAlert(warnMsg, 'error');
+        showToast(`تم الحفظ محلياً فقط — فشلت المزامنة السحابية (${failureDetail})`, 'error');
       }
     }
 
-    function showToast(msg) {
+    function showToast(msg, type = 'success') {
       const toast = document.getElementById('vault-toast');
       const text = document.getElementById('vault-toast-text');
+      const icon = document.getElementById('vault-toast-icon');
       if (!toast || !text) return;
+      if (type === 'error' || type === 'warning') {
+        toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-[10000] px-5 py-3 rounded-2xl bg-rose-950 border border-amber-500 text-amber-200 text-xs font-bold shadow-2xl flex items-center gap-2 transition-all max-w-md';
+        if (icon) icon.textContent = 'warning';
+      } else {
+        toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-[10000] px-5 py-3 rounded-2xl bg-slate-900 border border-emerald-500 text-emerald-300 text-xs font-bold shadow-2xl flex items-center gap-2 transition-all max-w-md';
+        if (icon) icon.textContent = 'check_circle';
+      }
       text.textContent = msg;
       toast.classList.remove('hidden');
       setTimeout(() => {
         toast.classList.add('hidden');
-      }, 4000);
+      }, 5000);
     }
 
-    // Auto-login if previously unlocked in this session
+    // Boot: initialize Firebase Auth listener & restore unlocked vault if active
     window.addEventListener('DOMContentLoaded', () => {
-      // Check query param or hash for router compatibility
-      const urlParams = new URLSearchParams(window.location.search);
-      const isApiParam = urlParams.get('page') === 'api' || window.location.hash === '#/api' || window.location.hash === '#api';
-
+      initVaultFirebaseAuth();
       if (sessionStorage.getItem('ksumc_vault_unlocked') === 'true') {
         showVaultDashboard();
         loadCentralizedKeys();

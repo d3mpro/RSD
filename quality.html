@@ -76,9 +76,9 @@
   </script>
   <link rel="stylesheet" href="assets/css/styles.css?v=2.24" />
   <link rel="stylesheet" href="assets/css/core-theme.css?v=3.1" />
-  <script src="assets/js/auth-guard.js?v=4.3"></script>
+  <script src="assets/js/auth-guard.js?v=8.0.0"></script>
   <script src="assets/js/ksumc-data-bridge.js?v=6.3.1"></script>
-  <script src="assets/js/ksu-firebase-realtime.js?v=6.9.1"></script>
+  <script src="assets/js/ksu-firebase-realtime.js?v=8.0.0"></script>
   <script src="assets/js/ksu-nav-component.js?v=5.15"></script>
   <script>
     KSUAuth.protect('quality', ['admin', 'developer', 'executive', 'head', 'quality']);
@@ -2617,7 +2617,7 @@
   <script src="assets/js/ksu-facp-assets.js?v=2.0" charset="UTF-8"></script>
   <script src="assets/js/app.js?v=8.2.2"></script>
   <script src="assets/js/vision-reticle-helper.js"></script>
-  <script src="assets/js/ksu-ai-client.js?v=7.3.1" charset="UTF-8"></script>
+  <script src="assets/js/ksu-ai-client.js?v=8.0.0" charset="UTF-8"></script>
   <script>
     // ============================================================================
     // 1. UNIFIED SEQUENTIAL WORKFLOW INBOX (جولات التفتيش + فتح الأبواب + تصاريح العمل الساخن)
@@ -3764,18 +3764,21 @@
             monthHint: monthVal
           });
         } else {
-          // Route directly to backend agent
-          const agentUrl = (window.KSUAI && window.KSUAI.oracleAgentUrl) || 'https://rsdsafety.online';
-          const resp = await fetch(`${agentUrl}/safety/api/ai/ask-safety-assistant`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query: `استخرج مصفوفة الجولات التفتيشية لوردية ${shiftKey} لشهر ${monthVal}`,
-              context: 'duty_schedule_ocr'
-            })
-          });
-          if (resp.ok) {
-            aiRes = await resp.json();
+          const agentUrl = (window.KSUAI && window.KSUAI.oracleAgentUrl)
+            || (typeof localStorage !== 'undefined' && localStorage.getItem('ksumc_oracle_agent_url'))
+            || '';
+          if (agentUrl) {
+            const resp = await fetch(`${agentUrl.replace(/\/+$/, '')}/safety/api/ai/ask-safety-assistant`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                query: `استخرج مصفوفة الجولات التفتيشية لوردية ${shiftKey} لشهر ${monthVal}`,
+                context: 'duty_schedule_ocr'
+              })
+            });
+            if (resp.ok) {
+              aiRes = await resp.json();
+            }
           }
         }
 

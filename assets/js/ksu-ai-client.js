@@ -24,17 +24,20 @@
     // مفتاح أو عدة مفاتيح Gemini مفصولة بفاصلة للتدوير التلقائي (قراءة ديناميكية نظيفة بدون مفتاح تالف افتراضي)
     geminiApiKey: (typeof localStorage !== 'undefined' ? (localStorage.getItem('ksumc_gemini_api_key') || localStorage.getItem('ksumc_gemini_api_keys') || '') : ''),
     _geminiKeyIdx: 0,
-    // سلسلة نماذج Gemini النشطة (2026) — لكل نموذج حصة يومية/دقيقة مستقلة (RPD/RPM)
-    // تم استبدال gemini-2.0-flash و gemini-2.0-flash-lite المتوقفة و gemini-2.5-flash المنتهية قريباً
+    // سلسلة نماذج Gemini النشطة (2026) — نماذج متعددة الوسائط مجانية نشطة بدون 2.5-flash-lite المقيدة للمشاريع الجديدة
     MODELS_HIERARCHY: [
       'gemini-3.5-flash-lite',
+      'gemini-3.1-flash-lite',
+      'gemini-3.6-flash',
       'gemini-3.8-flash',
-      'gemini-2.5-flash-lite'
+      'gemini-4-hydrogen'
     ],
     _visionCache: new Map(),
     _visionInFlight: new Map(),
     _geminiCooldowns: new Map(),
     _quotaStats: { cacheHits: 0, coalescedHits: 0, cooldownSkips: 0 },
+    _lastCloudKeySyncError: null,
+    _lastVisionErrorInfo: null,
 
     /**
      * بصمة سريعة وحتمية (FNV-1a) لتفادي تكرار طلبات الـ API لنفس الصورة
@@ -47,6 +50,69 @@
         h = Math.imul(h, 16777619);
       }
       return (h >>> 0).toString(16);
+    },
+
+    _sha256Hex(str) {
+      function rightRotate(value, amount) { return (value >>> amount) | (value << (32 - amount)); }
+      let i, j, result = '', words = [];
+      const utf8 = unescape(encodeURIComponent(str || ''));
+      const bitLen = utf8.length * 8;
+      const hash = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+      const k = [
+        0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+        0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+        0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+        0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+        0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+        0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+        0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+        0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+      ];
+      const w = [];
+      for (i = 0; i < utf8.length; i++) { words[i >> 2] |= (utf8.charCodeAt(i) & 0xff) << ((3 - (i % 4)) * 8); }
+      words[bitLen >> 5] |= 0x80 << (24 - (bitLen % 32));
+      words[(((bitLen + 64) >> 9) << 4) + 15] = bitLen;
+      for (i = 0; i < words.length; i += 16) {
+        let a = hash[0], b = hash[1], c = hash[2], d = hash[3], e = hash[4], f = hash[5], g = hash[6], h = hash[7];
+        for (j = 0; j < 64; j++) {
+          if (j < 16) w[j] = words[j + i] | 0;
+          else {
+            const s0 = rightRotate(w[j - 15], 7) ^ rightRotate(w[j - 15], 18) ^ (w[j - 15] >>> 3);
+            const s1 = rightRotate(w[j - 2], 17) ^ rightRotate(w[j - 2], 19) ^ (w[j - 2] >>> 10);
+            w[j] = (w[j - 16] + s0 + w[j - 7] + s1) | 0;
+          }
+          const t1 = (h + (rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25)) + ((e & f) ^ (~e & g)) + k[j] + w[j]) | 0;
+          const t2 = ((rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+          h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+        }
+        hash[0] = (hash[0] + a) | 0; hash[1] = (hash[1] + b) | 0; hash[2] = (hash[2] + c) | 0; hash[3] = (hash[3] + d) | 0;
+        hash[4] = (hash[4] + e) | 0; hash[5] = (hash[5] + f) | 0; hash[6] = (hash[6] + g) | 0; hash[7] = (hash[7] + h) | 0;
+      }
+      for (i = 0; i < 8; i++) {
+        for (j = 3; j >= 0; j--) {
+          const byte = (hash[i] >> (j * 8)) & 255;
+          result += (byte < 16 ? '0' : '') + byte.toString(16);
+        }
+      }
+      return result;
+    },
+
+    _isLegacyLeakedKey(key) {
+      if (!key || typeof key !== 'string') return false;
+      return this._sha256Hex(key.trim()) === 'dc8cfed5d7c07c7460c23aa660b75d2349d2a20b863fa6c40c98f23b17a90b12';
+    },
+
+    _extractGeminiResponseText(resJson) {
+      const candidate = resJson && Array.isArray(resJson.candidates) ? resJson.candidates[0] : null;
+      const parts = (candidate && candidate.content && Array.isArray(candidate.content.parts)) ? candidate.content.parts : [];
+      const text = parts
+        .filter(p => p && typeof p.text === 'string' && !p.thought)
+        .map(p => p.text)
+        .join('');
+      return {
+        text,
+        finishReason: candidate ? String(candidate.finishReason || '') : ''
+      };
     },
 
     /**
@@ -108,21 +174,70 @@
       return checks.some(id => (this._geminiCooldowns.get(id) || 0) > now);
     },
 
+    _parseGeminiErrorPayload(errText) {
+      if (!errText || typeof errText !== 'string') return { status: '', message: '', retryDelaySec: 0, isDailyQuota: false, invalidKey: false };
+      let status = '';
+      let message = errText;
+      let retryDelaySec = 0;
+      let isDailyQuota = /per\s*day|daily|rpd|requestsperday/i.test(errText);
+      let invalidKey = /API_KEY_INVALID|API key not valid/i.test(errText);
+      try {
+        const parsed = JSON.parse(errText);
+        const errObj = (parsed && parsed.error) ? parsed.error : parsed;
+        if (errObj) {
+          status = String(errObj.status || '');
+          message = String(errObj.message || errText);
+          if (/API key not valid|API_KEY_INVALID|expired/i.test(message)) invalidKey = true;
+          const details = Array.isArray(errObj.details) ? errObj.details : [];
+          for (const d of details) {
+            if (!d || typeof d !== 'object') continue;
+            const dType = String(d['@type'] || '');
+            if (d.reason === 'API_KEY_INVALID') invalidKey = true;
+            if (dType.includes('RetryInfo') && d.retryDelay) {
+              const m = String(d.retryDelay).match(/^([\d.]+)s$/i);
+              if (m) {
+                const parsedSec = Math.ceil(Number(m[1]));
+                if (!isNaN(parsedSec) && parsedSec > 0) retryDelaySec = Math.max(retryDelaySec, parsedSec);
+              }
+            }
+            if (dType.includes('QuotaFailure') && Array.isArray(d.violations)) {
+              for (const v of d.violations) {
+                const metricStr = `${v?.quotaMetric || ''} ${v?.quotaId || ''}`;
+                if (/per\s*day|daily|rpd|requestsperday/i.test(metricStr)) {
+                  isDailyQuota = true;
+                }
+              }
+            }
+          }
+        }
+      } catch (_) {}
+      return { status, message, retryDelaySec, isDailyQuota, invalidKey };
+    },
+
     _markGeminiCooldown(model, key, status, errText = '', retryAfterHeader = null) {
       const now = Date.now();
       const kHash = this._hashString(key);
+      const parsedErr = this._parseGeminiErrorPayload(errText);
       if (status === 429) {
-        const isDaily = /per\s*day|daily|rpd|requestsperday/i.test(String(errText || ''));
-        let waitMs = isDaily ? 15 * 60 * 1000 : 65 * 1000;
-        const retrySec = Number(retryAfterHeader);
-        if (!isNaN(retrySec) && retrySec > 0 && retrySec <= 3600) {
-          waitMs = Math.max(waitMs, retrySec * 1000);
+        let waitMs = parsedErr.isDailyQuota ? 15 * 60 * 1000 : 65 * 1000;
+        const headerSec = Number(retryAfterHeader);
+        if (!isNaN(headerSec) && headerSec > 0 && headerSec <= 3600) {
+          waitMs = Math.max(waitMs, headerSec * 1000);
+        }
+        if (parsedErr.retryDelaySec > 0 && parsedErr.retryDelaySec <= 3600) {
+          waitMs = Math.max(waitMs, parsedErr.retryDelaySec * 1000);
         }
         this._geminiCooldowns.set(`${model}::${kHash}`, now + waitMs);
+      } else if (status === 400) {
+        if (parsedErr.invalidKey) {
+          this._geminiCooldowns.set(`key::${kHash}`, now + 10 * 60 * 1000);
+        }
       } else if (status === 401 || status === 403) {
         this._geminiCooldowns.set(`key::${kHash}`, now + 10 * 60 * 1000);
       } else if (status === 404) {
         this._geminiCooldowns.set(`model::${model}`, now + 30 * 60 * 1000);
+      } else if (status === 500 || status === 503 || status === 504) {
+        this._geminiCooldowns.set(`model::${model}`, now + 20 * 1000);
       }
       this._persistGeminiCooldowns();
     },
@@ -130,15 +245,15 @@
     /**
      * إعدادات التوليد المخصصة لكل نموذج لتقليل التوكنز ومنع استنزاف الحصة وزمن الاستجابة
      */
-    _buildGeminiGenerationConfig(model, { expectJson = true, maxOutputTokens = 700 } = {}) {
+    _buildGeminiGenerationConfig(model, { expectJson = true, maxOutputTokens = 2048 } = {}) {
       const cfg = { maxOutputTokens };
       if (expectJson) cfg.responseMimeType = 'application/json';
-      if (model.startsWith('gemini-3.5-flash-lite')) {
-        cfg.temperature = 0.15;
+      const m = String(model || '').toLowerCase();
+      if (m.startsWith('gemini-3.5') || m.startsWith('gemini-3.1') || m.startsWith('gemini-3.6')) {
         cfg.thinkingConfig = { thinkingLevel: 'MINIMAL' };
-      } else if (model.startsWith('gemini-3.8-flash')) {
+      } else if (m.startsWith('gemini-3.8') || m.startsWith('gemini-4')) {
         cfg.thinkingConfig = { thinkingLevel: 'LOW' };
-      } else if (model.startsWith('gemini-2.5-')) {
+      } else if (m.startsWith('gemini-2.5-')) {
         cfg.temperature = 0.15;
         cfg.thinkingConfig = { thinkingBudget: 0 };
       } else {
@@ -174,41 +289,77 @@
     },
 
     /**
-     * تنظيف وفلترة مفاتيح الـ API وإزالة المسافات والأحرف غير الصالحة والمفاتيح التالفة
+     * تنظيف وفلترة مفاتيح الـ API وإزالة المسافات والأحرف غير المرئية والمفتاح المسرب القديم فقط
      */
     getSanitizedKeys(keyString) {
       if (!keyString || typeof keyString !== 'string') return [];
-      return keyString
-        .split(',')
-        .map(k => k.replace(/["'\r\n]/g, '').trim())
-        .filter(k => {
-          if (!k) return false;
-          // استبعاد المفتاح التالف القديم المسبب للخطأ 401
-          if (k.includes('AQ.Ab8RN6K')) return false;
-          // التحقق من أن المفتاح يحتوي فقط على محارف ASCII صالحة
-          return /^[\x20-\x7E]+$/.test(k);
-        });
+      const cleaned = keyString
+        .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '')
+        .replace(/\u00A0/g, ' ')
+        .replace(/["']/g, '');
+      const seen = new Set();
+      const result = [];
+      for (const token of cleaned.split(/[\s,;]+/)) {
+        const k = token.trim();
+        if (!k) continue;
+        if (this._isLegacyLeakedKey(k)) continue;
+        if (!/^[\x21-\x7E]+$/.test(k)) continue;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        result.push(k);
+      }
+      return result;
     },
 
     /**
-     * استرجاع مفاتيح Gemini الصالحة من الذاكرة أو التخزين المحلي
+     * استرجاع مفاتيح Gemini الصالحة من التخزين الحي (أولوية sessionStorage للتجريبي ثم localStorage ثم الذاكرة)
      */
     getGeminiKeys() {
-      const stored = (typeof localStorage !== 'undefined')
-        ? (localStorage.getItem('ksumc_gemini_api_key') || localStorage.getItem('ksumc_gemini_api_keys') || '')
+      let isDemo = false;
+      try {
+        if (typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function') {
+          isDemo = Boolean(window.KSUAuth.isDemoUser());
+        } else if (typeof sessionStorage !== 'undefined') {
+          const rawU = sessionStorage.getItem('ksu_active_user');
+          if (rawU) {
+            const parsedU = JSON.parse(rawU);
+            isDemo = Boolean(parsedU && (parsedU.isDemoAccount === true || String(parsedU.username || '').toLowerCase() === 'demo'));
+          }
+        }
+      } catch (_) {}
+      const demoStored = (isDemo && typeof sessionStorage !== 'undefined')
+        ? (sessionStorage.getItem('demo_ksumc_gemini_api_keys') || sessionStorage.getItem('demo_ksumc_gemini_api_key') || '')
         : '';
-      const raw = this.geminiApiKey || stored || '';
+      const stored = (typeof localStorage !== 'undefined')
+        ? (localStorage.getItem('ksumc_gemini_api_keys') || localStorage.getItem('ksumc_gemini_api_key') || '')
+        : '';
+      const raw = demoStored || stored || this.geminiApiKey || '';
       return this.getSanitizedKeys(raw);
     },
 
     /**
-     * استرجاع مفاتيح Qwen الصالحة من الذاكرة أو التخزين المحلي
+     * استرجاع مفاتيح Qwen الصالحة من التخزين الحي أو الذاكرة
      */
     getQwenKeys() {
-      const stored = (typeof localStorage !== 'undefined')
-        ? (localStorage.getItem('ksumc_qwen_api_key') || localStorage.getItem('ksumc_qwen_api_keys') || '')
+      let isDemo = false;
+      try {
+        if (typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function') {
+          isDemo = Boolean(window.KSUAuth.isDemoUser());
+        } else if (typeof sessionStorage !== 'undefined') {
+          const rawU = sessionStorage.getItem('ksu_active_user');
+          if (rawU) {
+            const parsedU = JSON.parse(rawU);
+            isDemo = Boolean(parsedU && (parsedU.isDemoAccount === true || String(parsedU.username || '').toLowerCase() === 'demo'));
+          }
+        }
+      } catch (_) {}
+      const demoStored = (isDemo && typeof sessionStorage !== 'undefined')
+        ? (sessionStorage.getItem('demo_ksumc_qwen_api_keys') || sessionStorage.getItem('demo_ksumc_qwen_api_key') || '')
         : '';
-      const raw = this.qwenApiKey || stored || '';
+      const stored = (typeof localStorage !== 'undefined')
+        ? (localStorage.getItem('ksumc_qwen_api_keys') || localStorage.getItem('ksumc_qwen_api_key') || '')
+        : '';
+      const raw = demoStored || stored || this.qwenApiKey || '';
       return this.getSanitizedKeys(raw);
     },
 
@@ -220,11 +371,81 @@
         if (typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser()) {
           return;
         }
+        try {
+          if (typeof sessionStorage !== 'undefined') {
+            const rawDemo = sessionStorage.getItem('ksu_active_user');
+            if (rawDemo) {
+              const uDemo = JSON.parse(rawDemo);
+              if (uDemo && (uDemo.isDemoAccount === true || String(uDemo.username || '').toLowerCase() === 'demo')) {
+                return;
+              }
+            }
+          }
+        } catch (_) {}
+
+        if (typeof window !== 'undefined' && window.ksuFirebaseSync && window.ksuFirebaseSync._sdkLoadPromise && typeof firebase === 'undefined') {
+          try {
+            await Promise.race([
+              window.ksuFirebaseSync._sdkLoadPromise.catch(() => null),
+              new Promise(resolve => setTimeout(resolve, 2500))
+            ]);
+          } catch (_) {}
+        }
+
+        let idToken = '';
+        let firebaseAuthActive = false;
+        if (typeof firebase !== 'undefined' && typeof firebase.auth === 'function') {
+          firebaseAuthActive = true;
+          try {
+            const fbAuth = firebase.auth();
+            let fbUser = fbAuth.currentUser;
+            const authAlreadyResolved = Boolean(typeof window !== 'undefined' && window.ksuFirebaseSync && window.ksuFirebaseSync._authStateResolved);
+            if (!fbUser && !authAlreadyResolved && typeof fbAuth.onAuthStateChanged === 'function') {
+              fbUser = await new Promise((resolve) => {
+                let done = false;
+                let unsub = null;
+                const timer = setTimeout(() => {
+                  if (!done) {
+                    done = true;
+                    if (typeof unsub === 'function') try { unsub(); } catch (_) {}
+                    resolve(fbAuth.currentUser || null);
+                  }
+                }, 2500);
+                try {
+                  unsub = fbAuth.onAuthStateChanged((u) => {
+                    if (!done) {
+                      done = true;
+                      clearTimeout(timer);
+                      if (typeof unsub === 'function') try { unsub(); } catch (_) {}
+                      resolve(u || null);
+                    }
+                  });
+                } catch (_) {
+                  if (!done) {
+                    done = true;
+                    clearTimeout(timer);
+                    resolve(fbAuth.currentUser || null);
+                  }
+                }
+              });
+            }
+            if (fbUser && !fbUser.isAnonymous && typeof fbUser.getIdToken === 'function') {
+              idToken = await fbUser.getIdToken();
+            }
+          } catch (_) {}
+        }
+
+        if (firebaseAuthActive && !idToken) {
+          this._lastCloudKeySyncError = 'AUTH_REQUIRED';
+          return;
+        }
+
         const defaultRtdb = 'https://rsd-ksu-default-rtdb.firebaseio.com';
         const rtdbUrl = (typeof window !== 'undefined' && window.KSU_FIREBASE_RTDB_URL)
           || (typeof localStorage !== 'undefined' && localStorage.getItem('ksumc_rtdb_url'))
           || defaultRtdb;
-        const url = `${rtdbUrl.replace(/\/+$/, '')}/system_config/ai_keys.json`;
+        const baseUrl = `${rtdbUrl.replace(/\/+$/, '')}/system_config/ai_keys.json`;
+        const url = idToken ? `${baseUrl}?auth=${encodeURIComponent(idToken)}` : baseUrl;
         const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
         const timer = controller ? setTimeout(() => controller.abort(), 4000) : null;
         const resp = await fetch(url, controller ? { signal: controller.signal } : {});
@@ -249,10 +470,15 @@
                 localStorage.setItem('ksumc_qwen_api_keys', cfg.qwen_api_key);
               }
             }
+            this._lastCloudKeySyncError = 'OK';
+          } else {
+            this._lastCloudKeySyncError = 'EMPTY_CLOUD_VAULT';
           }
+        } else if (resp) {
+          this._lastCloudKeySyncError = resp.status === 401 ? 'HTTP_401' : (resp.status === 403 ? 'HTTP_403' : `HTTP_${resp.status}`);
         }
       } catch (_) {
-        // فحص صامت لا يعطل الواجهة أو يظهر أي أخطاء للمفتشين
+        this._lastCloudKeySyncError = 'NETWORK_ERROR';
       }
     },
 
@@ -504,11 +730,30 @@
       }
     },
 
+    _isDemoSession() {
+      try {
+        if (typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function') {
+          if (window.KSUAuth.isDemoUser()) return true;
+        }
+        if (typeof sessionStorage !== 'undefined') {
+          const raw = sessionStorage.getItem('ksu_active_user');
+          if (raw) {
+            const u = JSON.parse(raw);
+            if (u && (u.isDemoAccount === true || String(u.username || '').toLowerCase() === 'demo')) return true;
+          }
+        }
+      } catch (_) {}
+      return false;
+    },
+
     /**
      * إرسال طلب الذكاء الاصطناعي عبر جسر الفايربيس اللحظي (Firebase RTDB Bridge)
      * مخصص لشبكة الجامعة والمدينة الطبية لتجاوز أي حظر جدار حماية خارجي نهائياً عبر نطاق web.app المعتمد
      */
     async dispatchViaFirebaseBridge(action, payload, timeoutMs = 12000) {
+      if (this._isDemoSession()) {
+        throw new Error('Firebase Bridge disabled in demo sandbox mode');
+      }
       const getDb = () => {
         if (window.firebase && typeof window.firebase.database === 'function') {
           return window.firebase.database();
@@ -729,7 +974,7 @@
 
     /**
      * 1. التدقيق البصري الذكي للصور والمخالفات الميدانية
-     * (الأولوية المباشرة: كاش البصمة المحلي -> Google Gemini Vision 2026 مع درع الحصة -> Qwen2.5-VL -> وكيل أوراكل -> جسر الفايربيس)
+     * (الأولوية المباشرة: كاش البصمة المحلي -> Google Gemini Vision 2026 مع درع الحصة -> Qwen2.5-VL -> وكيل مخصص)
      */
     async analyzeInspectionImage({ image, images, checklistType, itemLabel, facility, building, floor, notes, submode }) {
       const onProgress = arguments[0] && arguments[0].onProgress;
@@ -797,6 +1042,7 @@
       };
 
       const runPipeline = async () => {
+        this._lastVisionErrorInfo = null;
         const payload = {
           image: allImages[0] || '',
           checklistType: checklistType || 'general',
@@ -824,14 +1070,16 @@
           }
         }
 
-        const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com') || window.location.protocol === 'file:';
-
         // جلب المفاتيح المركزية سحابياً من Firebase في الخلفية إن لم تكن محملة
         let geminiKeys = this.getGeminiKeys();
         if (!geminiKeys.length) {
           await this.fetchCloudKeysSilently();
           geminiKeys = this.getGeminiKeys();
         }
+
+        let geminiFailure = null;
+        let qwenFailure = null;
+        let customAgentFailure = null;
 
         // المسار 1 (الأولوية القصوى والسريعة المعتمدة): الاستدعاء المباشر لمحرك Google Gemini Vision مع التدرج الصامت ودرع الحصة
         if (geminiKeys.length > 0) {
@@ -854,6 +1102,10 @@
               return saveToCache(geminiRes);
             }
           } catch (geminiErr) {
+            geminiFailure = {
+              code: geminiErr.errorCode || (this._lastVisionErrorInfo && this._lastVisionErrorInfo.errorCode) || 'ERR_ALL_PROVIDERS_UNREACHABLE',
+              detail: geminiErr.diagnosticDetail || geminiErr.message || ''
+            };
             console.warn('[KSUAI] Gemini multi-model fallback chain exhausted, switching silently to alternate providers:', geminiErr.message);
           }
         }
@@ -882,11 +1134,12 @@
               return saveToCache(qwenRes);
             }
           } catch (qwenErr) {
+            qwenFailure = qwenErr.message || '';
             console.warn('[KSUAI] Direct Qwen2.5-VL API failed, trying backend agent:', qwenErr.message);
           }
         }
 
-        // المسار 3 (اختياري): لا يُستدعى إلا إذا تم ضبط رابط خادم مخصص صراحةً (تم إلغاء خادم أوراكل الافتراضي)
+        // المسار 3 (اختياري): لا يُستدعى إلا إذا تم ضبط رابط خادم مخصص صراحةً
         const hasCustomAgent = Boolean(this.oracleAgentUrl);
         if (hasCustomAgent) {
           let progressTimer = null;
@@ -919,15 +1172,60 @@
               return saveToCache(res);
             }
           } catch (serverErr) {
+            customAgentFailure = serverErr.message || '';
             console.warn('[KSUAI] Custom Vision Agent unreachable or timed out:', serverErr.message);
           } finally {
             if (progressTimer) clearInterval(progressTimer);
           }
         }
 
-        // المسار 4 (الشفافية الكاملة): الإشعار الصادق الصريح عند تعذر مزودي السحابة (Gemini / Qwen)
-        const honestFailureMsg = 'تعذر الاتصال بخادم الذكاء الاصطناعي أو استغرق الفحص وقتاً أطول من المتوقع، يرجى إعادة المحاولة أو التحقق من الاتصال';
-        const offlineSaveMsg = 'تعذر الاتصال بخادم الرؤية البصرية، تم حفظ الصورة في المسودات المحلية لمزامنتها لاحقاً';
+        // المسار 4 (الشفافية الكاملة والتشخيص الدقيق): تحديد السبب الحقيقي بدقة دون إلقاء اللوم على الشبكة عند غياب المفاتيح أو 401/429
+        const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+        let errorCode = 'ERR_ALL_PROVIDERS_UNREACHABLE';
+        let honestFailureMsg = 'تعذر الاتصال بخادم الذكاء الاصطناعي أو استغرق الفحص وقتاً أطول من المتوقع، يرجى إعادة المحاولة أو التحقق من الاتصال';
+        let diagnosticDetail = '';
+
+        if (isOffline) {
+          errorCode = 'ERR_OFFLINE';
+          honestFailureMsg = 'لا يوجد اتصال بالإنترنت حالياً؛ تم حفظ الصورة في المسودات المحلية لمزامنتها لاحقاً عند عودة الاتصال.';
+          diagnosticDetail = 'navigator.onLine === false';
+        } else if (geminiKeys.length === 0 && qwenKeys.length === 0 && !hasCustomAgent) {
+          if (this._lastCloudKeySyncError === 'NETWORK_ERROR') {
+            errorCode = 'ERR_ALL_PROVIDERS_UNREACHABLE';
+            honestFailureMsg = 'تعذر الاتصال بخادم الذكاء الاصطناعي أو جلب مفاتيح التشغيل السحابية، يرجى التحقق من الشبكة والمحاولة مجدداً.';
+            diagnosticDetail = 'Cloud key sync network error';
+          } else if (this._lastCloudKeySyncError === 'AUTH_REQUIRED' || this._lastCloudKeySyncError === 'HTTP_401' || this._lastCloudKeySyncError === 'HTTP_403') {
+            errorCode = 'ERR_CLOUD_AUTH_REQUIRED';
+            honestFailureMsg = this._isDemoSession()
+              ? 'الوضع التجريبي لا يملك مفاتيح AI محلية؛ يمكنك إدخال مفتاح تجريبي مؤقت أو تشغيل المحاكاة التجريبية.'
+              : 'يتطلب تحميل مفاتيح الذكاء الاصطناعي من السحابة تسجيل دخول موثق بحساب الموظف المعتمد (يرجى إعادة تسجيل الدخول من البوابة الرئيسية أو حفظ المفاتيح من صفحة /api).';
+            diagnosticDetail = this._lastCloudKeySyncError;
+          } else {
+            errorCode = 'ERR_NO_AI_KEYS';
+            honestFailureMsg = this._isDemoSession()
+              ? 'لا توجد مفاتيح AI مفعّلة في جلسة الوضع التجريبي؛ يمكنك إدخال مفتاح اختبار مؤقت أو تشغيل المحاكاة التجريبية للعرض.'
+              : 'لا توجد مفاتيح AI مفعّلة في هذا المتصفح أو في الخزينة السحابية (/api). يرجى إضافة مفاتيح Gemini في /api والضغط على «حفظ مركزي لجميع المفتشين».';
+            diagnosticDetail = this._lastCloudKeySyncError || 'NO_LOCAL_OR_CLOUD_KEYS';
+          }
+        } else if (hasCustomAgent) {
+          errorCode = 'ERR_ALL_PROVIDERS_UNREACHABLE';
+          honestFailureMsg = 'تعذر الاتصال بخادم الذكاء الاصطناعي أو استغرق الفحص وقتاً أطول من المتوقع، يرجى إعادة المحاولة أو التحقق من الاتصال';
+          diagnosticDetail = [geminiFailure?.detail, qwenFailure, customAgentFailure].filter(Boolean).join(' | ');
+        } else if (geminiFailure) {
+          errorCode = geminiFailure.code || 'ERR_ALL_PROVIDERS_UNREACHABLE';
+          diagnosticDetail = geminiFailure.detail || '';
+          if (errorCode === 'ERR_GEMINI_AUTH_401_403') {
+            honestFailureMsg = 'مفاتيح Gemini المفعّلة مرفوضة أو غير مصرح لها (HTTP 401/403). يرجى فحص المفاتيح وتحديثها من صفحة /api.';
+          } else if (errorCode === 'ERR_QUOTA_EXHAUSTED_429') {
+            honestFailureMsg = 'نفدت حصة الاستخدام المجانية لمفاتيح Gemini مؤقتاً (429 Quota Exhausted). يرجى إضافة مفاتيح من مشاريع Google Cloud منفصلة أو الانتظار قليلاً.';
+          } else if (errorCode === 'ERR_TIMEOUT') {
+            honestFailureMsg = 'استغرق نموذج Gemini وقتاً أطول من المتوقع (مهلة 25 ثانية لكل محاولة). يرجى إعادة المحاولة الآن.';
+          } else if (errorCode === 'ERR_INVALID_JSON') {
+            honestFailureMsg = 'تم استلام استجابة غير مكتملة أو غير قابلة للقراءة من نموذج الذكاء الاصطناعي. يرجى إعادة المحاولة.';
+          }
+        }
+
+        const offlineSaveMsg = 'تم حفظ الصورة في المسودات المحلية لمزامنتها لاحقاً';
         if (typeof onProgress === 'function') onProgress(honestFailureMsg);
 
         return {
@@ -936,7 +1234,8 @@
           error: honestFailureMsg,
           message: honestFailureMsg,
           user_message: offlineSaveMsg,
-          error_code: 'ERR_ALL_PROVIDERS_UNREACHABLE',
+          error_code: errorCode,
+          diagnostic_detail: diagnosticDetail,
           stage: 'inference',
           offline_draft_ready: true,
           data: null
@@ -954,7 +1253,7 @@
      * الاستدعاء المباشر لنموذج كوين البصري Qwen2.5-VL (OpenRouter / Alibaba DashScope)
      */
     async callQwenDirectly({ images, checklistType, submode, itemLabel, facility, building, floor, notes }) {
-      const keys = (this.qwenApiKey || '').split(',').map(k => k.trim()).filter(Boolean);
+      const keys = this.getQwenKeys();
       if (!keys.length) throw new Error('لم يتم ضبط مفتاح Qwen API');
 
       const contextHint = (notes || itemLabel || building)
@@ -971,21 +1270,29 @@
       contentList.push({ type: 'text', text: promptText });
 
       const apiKey = keys[0];
-      const resp = await fetch(this.qwenApiBaseUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: this.qwenVisionModel || 'qwen/qwen2.5-vl-72b-instruct:free',
-          messages: [
-            { role: 'system', content: this.VISION_SYSTEM_PROMPT },
-            { role: 'user', content: contentList }
-          ],
-          temperature: 0.2
-        })
-      });
+      const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      const timer = controller ? setTimeout(() => controller.abort(), 25000) : null;
+      let resp;
+      try {
+        resp = await fetch(this.qwenApiBaseUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: this.qwenVisionModel || 'qwen/qwen2.5-vl-72b-instruct:free',
+            messages: [
+              { role: 'system', content: this.VISION_SYSTEM_PROMPT },
+              { role: 'user', content: contentList }
+            ],
+            temperature: 0.2
+          }),
+          signal: controller ? controller.signal : undefined
+        });
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
 
       if (!resp.ok) {
         const errTxt = await resp.text();
@@ -1005,7 +1312,7 @@
     },
 
     /**
-     * الاستدعاء السحابي المباشر لـ Google Gemini مع التدرج الصامت (3.5-Flash-Lite -> 3.8-Flash -> 2.5-Flash-Lite) ودرع الحصة وتدوير المفاتيح
+     * الاستدعاء السحابي المباشر لـ Google Gemini مع التدرج الصامت عبر سلسلة نماذج 2026 النشطة ودرع الحصة وتدوير المفاتيح
      */
     async callGeminiDirectly({ images, checklistType, submode, itemLabel, facility, building, floor, notes, onProgress }) {
       let keys = this.getGeminiKeys();
@@ -1014,7 +1321,9 @@
         keys = this.getGeminiKeys();
       }
       if (!keys.length) {
-        throw new Error('لم يتم ضبط مفاتيح Gemini API صالحة في الخزينة السحابية');
+        const noKeyErr = new Error('لم يتم ضبط مفاتيح Gemini API صالحة في الخزينة السحابية');
+        noKeyErr.errorCode = 'ERR_NO_AI_KEYS';
+        throw noKeyErr;
       }
 
       // تجهيز الصور
@@ -1064,23 +1373,41 @@
       // سلسلة النماذج النشطة (لكل نموذج كوتا وحصة يومية/دقيقة مستقلة)
       const MODELS_HIERARCHY = (Array.isArray(this.MODELS_HIERARCHY) && this.MODELS_HIERARCHY.length)
         ? this.MODELS_HIERARCHY
-        : ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash-lite'];
+        : ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-4-hydrogen'];
 
       let lastErr = null;
       let networkUnreachable = false;
+      let consecutiveNetworkErrors = 0;
+      const startTimeMs = Date.now();
+      const attemptStats = {
+        totalAttempts: 0,
+        authFailures: 0,
+        quotaExhausted: 0,
+        timeouts: 0,
+        invalidJson: 0,
+        networkErrors: 0,
+        lastHttpStatus: 0,
+        lastDetail: ''
+      };
 
       for (let mIdx = 0; mIdx < MODELS_HIERARCHY.length; mIdx++) {
         if (networkUnreachable) break;
+        if (Date.now() - startTimeMs > 75000) break;
+
         const currentModel = MODELS_HIERARCHY[mIdx];
         const reqBodyStr = JSON.stringify({
           systemInstruction,
           contents: [{ parts }],
-          generationConfig: this._buildGeminiGenerationConfig(currentModel, { expectJson: true, maxOutputTokens: 700 })
+          generationConfig: this._buildGeminiGenerationConfig(currentModel, { expectJson: true, maxOutputTokens: 2048 })
         });
 
         let triedModel = false;
         // تدوير المفاتيح لكل نموذج مع تخطي المفاتيح/النماذج الموجودة في فترة التهدئة (Cooldown)
         for (let attempt = 0; attempt < keys.length; attempt++) {
+          if (Date.now() - startTimeMs > 75000) {
+            networkUnreachable = true;
+            break;
+          }
           const geminiKey = keys[(this._geminiKeyIdx++) % keys.length];
           if (this._isGeminiCoolingDown(currentModel, geminiKey)) {
             this._quotaStats.cooldownSkips++;
@@ -1091,10 +1418,11 @@
             onProgress('جاري الفحص المتقدم ومطابقة المعايير الهندسية...');
           }
           triedModel = true;
+          attemptStats.totalAttempts++;
 
-          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${geminiKey}`;
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${encodeURIComponent(geminiKey)}`;
           const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-          const timer = controller ? setTimeout(() => controller.abort(), 16000) : null;
+          const timer = controller ? setTimeout(() => controller.abort(), 25000) : null;
 
           try {
             const resp = await fetch(geminiUrl, {
@@ -1104,11 +1432,20 @@
               signal: controller ? controller.signal : undefined
             });
             if (timer) clearTimeout(timer);
+            consecutiveNetworkErrors = 0;
 
             if (!resp.ok) {
               const errRaw = await resp.text();
               const retryAfter = resp.headers && typeof resp.headers.get === 'function' ? resp.headers.get('retry-after') : null;
+              const parsedErr = this._parseGeminiErrorPayload(errRaw);
               this._markGeminiCooldown(currentModel, geminiKey, resp.status, errRaw, retryAfter);
+              attemptStats.lastHttpStatus = resp.status;
+              attemptStats.lastDetail = `HTTP ${resp.status}${parsedErr.status ? ` (${parsedErr.status})` : ''}: ${parsedErr.message.slice(0, 90)}`;
+              if (resp.status === 401 || resp.status === 403 || (resp.status === 400 && parsedErr.invalidKey)) {
+                attemptStats.authFailures++;
+              } else if (resp.status === 429) {
+                attemptStats.quotaExhausted++;
+              }
               lastErr = new Error(`Gemini ${currentModel} HTTP ${resp.status}: ${errRaw.slice(0, 100)}`);
               // عند عدم وجود النموذج (404) ننتقل مباشرة للنموذج التالي بدون إضاعة بقية المفاتيح عليه
               if (resp.status === 404) break;
@@ -1116,13 +1453,25 @@
             }
 
             const resJson = await resp.json();
-            const rawOutput = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const extracted = this._extractGeminiResponseText(resJson);
+            const rawOutput = extracted.text || '';
             if (!rawOutput) {
-              lastErr = new Error(`لم يتم استلام محتوى من ${currentModel}`);
+              attemptStats.invalidJson++;
+              attemptStats.lastDetail = extracted.finishReason ? `Empty content (${extracted.finishReason})` : 'Empty content';
+              lastErr = new Error(`لم يتم استلام محتوى من ${currentModel}${extracted.finishReason ? ` (${extracted.finishReason})` : ''}`);
               continue;
             }
 
-            const parsedRaw = this.cleanAndParseJSON(rawOutput);
+            let parsedRaw;
+            try {
+              parsedRaw = this.cleanAndParseJSON(rawOutput);
+            } catch (jsonErr) {
+              attemptStats.invalidJson++;
+              attemptStats.lastDetail = `Invalid JSON${extracted.finishReason ? ` (${extracted.finishReason})` : ''}: ${jsonErr.message}`;
+              lastErr = jsonErr;
+              continue;
+            }
+
             const parsedData = this.applyStaticReferenceMapping(parsedRaw, submode || checklistType);
             parsedData.ai_engine_source = `Google ${currentModel} Vision`;
 
@@ -1134,23 +1483,64 @@
           } catch (err) {
             if (timer) clearTimeout(timer);
             lastErr = err;
-            // كسر فوري عند انقطاع الشبكة أو جدار الحماية (AbortError / TypeError) لمنع مضاعفة الانتظار
-            if (err && (err.name === 'AbortError' || err.name === 'TypeError')) {
-              networkUnreachable = true;
-              break;
+            if (err && err.name === 'AbortError') {
+              attemptStats.timeouts++;
+              attemptStats.lastDetail = `Timeout 25s (${currentModel})`;
+              consecutiveNetworkErrors = 0;
+              // AbortError عابر للمفتاح/النموذج الحالي — نكمل التدوير للمفتاح والنموذج التالي
+              continue;
+            }
+            if (err && err.name === 'TypeError') {
+              attemptStats.networkErrors++;
+              attemptStats.lastDetail = err.message || 'Network error';
+              consecutiveNetworkErrors++;
+              if ((typeof navigator !== 'undefined' && navigator.onLine === false) || consecutiveNetworkErrors >= Math.max(2, keys.length)) {
+                networkUnreachable = true;
+                break;
+              }
+              continue;
             }
             continue;
           }
         }
       }
 
-      throw lastErr || new Error('تعذر التحليل عبر جميع نماذج ومفاتيح Gemini المتوفرة');
+      let errorCode = 'ERR_ALL_PROVIDERS_UNREACHABLE';
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        errorCode = 'ERR_OFFLINE';
+      } else if (attemptStats.totalAttempts === 0) {
+        errorCode = 'ERR_QUOTA_EXHAUSTED_429';
+        attemptStats.lastDetail = attemptStats.lastDetail || 'All keys/models currently in cooldown';
+      } else if (attemptStats.authFailures > 0 && attemptStats.authFailures >= (attemptStats.totalAttempts - attemptStats.quotaExhausted) && attemptStats.quotaExhausted === 0) {
+        errorCode = 'ERR_GEMINI_AUTH_401_403';
+      } else if (attemptStats.quotaExhausted > 0 && attemptStats.timeouts === 0 && attemptStats.invalidJson === 0) {
+        errorCode = 'ERR_QUOTA_EXHAUSTED_429';
+      } else if (attemptStats.timeouts > 0 && attemptStats.quotaExhausted === 0 && attemptStats.authFailures === 0) {
+        errorCode = 'ERR_TIMEOUT';
+      } else if (attemptStats.invalidJson > 0 && attemptStats.timeouts === 0 && attemptStats.authFailures === 0) {
+        errorCode = 'ERR_INVALID_JSON';
+      } else if (attemptStats.quotaExhausted > 0) {
+        errorCode = 'ERR_QUOTA_EXHAUSTED_429';
+      } else if (attemptStats.authFailures > 0) {
+        errorCode = 'ERR_GEMINI_AUTH_401_403';
+      }
+
+      const finalErr = lastErr || new Error('تعذر التحليل عبر جميع نماذج ومفاتيح Gemini المتوفرة');
+      finalErr.errorCode = errorCode;
+      finalErr.diagnosticDetail = attemptStats.lastDetail || finalErr.message;
+      finalErr.attemptStats = attemptStats;
+      this._lastVisionErrorInfo = {
+        errorCode,
+        diagnosticDetail: finalErr.diagnosticDetail,
+        message: finalErr.message
+      };
+      throw finalErr;
     },
 
     /**
      * مساعد مشترك لطلبات Gemini النصية والمرئية الخفيفة مع تدوير المفاتيح وتدرج النماذج ودرع التهدئة
      */
-    async _callGeminiWithRotation({ parts, expectJson = false, maxOutputTokens = 900, timeoutMs = 20000 }) {
+    async _callGeminiWithRotation({ parts, expectJson = false, maxOutputTokens = 2048, timeoutMs = 25000 }) {
       let keys = this.getGeminiKeys();
       if (!keys.length) {
         await this.fetchCloudKeysSilently();
@@ -1160,10 +1550,13 @@
 
       const models = (Array.isArray(this.MODELS_HIERARCHY) && this.MODELS_HIERARCHY.length)
         ? this.MODELS_HIERARCHY
-        : ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash-lite'];
+        : ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-4-hydrogen'];
 
       let lastErr = null;
+      let consecutiveNetworkErrors = 0;
+      let networkUnreachable = false;
       for (const currentModel of models) {
+        if (networkUnreachable) break;
         const bodyStr = JSON.stringify({
           contents: [{ parts }],
           generationConfig: this._buildGeminiGenerationConfig(currentModel, { expectJson, maxOutputTokens })
@@ -1177,7 +1570,7 @@
           const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
           const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
           try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${geminiKey}`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${encodeURIComponent(geminiKey)}`;
             const resp = await fetch(url, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -1185,6 +1578,7 @@
               signal: controller ? controller.signal : undefined
             });
             if (timer) clearTimeout(timer);
+            consecutiveNetworkErrors = 0;
             if (!resp.ok) {
               const errRaw = await resp.text();
               const retryAfter = resp.headers && typeof resp.headers.get === 'function' ? resp.headers.get('retry-after') : null;
@@ -1194,15 +1588,23 @@
               continue;
             }
             const rJson = await resp.json();
-            const text = rJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            if (text) {
-              return { text, model: currentModel };
+            const extracted = this._extractGeminiResponseText(rJson);
+            if (extracted.text) {
+              return { text: extracted.text, model: currentModel };
             }
           } catch (err) {
             if (timer) clearTimeout(timer);
             lastErr = err;
-            if (err && (err.name === 'AbortError' || err.name === 'TypeError')) {
-              throw err;
+            if (err && err.name === 'AbortError') {
+              consecutiveNetworkErrors = 0;
+              continue;
+            }
+            if (err && err.name === 'TypeError') {
+              consecutiveNetworkErrors++;
+              if ((typeof navigator !== 'undefined' && navigator.onLine === false) || consecutiveNetworkErrors >= Math.max(2, keys.length)) {
+                networkUnreachable = true;
+                break;
+              }
             }
           }
         }
@@ -1214,6 +1616,7 @@
      * أرشفة الصور عالية الدقة (1280px) ومحضر الضبط في خزنة الوكيل دون تأخير واجهة المفتش
      */
     archiveVisualViolationBundle(bundlePayload) {
+      if (this._isDemoSession()) return Promise.resolve(false);
       if (!bundlePayload || !bundlePayload.cardId || !this.oracleAgentUrl) return Promise.resolve(false);
       const url = this.getApiUrl('/archive/dispatch');
       const headers = {
@@ -1978,16 +2381,18 @@
     },
 
     /**
-     * الاستدعاء السحابي المباشر لـ Google Gemini 2.5 Flash لمحاكاة تدقيق سباهي الافتراضي
+     * الاستدعاء السحابي المباشر لـ Google Gemini لمحاكاة تدقيق سباهي الافتراضي عبر سلسلة النماذج النشطة 2026
      */
     async callGeminiCBAHIAudit(building = 'كافة مباني المدينة الطبية (KSUMC)', days = 30, stats = null) {
       stats = stats || this._collectBuildingStats(building, days);
-      const geminiKeys = this.getGeminiKeys();
+      let geminiKeys = this.getGeminiKeys();
+      if (!geminiKeys.length) {
+        await this.fetchCloudKeysSilently();
+        geminiKeys = this.getGeminiKeys();
+      }
       if (!geminiKeys.length) {
         throw new Error('لم يتم ضبط مفاتيح Gemini API صالحة');
       }
-      const geminiKey = geminiKeys[0];
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`;
 
       const checklistsStr = (stats.checklists_covered || []).join('، ');
       const today = new Date().toISOString().split('T')[0];
@@ -2132,33 +2537,16 @@
   "executive_verdict": "المبنى مستوفٍ لمعايير سباهي (FMS) بدرجة جاهزية واقعية (${expectedScore}%) وفق السجلات الميدانية الموثقة."
 }`;
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 35000);
-
-      const resp = await fetch(geminiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json'
-          }
-        }),
-        signal: controller.signal
+      const res = await this._callGeminiWithRotation({
+        parts: [{ text: prompt }],
+        expectJson: true,
+        maxOutputTokens: 2500,
+        timeoutMs: 35000
       });
-      clearTimeout(timer);
-
-      if (!resp.ok) {
-        const errRaw = await resp.text();
-        throw new Error(`Gemini Cloud API Error ${resp.status}: ${errRaw.slice(0, 100)}`);
-      }
-
-      const resJson = await resp.json();
-      const rawOutput = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const rawOutput = (res && res.text) ? res.text : '';
       if (!rawOutput) throw new Error('لم يتم استلام محتوى من نموذج الذكاء الاصطناعي');
 
-      const cleanJsonStr = rawOutput.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsedData = JSON.parse(cleanJsonStr);
+      const parsedData = this.cleanAndParseJSON(rawOutput);
 
       parsedData.building_name = parsedData.building_name || building;
       parsedData.building = parsedData.building || building;
@@ -2177,7 +2565,7 @@
         building,
         time_window_days: days,
         data: parsedData,
-        source: 'Google Gemini 2.5 Flash'
+        source: `Google ${res.model || 'Gemini'}`
       };
     },
 
@@ -2979,9 +3367,9 @@
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-emerald-300 text-[11px] font-bold border border-white/15">
-              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>الراصد الذكي جاهز</span>
+            <span id="vision-readiness-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-emerald-300 text-[11px] font-bold border border-white/15">
+              <span id="vision-readiness-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span id="vision-readiness-text">الراصد الذكي جاهز</span>
             </span>
             <button onclick="document.getElementById('ksu-ai-vision-modal').remove()" class="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer font-bold text-base" title="إغلاق النافذة">✕</button>
           </div>
@@ -3186,6 +3574,25 @@
             </div>
           </div>
 
+          <!-- Demo Mode Session Helper Strip (Visible only in demo sandbox mode) -->
+          <div id="vision-demo-helper-panel" class="hidden p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-xs space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2 text-amber-900 font-black">
+                <span class="material-symbols-outlined text-lg text-amber-600">science</span>
+                <span>أدوات الراصد البصري للوضع التجريبي (Demo Mode)</span>
+              </div>
+              <button type="button" onclick="runDemoSimulatedVisionAnalysis()" class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-[11px] flex items-center gap-1.5 cursor-pointer transition-all">
+                <span class="material-symbols-outlined text-sm">play_circle</span>
+                <span>تشغيل محاكاة تجريبية للعرض (Demo)</span>
+              </button>
+            </div>
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <input id="inp-demo-gemini-key" type="password" dir="ltr" placeholder="أو أدخل مفتاح Gemini تجريبي مؤقت لهذه الجلسة فقط..." class="flex-1 px-3 py-2 rounded-xl bg-white border border-amber-300 text-slate-800 font-mono text-[11px] outline-none focus:border-amber-600" />
+              <button type="button" onclick="saveDemoSessionGeminiKey()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-[11px] shrink-0 cursor-pointer">حفظ للجلسة فقط</button>
+            </div>
+            <p class="text-[11px] text-amber-800 font-semibold">ملاحظة: أي مفتاح أو فحص في الوضع التجريبي يبقى معزولاً في sessionStorage ويُمسح فور تسجيل الخروج.</p>
+          </div>
+
           <!-- Dynamic Results Container -->
           <div id="vision-results-area" class="hidden pt-3 border-t border-slate-200 space-y-3.5 animate-in fade-in duration-300">
             <!-- Populated dynamically -->
@@ -3195,8 +3602,8 @@
         <!-- Footer -->
         <div class="px-5 py-3 bg-slate-100 border-t border-slate-200 flex items-center justify-between gap-3 text-xs text-slate-500 shrink-0">
           <div class="flex items-center gap-2">
-            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span class="font-bold text-slate-700">محرك الرؤية البصرية متصل ومطابق لمعايير سباهي (CBAHI FMS)</span>
+            <span id="vision-footer-dot" class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span id="vision-footer-text" class="font-bold text-slate-700">محرك الرؤية البصرية مطابق لمعايير سباهي (CBAHI FMS)</span>
           </div>
           <button onclick="document.getElementById('ksu-ai-vision-modal').remove()" class="min-h-[38px] px-4 py-2 shrink-0 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-200 font-bold transition-all cursor-pointer">إغلاق</button>
         </div>
@@ -3204,6 +3611,17 @@
     `;
 
     document.body.appendChild(modal);
+
+    if (typeof window.updateVisionReadinessBadge === 'function') {
+      window.updateVisionReadinessBadge();
+    }
+    if (!KSUAI._isDemoSession() && KSUAI.getGeminiKeys().length === 0 && typeof KSUAI.fetchCloudKeysSilently === 'function') {
+      KSUAI.fetchCloudKeysSilently().then(() => {
+        if (typeof window.updateVisionReadinessBadge === 'function') {
+          window.updateVisionReadinessBadge();
+        }
+      }).catch(() => {});
+    }
 
     const dropzone = document.getElementById('vision-dropzone');
     if (dropzone) {
@@ -3254,6 +3672,118 @@
       }
     }
     setVisionSubmode(initialSubmode);
+  };
+
+  window.updateVisionReadinessBadge = function() {
+    const badge = document.getElementById('vision-readiness-badge');
+    const dot = document.getElementById('vision-readiness-dot');
+    const text = document.getElementById('vision-readiness-text');
+    const demoPanel = document.getElementById('vision-demo-helper-panel');
+    const footerDot = document.getElementById('vision-footer-dot');
+    const footerText = document.getElementById('vision-footer-text');
+
+    const gemCount = (KSUAI && typeof KSUAI.getGeminiKeys === 'function') ? KSUAI.getGeminiKeys().length : 0;
+    const qwenCount = (KSUAI && typeof KSUAI.getQwenKeys === 'function') ? KSUAI.getQwenKeys().length : 0;
+    const totalKeys = gemCount + qwenCount;
+    const hasCustomAgent = Boolean(KSUAI && KSUAI.oracleAgentUrl);
+    const isDemo = Boolean(KSUAI && typeof KSUAI._isDemoSession === 'function' && KSUAI._isDemoSession());
+
+    if (demoPanel) {
+      if (isDemo) demoPanel.classList.remove('hidden');
+      else demoPanel.classList.add('hidden');
+    }
+
+    if (!badge || !text) return;
+    if (isDemo) {
+      if (totalKeys > 0) {
+        badge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-emerald-300 text-[11px] font-bold border border-white/15';
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+        text.textContent = `الوضع التجريبي (${totalKeys} ${totalKeys === 1 ? 'مفتاح' : 'مفاتيح'} متاحة)`;
+      } else {
+        badge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-200 text-[11px] font-bold border border-amber-400/40';
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        text.textContent = 'الوضع التجريبي — يتطلب مفتاحاً أو محاكاة';
+      }
+      return;
+    }
+
+    if (totalKeys > 0) {
+      badge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-emerald-300 text-[11px] font-bold border border-white/15';
+      if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+      text.textContent = `الراصد الذكي جاهز (${totalKeys} ${totalKeys === 1 ? 'مفتاح' : 'مفاتيح'})`;
+      if (footerDot) footerDot.className = 'inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+      if (footerText) footerText.textContent = 'محرك الرؤية البصرية متصل ومطابق لمعايير سباهي (CBAHI FMS)';
+    } else if (hasCustomAgent) {
+      badge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-emerald-300 text-[11px] font-bold border border-white/15';
+      if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+      text.textContent = 'الراصد الذكي جاهز (خادم مخصص)';
+    } else {
+      badge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-200 text-[11px] font-bold border border-amber-400/40';
+      if (dot) dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+      text.textContent = 'تنبيه: لا توجد مفاتيح AI مفعّلة';
+      if (footerDot) footerDot.className = 'inline-block w-2 h-2 rounded-full bg-amber-500';
+      if (footerText) footerText.textContent = 'بانتظار تفعيل ومزامنة مفاتيح الذكاء الاصطناعي من صفحة /api';
+    }
+  };
+
+  window.saveDemoSessionGeminiKey = function() {
+    const inp = document.getElementById('inp-demo-gemini-key');
+    const raw = inp ? inp.value.trim() : '';
+    const cleaned = KSUAI.getSanitizedKeys(raw);
+    if (!cleaned.length) {
+      alert('يرجى إدخال مفتاح Gemini صالح أولاً.');
+      return;
+    }
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.setItem('demo_ksumc_gemini_api_key', cleaned.join(', '));
+        sessionStorage.setItem('demo_ksumc_gemini_api_keys', cleaned.join(', '));
+      }
+    } catch (_) {}
+    if (inp) inp.value = '';
+    if (typeof window.updateVisionReadinessBadge === 'function') window.updateVisionReadinessBadge();
+    if (typeof showToast === 'function') showToast('تم حفظ المفتاح للوضع التجريبي لهذه الجلسة فقط', 'success');
+  };
+
+  window.runDemoSimulatedVisionAnalysis = function() {
+    if (!KSUAI._isDemoSession()) return;
+    if (Array.isArray(window.visionImagesList) && window.visionImagesList.length > 0 && (!visionImagesList || visionImagesList.length === 0)) {
+      visionImagesList = window.visionImagesList;
+    }
+    if (!visionImagesList || visionImagesList.length === 0) {
+      alert('يرجى التقاط أو اختيار صورة واحدة على الأقل لتشغيل المحاكاة التجريبية.');
+      return;
+    }
+    const building = document.getElementById('sel-vision-building')?.value || 'المستشفى';
+    const floor = document.getElementById('inp-vision-floor')?.value || '';
+    const room = document.getElementById('inp-vision-room')?.value || '';
+    const type = document.getElementById('sel-vision-type')?.value || 'general';
+    const notes = document.getElementById('inp-vision-notes')?.value || '';
+    const activeSubmode = currentVisionSubmode || 'general';
+
+    const simRes = KSUAI.heuristicVisualAnalysis({
+      checklistType: type,
+      submode: activeSubmode,
+      itemLabel: room ? `${floor} - ${room}` : floor,
+      facility: 'المدينة الطبية (KSUMC)',
+      building,
+      floor,
+      notes,
+      fallbackReason: 'demo_simulation'
+    });
+    const d = KSUAI.applyStaticReferenceMapping(simRes.data || {}, activeSubmode);
+    d.images_count = visionImagesList.length;
+    d.submode = d.pattern || activeSubmode;
+    d.ai_engine_source = 'Demo Simulation Mode';
+    d._isDemoSimulated = true;
+    lastVisionAnalysisData = d;
+    lastVisionAnalysisImage = visionImagesList[0];
+    lastVisionAnalysisImages = [...visionImagesList];
+    window.lastVisionAnalysisData = d;
+    window.lastVisionAnalysisImage = lastVisionAnalysisImage;
+    window.lastVisionAnalysisImages = lastVisionAnalysisImages;
+    window.lastVisionLocation = { building, floor, room, type, notes, submode: activeSubmode };
+    renderVisionInspectionResults(d, building, floor, room);
   };
 
   /**
@@ -3618,7 +4148,7 @@
       if (!res || !res.success || !res.data) {
         const errorMsg = (res && (res.error || res.user_message || res.message)) ||
           'تعذر الاتصال بخادم الذكاء الاصطناعي أو استغرق الفحص وقتاً أطول من المتوقع، يرجى إعادة المحاولة أو التحقق من الاتصال';
-        renderVisionInspectionError(errorMsg, building, floor, room);
+        renderVisionInspectionError(errorMsg, building, floor, room, res || null);
         return;
       }
 
@@ -3637,7 +4167,10 @@
     } catch (err) {
       console.warn('[KSUAI] AI vision error caught:', err.message);
       const errorMsg = err.message || 'تعذر الاتصال بخادم الذكاء الاصطناعي أو استغرق الفحص وقتاً أطول من المتوقع، يرجى إعادة المحاولة أو التحقق من الاتصال';
-      renderVisionInspectionError(errorMsg, building, floor, room);
+      const errMeta = (err && err.name === 'Error' && String(err.message || '').includes('Timeout'))
+        ? { error_code: 'ERR_TIMEOUT', diagnostic_detail: err.message }
+        : (KSUAI._lastVisionErrorInfo ? { error_code: KSUAI._lastVisionErrorInfo.errorCode, diagnostic_detail: KSUAI._lastVisionErrorInfo.diagnosticDetail } : null);
+      renderVisionInspectionError(errorMsg, building, floor, room, errMeta);
     } finally {
       if (progressTimer) clearInterval(progressTimer);
       if (laser) laser.classList.add('hidden');
@@ -3652,14 +4185,14 @@
   window.toggleVisionAgentSettingsPanel = function() {};
   window.testAndSaveVisionAgentConfig = async function() {};
 
-  function renderVisionInspectionError(errorMessage, building, floor, room) {
+  function renderVisionInspectionError(errorMessage, building, floor, room, meta = null) {
     const resultsArea = document.getElementById('vision-results-area');
     if (!resultsArea) return;
 
+    const isDemo = Boolean(KSUAI && typeof KSUAI._isDemoSession === 'function' && KSUAI._isDemoSession());
     try {
       if (typeof window !== 'undefined' && window.visionImagesList && window.visionImagesList.length) {
-        const drafts = JSON.parse(localStorage.getItem('ksu_offline_vision_drafts') || '[]');
-        drafts.push({
+        const draftRecord = {
           id: 'draft_' + Date.now(),
           timestamp: Date.now(),
           images: window.visionImagesList,
@@ -3667,38 +4200,80 @@
           floor: floor || '',
           room: room || '',
           submode: window.currentVisionSubmode || 'general',
-          error: errorMessage
-        });
-        localStorage.setItem('ksu_offline_vision_drafts', JSON.stringify(drafts.slice(-20)));
+          error: errorMessage,
+          errorCode: (meta && meta.error_code) || ''
+        };
+        if (isDemo && typeof sessionStorage !== 'undefined') {
+          const drafts = JSON.parse(sessionStorage.getItem('demo_ksu_offline_vision_drafts') || '[]');
+          drafts.push(draftRecord);
+          sessionStorage.setItem('demo_ksu_offline_vision_drafts', JSON.stringify(drafts.slice(-20)));
+        } else if (!isDemo && typeof localStorage !== 'undefined') {
+          const drafts = JSON.parse(localStorage.getItem('ksu_offline_vision_drafts') || '[]');
+          drafts.push(draftRecord);
+          localStorage.setItem('ksu_offline_vision_drafts', JSON.stringify(drafts.slice(-20)));
+        }
       }
     } catch (_) {}
 
+    const errCode = (meta && meta.error_code) || '';
+    const diagDetail = (meta && meta.diagnostic_detail) ? String(meta.diagnostic_detail) : '';
     const safeMessage = errorMessage || 'تعذر الاتصال بخادم الذكاء الاصطناعي أو استغرق الفحص وقتاً أطول من المتوقع، يرجى إعادة المحاولة أو التحقق من الاتصال';
+
+    let errIcon = 'wifi_off';
+    let errBadge = 'تنبيه اتصال';
+    let errSubtitle = 'حالة التحليل الميداني';
+    if (errCode === 'ERR_NO_AI_KEYS' || errCode === 'ERR_CLOUD_AUTH_REQUIRED' || errCode === 'ERR_GEMINI_AUTH_401_403') {
+      errIcon = 'vpn_key_off';
+      errBadge = 'تنبيه مفاتيح AI';
+      errSubtitle = errCode === 'ERR_GEMINI_AUTH_401_403' ? 'مفتاح مرفوض (401/403)' : 'مفاتيح التشغيل غير مفعّلة';
+    } else if (errCode === 'ERR_QUOTA_EXHAUSTED_429') {
+      errIcon = 'hourglass_disabled';
+      errBadge = 'نفاد الحصة (429)';
+      errSubtitle = 'تجاوز حد الاستخدام المؤقت';
+    } else if (errCode === 'ERR_TIMEOUT') {
+      errIcon = 'timer_off';
+      errBadge = 'مهلة الاستجابة';
+      errSubtitle = 'تجاوز وقت الانتظار';
+    } else if (errCode === 'ERR_INVALID_JSON') {
+      errIcon = 'data_alert';
+      errBadge = 'استجابة غير مكتملة';
+      errSubtitle = 'تعذر تحليل مخرجات النموذج';
+    }
+
+    const escapeErr = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
     resultsArea.innerHTML = `
       <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-amber-950/80 via-slate-900 to-slate-900 text-white border border-amber-500/40 shadow-lg space-y-3">
         <div class="flex items-start gap-3">
           <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center shrink-0 text-amber-400">
-            <span class="material-symbols-outlined text-2xl">wifi_off</span>
+            <span class="material-symbols-outlined text-2xl">${errIcon}</span>
           </div>
           <div class="space-y-1 flex-1">
-            <div class="flex items-center gap-2">
-              <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-black border border-amber-400/30">تنبيه اتصال</span>
-              <span class="text-xs text-slate-300 font-semibold">حالة التحليل الميداني</span>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[11px] font-black border border-amber-400/30">${errBadge}</span>
+              <span class="text-xs text-slate-300 font-semibold">${errSubtitle}</span>
+              ${errCode ? `<span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-mono text-[10px]">${escapeErr(errCode)}</span>` : ''}
             </div>
             <h4 class="text-base font-black text-amber-300">تعذر استكمال التحليل الآلي للرؤية البصرية</h4>
-            <p class="text-xs text-slate-200 leading-relaxed font-medium">${safeMessage}</p>
+            <p class="text-xs text-slate-200 leading-relaxed font-medium">${escapeErr(safeMessage)}</p>
+            ${diagDetail ? `<p class="text-[10px] text-slate-400 font-mono" dir="ltr">${escapeErr(diagDetail)}</p>` : ''}
             <p class="text-[11px] text-emerald-300 font-semibold mt-1">
-              ✅ تم حفظ الصورة في المسودات المحلية لمزامنتها لاحقاً عند استقرار الاتصال.
+              ✅ تم حفظ الصورة في ${isDemo ? 'مسودات الجلسة التجريبية المؤقتة' : 'المسودات المحلية لمزامنتها لاحقاً'}.
             </p>
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-700/60">
-          <button type="button" onclick="runVisionModalAnalysis()" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-black transition flex items-center gap-1.5 shadow">
+          <button type="button" onclick="runVisionModalAnalysis()" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-black transition flex items-center gap-1.5 shadow cursor-pointer">
             <span class="material-symbols-outlined text-sm">refresh</span>
             <span>إعادة المحاولة الآن</span>
           </button>
-          <button type="button" onclick="openManualViolationFromDraft()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-600 transition flex items-center gap-1.5">
+          ${isDemo ? `
+            <button type="button" onclick="runDemoSimulatedVisionAnalysis()" class="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-black transition flex items-center gap-1.5 shadow cursor-pointer">
+              <span class="material-symbols-outlined text-sm">science</span>
+              <span>تشغيل محاكاة تجريبية للعرض (Demo)</span>
+            </button>
+          ` : ''}
+          <button type="button" onclick="openManualViolationFromDraft()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-600 transition flex items-center gap-1.5 cursor-pointer">
             <span class="material-symbols-outlined text-sm">edit_note</span>
             <span>توثيق الملاحظة يدوياً في الجولة</span>
           </button>
@@ -3788,7 +4363,9 @@
             <span class="px-2.5 py-0.5 rounded-full ${badgeClass} text-[11px] font-black">${status}</span>
             <span class="text-xs text-white/80 font-bold">${standard_reference}</span>
             <span class="px-2 py-0.5 rounded-full bg-white/10 text-amber-300 text-[10px] font-black">دقة التحليل: ${confidence}%</span>
-            <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] font-black">تدقيق ذكي معتمد ✅</span>
+            ${d._isDemoSimulated
+              ? '<span class="px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 text-[10px] font-black">معاينة تجريبية محاكاة (Demo)</span>'
+              : '<span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-[10px] font-black">تدقيق ذكي معتمد ✅</span>'}
           </div>
           <div class="mt-2 space-y-1">
             <div class="flex items-center gap-1.5 text-xs font-black text-amber-400">
@@ -4360,12 +4937,15 @@
     const room = document.getElementById('inp-vision-room')?.value || window.lastVisionLocation?.room || 'الموقع العام';
     const loc = { building, floor, room, type: 'general' };
 
+    const isDemo = Boolean(KSUAI && typeof KSUAI._isDemoSession === 'function' && KSUAI._isDemoSession());
+
     let currentUser = null;
     try {
       currentUser =
         (window.KSUAuth && typeof window.KSUAuth.getUser === 'function' && window.KSUAuth.getUser()) ||
         (window.KSUAuth && window.KSUAuth.currentUser) ||
         (window.state && window.state.currentUser) ||
+        (typeof sessionStorage !== 'undefined' && JSON.parse(sessionStorage.getItem('ksu_active_user') || 'null')) ||
         JSON.parse(localStorage.getItem('ksu_active_user') || 'null') ||
         JSON.parse(localStorage.getItem('ksu_user') || '{}') ||
         {};
@@ -4397,8 +4977,8 @@
 
     const locationLabel = [building, floor].filter(Boolean).join(' - ') || 'المبنى الرئيسي';
 
-    // 0. حفظ النسخة الأصلية عالية الدقة (1280px) في خزنة المتصفح وخزنة وكيل الرؤية السحابي
-    if (window.KSUMediaVault && highResImages.length) {
+    // 0. حفظ النسخة الأصلية عالية الدقة (1280px) في خزنة المتصفح وخزنة الوكيل المخصصة للوضع الرسمي فقط
+    if (!isDemo && window.KSUMediaVault && highResImages.length) {
       await window.KSUMediaVault.saveMedia(cardRes.cardId, highResImages, {
         date: today,
         facility: building,
@@ -4406,7 +4986,7 @@
         room
       });
     }
-    if (KSUAI && typeof KSUAI.archiveVisualViolationBundle === 'function' && highResImages.length) {
+    if (!isDemo && KSUAI && typeof KSUAI.archiveVisualViolationBundle === 'function' && highResImages.length) {
       KSUAI.archiveVisualViolationBundle({
         cardId: cardRes.cardId,
         date: today,
@@ -4464,7 +5044,7 @@
       isApproved: true,
       photo: thumbPrimary,
       images: thumbImages,
-      highResVaulted: true,
+      highResVaulted: !isDemo,
       visionData: d,
       hasVisualInspectionCard: true,
       pdfGenerated: true,
@@ -4474,20 +5054,28 @@
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       updatedAtMs: Date.now(),
-      _isOfflinePending: true
+      _isOfflinePending: !isDemo,
+      _isDemo: isDemo || undefined
     };
     if (window.KSUDataBridge && typeof window.KSUDataBridge.stampViolationOwnership === 'function') {
       newViol = window.KSUDataBridge.stampViolationOwnership(newViol, currentUser);
     }
 
-    // 1. حفظ في التخزين المحلي لسجل المخالفات
+    // 1. حفظ في التخزين المحلي لسجل المخالفات (أو sessionStorage المعزول في الوضع التجريبي)
     try {
-      let viols = JSON.parse(localStorage.getItem('ksumc_safety_violations') || '[]');
-      viols = viols.filter(x => x.id !== newViol.id);
-      viols.unshift(newViol);
-      localStorage.setItem('ksumc_safety_violations', JSON.stringify(viols));
+      if (isDemo && typeof sessionStorage !== 'undefined') {
+        let demoViols = JSON.parse(sessionStorage.getItem('demo_ksumc_safety_violations') || '[]');
+        demoViols = demoViols.filter(x => x.id !== newViol.id);
+        demoViols.unshift(newViol);
+        sessionStorage.setItem('demo_ksumc_safety_violations', JSON.stringify(demoViols));
+      } else if (!isDemo && typeof localStorage !== 'undefined') {
+        let viols = JSON.parse(localStorage.getItem('ksumc_safety_violations') || '[]');
+        viols = viols.filter(x => x.id !== newViol.id);
+        viols.unshift(newViol);
+        localStorage.setItem('ksumc_safety_violations', JSON.stringify(viols));
+      }
     } catch (e) {
-      console.error('Error saving violation to localStorage', e);
+      console.error('Error saving violation to storage', e);
     }
 
     // 2. تحديث الحالة العامة في البوابة الميدانية إن وُجدت
@@ -4504,18 +5092,18 @@
       try { window.updateViolationBadges(); } catch(e) {}
     }
 
-    // 3. مزامنة مع جسر البيانات الموحد (Data Bridge)
+    // 3. مزامنة مع جسر البيانات الموحد (Data Bridge — معزول تلقائياً في الوضع التجريبي)
     if (window.KSUDataBridge && typeof window.KSUDataBridge.saveSafetyViolation === 'function') {
       try { window.KSUDataBridge.saveSafetyViolation(newViol); } catch(e) {}
     }
 
-    // 5. مزامنة مع سحابة فايربيس اللحظية
-    if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncSafetyViolation === 'function') {
+    // 5. مزامنة مع سحابة فايربيس اللحظية (للجلسات الرسمية فقط)
+    if (!isDemo && window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncSafetyViolation === 'function') {
       try { window.ksuFirebaseSync.syncSafetyViolation(newViol); } catch(e) {}
     }
 
-    // 6. بث إشعار فوري للغرف العمليات الميدانية
-    if (window.KSU_SYNC && typeof window.KSU_SYNC.broadcastMessage === 'function') {
+    // 6. بث إشعار فوري لغرف العمليات الميدانية (للجلسات الرسمية فقط)
+    if (!isDemo && window.KSU_SYNC && typeof window.KSU_SYNC.broadcastMessage === 'function') {
       try {
         window.KSU_SYNC.broadcastMessage('safety_violation_approved', {
           id: newViol.id,
@@ -4526,12 +5114,12 @@
     }
 
     // 7. تحديث جدول الأرشيف الشامل فوراً إن كانت البوابة الإدارية نشطة
-    if (typeof window.renderHeadMasterArchive === 'function') {
+    if (!isDemo && typeof window.renderHeadMasterArchive === 'function') {
       try { window.renderHeadMasterArchive(); } catch(e) {}
     }
 
     // 8. عرض حالة النجاح داخل النافذة وتوفير خيارات المعاينة والطباعة المباشرة
-    const resultsArea = document.getElementById('ai-vision-results');
+    const resultsArea = document.getElementById('ai-vision-results') || document.getElementById('vision-results-area');
     if (resultsArea) {
       resultsArea.innerHTML = `
         <div class="p-5 sm:p-6 rounded-2xl bg-emerald-50 border-2 border-emerald-500 text-center space-y-4 shadow-lg animate-fade-in">
@@ -4539,12 +5127,14 @@
             <span class="material-symbols-outlined text-3xl">verified</span>
           </div>
           <div>
-            <h3 class="text-base sm:text-lg font-black text-emerald-950">تم اعتماد ورفع المخالفة وحفظ كارت الفحص بنجاح</h3>
+            <h3 class="text-base sm:text-lg font-black text-emerald-950">${isDemo ? 'تم حفظ المخالفة في الجلسة التجريبية (Demo) بنجاح' : 'تم اعتماد ورفع المخالفة وحفظ كارت الفحص بنجاح'}</h3>
             <div class="inline-block mt-1 px-3 py-1 rounded-lg bg-emerald-200/70 border border-emerald-400 text-emerald-900 font-mono font-bold text-xs">
               الرقم المرجعي المعتمد: ${newViol.id}
             </div>
             <p class="text-xs text-slate-600 mt-2 max-w-lg mx-auto leading-relaxed">
-              تم إدراج المخالفة تلقائياً في <strong>سجلات الأرشيف الشامل</strong> بصيغة PDF بنفس تصميم كارت الفحص، ومتاحة للمعاينة والطباعة في بوابة الإدارة.
+              ${isDemo
+                ? 'تم الحفظ في ذاكرة الجلسة التجريبية المؤقتة فقط (sessionStorage) دون المساس بقاعدة البيانات أو السجلات الرسمية.'
+                : 'تم إدراج المخالفة تلقائياً في <strong>سجلات الأرشيف الشامل</strong> بصيغة PDF بنفس تصميم كارت الفحص، ومتاحة للمعاينة والطباعة في بوابة الإدارة.'}
             </p>
           </div>
           <div class="flex items-center justify-center gap-2.5 pt-2 flex-wrap">
@@ -4571,7 +5161,7 @@
     toast.innerHTML = `
       <span class="material-symbols-outlined text-emerald-400 text-2xl">verified</span>
       <div>
-        <div class="font-black text-xs text-white">تم اعتماد ورفع المخالفة وحفظ كارت الفحص (PDF) في الأرشيف!</div>
+        <div class="font-black text-xs text-white">${isDemo ? 'تم الحفظ في الجلسة التجريبية (Demo) فقط!' : 'تم اعتماد ورفع المخالفة وحفظ كارت الفحص (PDF) في الأرشيف!'}</div>
         <div class="text-[11px] font-mono text-emerald-300">الرقم المرجعي: ${newViol.id}</div>
       </div>
     `;
@@ -4588,6 +5178,11 @@
   window.broadcastVisualHazardAlert = function() {
     const d = lastVisionAnalysisData;
     if (!d) return;
+
+    if (KSUAI && typeof KSUAI._isDemoSession === 'function' && KSUAI._isDemoSession()) {
+      alert('وضع العرض التجريبي: تم عرض تنبيه الخطر محلياً فقط دون بث لغرف العمليات الرسمية.');
+      return;
+    }
 
     if (window.KSU_SYNC && typeof window.KSU_SYNC.broadcastMessage === 'function') {
       window.KSU_SYNC.broadcastMessage('ai_hazard_detected', {
@@ -6044,9 +6639,15 @@
       }
     }
 
-    const geminiKeys = (typeof KSUAI.getGeminiKeys === 'function')
+    let geminiKeys = (typeof KSUAI.getGeminiKeys === 'function')
       ? KSUAI.getGeminiKeys()
-      : ((KSUAI.geminiApiKey || '').split(',').map(k => k.trim()).filter(k => k && !k.includes('AQ.Ab8RN6K')));
+      : KSUAI.getSanitizedKeys(KSUAI.geminiApiKey || '');
+    if (!geminiKeys.length && typeof KSUAI.fetchCloudKeysSilently === 'function') {
+      await KSUAI.fetchCloudKeysSilently();
+      geminiKeys = (typeof KSUAI.getGeminiKeys === 'function')
+        ? KSUAI.getGeminiKeys()
+        : KSUAI.getSanitizedKeys(KSUAI.geminiApiKey || '');
+    }
 
     if (geminiKeys.length > 0) {
       const promptText = `أنت خبير واستشاري السلامة والصحة المهنية بالمدينة الطبية بجامعة الملك سعود (KSUMC).
@@ -6141,10 +6742,26 @@
   // إتاحة الكائن عالمياً
   window.KSUAI = KSUAI;
 
-  // جلب المفاتيح السحابية فور تحميل المنظومة بصمت تام في الخلفية
+  // جلب المفاتيح السحابية فور تحميل المنظومة وعند تحديث جلسة Firebase بصمت تام في الخلفية
   try {
     if (typeof KSUAI.fetchCloudKeysSilently === 'function') {
-      KSUAI.fetchCloudKeysSilently().catch(() => {});
+      KSUAI.fetchCloudKeysSilently().then(() => {
+        if (typeof window.updateVisionReadinessBadge === 'function') {
+          window.updateVisionReadinessBadge();
+        }
+      }).catch(() => {});
+    }
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('ksumc_firebase_claims_updated', (ev) => {
+        const detail = ev && ev.detail ? ev.detail : null;
+        if (detail && !detail.isAnonymous && typeof KSUAI.fetchCloudKeysSilently === 'function') {
+          KSUAI.fetchCloudKeysSilently().then(() => {
+            if (typeof window.updateVisionReadinessBadge === 'function') {
+              window.updateVisionReadinessBadge();
+            }
+          }).catch(() => {});
+        }
+      });
     }
   } catch (_) {}
 

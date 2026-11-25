@@ -198,7 +198,7 @@
       employeeId: 'Q1',
       username: 'Q1',
       altUsername: 'alsaqri',
-      email: 'aalsaqri@ksu.edu.sa',
+      email: 'q1@rsd-ksu.local',
       phone: '',
       role: 'مسؤول الجودة والاعتماد (CBAHI / JCI)',
       roleCategory: 'quality',

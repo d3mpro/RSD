@@ -68,11 +68,13 @@ test('3. Inspector UI Purity: No API Key Settings or Alerts in field.html or adm
 test('4. Multi-Model Silent Fallback Chain (2026 Active Models) & Quota-Shield in ksu-ai-client.js', (t) => {
   const ksuClientJs = fs.readFileSync(path.join(__dirname, '../assets/js/ksu-ai-client.js'), 'utf8');
 
-  // Active 2026 model hierarchy check (no retired gemini-2.0-flash / gemini-2.0-flash-lite)
+  // Active 2026 model hierarchy check (no retired gemini-2.0-flash / gemini-2.5-flash)
   assert.ok(ksuClientJs.includes("MODELS_HIERARCHY: ["), 'Must define MODELS_HIERARCHY array on KSUAI');
   assert.ok(ksuClientJs.includes("'gemini-3.5-flash-lite'"), 'MODELS_HIERARCHY must start with gemini-3.5-flash-lite');
+  assert.ok(ksuClientJs.includes("'gemini-3.1-flash-lite'"), 'MODELS_HIERARCHY must include gemini-3.1-flash-lite');
+  assert.ok(ksuClientJs.includes("'gemini-3.6-flash'"), 'MODELS_HIERARCHY must include gemini-3.6-flash');
   assert.ok(ksuClientJs.includes("'gemini-3.8-flash'"), 'MODELS_HIERARCHY must include gemini-3.8-flash');
-  assert.ok(ksuClientJs.includes("'gemini-2.5-flash-lite'"), 'MODELS_HIERARCHY must include gemini-2.5-flash-lite');
+  assert.ok(ksuClientJs.includes("'gemini-4-hydrogen'"), 'MODELS_HIERARCHY must include gemini-4-hydrogen');
 
   // Quota-Shield capabilities
   assert.ok(ksuClientJs.includes('_computeVisionCacheKey'), 'Must implement image fingerprint caching');
@@ -215,15 +217,15 @@ test('6. Quota-Shield Runtime: Image cache prevents duplicate API calls, 429 coo
   const ctx = createQuotaShieldSandbox(mockFetch);
   ctx.window.KSUAI.saveAgentConfig({ geminiApiKeys: 'key_1' });
 
-  // Call 1: hits 429 on gemini-3.5-flash-lite, automatically fails over to gemini-3.8-flash
+  // Call 1: hits 429 on gemini-3.5-flash-lite, automatically fails over to gemini-3.1-flash-lite
   const res1 = await ctx.window.KSUAI.analyzeInspectionImage({
     image: 'data:image/jpeg;base64,AAAA1111',
     submode: 'emergency_exit',
     building: 'المستشفى'
   });
   assert.equal(res1.success, true);
-  assert.equal(res1.source, 'Google gemini-3.8-flash Vision');
-  assert.equal(fetchCalls.length, 2, 'Should try 3.5-flash-lite (429) then succeed on 3.8-flash');
+  assert.equal(res1.source, 'Google gemini-3.1-flash-lite Vision');
+  assert.equal(fetchCalls.length, 2, 'Should try 3.5-flash-lite (429) then succeed on 3.1-flash-lite');
 
   // Verify prompt deduplication & token cap
   const firstReqBody = fetchCalls[0].body;
@@ -231,7 +233,7 @@ test('6. Quota-Shield Runtime: Image cache prevents duplicate API calls, 429 coo
   const userText = firstReqBody.contents[0].parts.find(p => p.text).text;
   assert.ok(sysText.includes('كبير مفتشي السلامة'), 'System instruction must carry VISION_SYSTEM_PROMPT');
   assert.ok(!userText.includes('كبير مفتشي السلامة'), 'User prompt must NOT duplicate VISION_SYSTEM_PROMPT');
-  assert.equal(firstReqBody.generationConfig.maxOutputTokens, 700, 'Must cap maxOutputTokens to save quota');
+  assert.equal(firstReqBody.generationConfig.maxOutputTokens, 2048, 'Must allow 2048 maxOutputTokens for thinking + Arabic JSON');
   assert.equal(firstReqBody.generationConfig.thinkingConfig.thinkingLevel, 'MINIMAL', '3.5-flash-lite should use MINIMAL thinking');
 
   // Call 2: EXACT SAME IMAGE -> 0 API calls (served from local fingerprint cache!)
@@ -244,19 +246,250 @@ test('6. Quota-Shield Runtime: Image cache prevents duplicate API calls, 429 coo
   assert.equal(res2.cached, true, 'Second identical call must be served from cache');
   assert.equal(fetchCalls.length, 2, 'Cached call must make ZERO additional API requests');
 
-  // Call 3: DIFFERENT IMAGE -> must SKIP cooling-down (gemini-3.5-flash-lite, key_1) and go straight to gemini-3.8-flash!
+  // Call 3: DIFFERENT IMAGE -> must SKIP cooling-down (gemini-3.5-flash-lite, key_1) and go straight to gemini-3.1-flash-lite!
   const res3 = await ctx.window.KSUAI.analyzeInspectionImage({
     image: 'data:image/jpeg;base64,BBBB2222',
     submode: 'extinguisher',
     building: 'العيادات'
   });
   assert.equal(res3.success, true);
-  assert.equal(res3.source, 'Google gemini-3.8-flash Vision');
+  assert.equal(res3.source, 'Google gemini-3.1-flash-lite Vision');
   assert.equal(fetchCalls.length, 3, 'Cooldown circuit-breaker must skip rate-limited 3.5-flash-lite in 1 call');
-  assert.ok(fetchCalls[2].url.includes('gemini-3.8-flash'), 'Call 3 must go straight to healthy gemini-3.8-flash');
+  assert.ok(fetchCalls[2].url.includes('gemini-3.1-flash-lite'), 'Call 3 must go straight to healthy gemini-3.1-flash-lite');
 
   const stats = ctx.window.KSUAI.getQuotaShieldStats();
   assert.equal(stats.cacheHits, 1, 'Must record 1 cache hit');
   assert.ok(stats.cooldownSkips >= 1, 'Must record at least 1 cooldown skip');
+});
+
+// 7. M1 Regression: AQ.* keys, iOS invisible Unicode stripping & exact leaked key SHA-256 rejection
+test('7. M1 Regression: AQ.* keys & iOS invisible Unicode stripped, exact leaked key rejected in ksu-ai-client.js and api.html', () => {
+  const ctx = createQuotaShieldSandbox(async () => ({ ok: true, status: 200, json: async () => ({}) }));
+  const exactLeaked = ['AQ.Ab8RN6K', '-cWBO2DLr-uuccKEbUvakPdEhwL9qMV4DMjeYggHF0w'].join('');
+  const iOSDirty = `\u200F\uFEFF AQ.Ab8RN6K_ProjA_Test01\u200B \n  AQ.Ab8RN6K_ProjB_Test02; ${exactLeaked}`;
+
+  const clientClean = Array.from(ctx.window.KSUAI.getSanitizedKeys(iOSDirty));
+  assert.deepEqual(clientClean, ['AQ.Ab8RN6K_ProjA_Test01', 'AQ.Ab8RN6K_ProjB_Test02']);
+  assert.equal(ctx.window.KSUAI._isLegacyLeakedKey(exactLeaked), true, 'Exact leaked key SHA-256 must match');
+  assert.equal(ctx.window.KSUAI._isLegacyLeakedKey('AQ.Ab8RN6K_ProjA_Test01'), false, 'Separate GCP project AQ.* key must NOT match leaked SHA-256');
+
+  // Verify api.html parseInputKeys parity
+  const vm = require('node:vm');
+  const apiHtml = fs.readFileSync(path.join(__dirname, '../api.html'), 'utf8');
+  const extractFn = (src, sig) => {
+    const start = src.indexOf(sig);
+    assert.ok(start !== -1, `${sig} must exist in api.html`);
+    let i = src.indexOf('{', start);
+    let depth = 0;
+    for (; i < src.length; i++) {
+      if (src[i] === '{') depth++;
+      else if (src[i] === '}') {
+        depth--;
+        if (depth === 0) return src.slice(start, i + 1);
+      }
+    }
+    throw new Error(`Unclosed function ${sig}`);
+  };
+  const leakedConstMatch = apiHtml.match(/const LEGACY_LEAKED_KEY_SHA256 = '[^']+';/);
+  assert.ok(leakedConstMatch, 'api.html must define LEGACY_LEAKED_KEY_SHA256');
+  const shaFn = extractFn(apiHtml, 'function sha256Hex(');
+  const parseFn = extractFn(apiHtml, 'function parseInputKeys(');
+  const apiCtx = vm.createContext({ Array, Set, String, Math });
+  vm.runInContext(`${leakedConstMatch[0]}\n${shaFn}\n${parseFn}\nglobalThis.parseInputKeys = parseInputKeys;`, apiCtx);
+
+  const vaultClean = Array.from(apiCtx.parseInputKeys(iOSDirty));
+  assert.deepEqual(vaultClean, ['AQ.Ab8RN6K_ProjA_Test01', 'AQ.Ab8RN6K_ProjB_Test02']);
+});
+
+// 8. M1 Regression: database.rules.json system_config RBAC structure
+test('8. M1 Regression: database.rules.json permits staff read of ai_keys while locking system_config writes & admin_auth to admin|developer', () => {
+  const rulesRaw = fs.readFileSync(path.join(__dirname, '../database.rules.json'), 'utf8');
+  const rules = JSON.parse(rulesRaw);
+  const sysCfg = rules?.rules?.system_config;
+  assert.ok(sysCfg, 'system_config rules node must exist');
+
+  assert.ok(sysCfg['.read'].includes("auth.token.role == 'admin'") && sysCfg['.read'].includes("auth.token.role == 'developer'"));
+  assert.ok(!sysCfg['.read'].includes('field_inspector'), 'Top-level system_config read must NOT expose all nodes to inspectors');
+  assert.ok(sysCfg['.write'].includes("auth.token.role == 'admin'") && sysCfg['.write'].includes("auth.token.role == 'developer'"));
+
+  const aiKeysRead = sysCfg.ai_keys['.read'];
+  for (const role of ['head', 'admin', 'developer', 'executive', 'quality', 'shift_supervisor', 'field_inspector']) {
+    assert.ok(aiKeysRead.includes(`'${role}'`), `system_config/ai_keys .read must include ${role}`);
+  }
+  assert.ok(!sysCfg.ai_keys['.write'].includes('field_inspector'), 'system_config/ai_keys .write must remain restricted');
+
+  assert.ok(sysCfg.admin_auth['.read'].includes("auth.token.role == 'admin'") && !sysCfg.admin_auth['.read'].includes('field_inspector'));
+  assert.ok(sysCfg.admin_auth['.write'].includes("auth.token.role == 'admin'") && !sysCfg.admin_auth['.write'].includes('field_inspector'));
+});
+
+// 9. M1 Regression: api.html Firebase DEV/admin Auth, ?auth= parameter, and honest failure banners
+test('9. M1 Regression: api.html wires Firebase Auth ID token (?auth=), probe reminder, and honest failure status alert', () => {
+  const apiHtml = fs.readFileSync(path.join(__dirname, '../api.html'), 'utf8');
+  assert.ok(apiHtml.includes('firebase-app-compat.js'), 'api.html must load firebase-app-compat.js');
+  assert.ok(apiHtml.includes('firebase-auth-compat.js'), 'api.html must load firebase-auth-compat.js');
+  assert.ok(apiHtml.includes('ksu-firebase-config.js'), 'api.html must load ksu-firebase-config.js');
+  assert.ok(apiHtml.includes('id="firebase-inline-signin-panel"'), 'api.html must render Firebase sign-in panel for unauthenticated admins');
+  assert.ok(apiHtml.includes('id="cloud-sync-status-alert"'), 'api.html must expose honest cloud sync error alert banner');
+  assert.ok(apiHtml.includes('id="verify-save-reminder"'), 'api.html must remind operator to save centrally after probe');
+  assert.ok(apiHtml.includes('async function getAdminFirebaseIdToken()'), 'api.html must acquire Firebase ID token');
+  assert.ok(apiHtml.includes('?auth=${encodeURIComponent(idToken)}'), 'api.html must attach ?auth=<idToken> on RTDB requests');
+  assert.ok(!apiHtml.includes('تم الحفظ محلياً (مؤقتاً) رغم تعذر'), 'api.html must never mask RTDB failure as fake green success toast');
+});
+
+// 10. M1 Regression: !p.thought extraction, 400 API_KEY_INVALID cooldown, and honest error_code telemetry
+test('10. M1 Regression: callGeminiDirectly extracts non-thought parts, cools down 400 API_KEY_INVALID, and sets exact error_code values', async () => {
+  // 10a: Multi-part thought filtering -> picks non-thought JSON part
+  const ctxThought = createQuotaShieldSandbox(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      candidates: [{
+        content: {
+          parts: [
+            { text: 'Thinking step: evaluating hazard...', thought: true },
+            { text: '{"status":"مخالفة","title":"مخرج طوارئ مغلق","summary":"تم حجب المخرج بكراتين","severity":"high"}' }
+          ]
+        }
+      }]
+    })
+  }));
+  ctxThought.window.KSUAI.saveAgentConfig({ geminiApiKeys: 'AQ.Ab8RN6K_ThoughtKey_01' });
+  const thoughtRes = await ctxThought.window.KSUAI.analyzeInspectionImage({ image: 'data:image/jpeg;base64,VEVTVF9USE9VR0hU' });
+  assert.equal(thoughtRes.success, true);
+  assert.equal(thoughtRes.data.title, 'مخرج طوارئ مغلق');
+
+  // 10b: HTTP 400 API_KEY_INVALID skips key immediately across models & surfaces ERR_GEMINI_AUTH_401_403
+  let invalidKeyCalls = 0;
+  const ctxInvalid = createQuotaShieldSandbox(async (url) => {
+    if (url.includes('generativelanguage.googleapis.com')) {
+      invalidKeyCalls++;
+      return {
+        ok: false,
+        status: 400,
+        text: async () => JSON.stringify({
+          error: {
+            code: 400,
+            message: 'API key not valid. Please pass a valid API key.',
+            status: 'INVALID_ARGUMENT',
+            details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'API_KEY_INVALID' }]
+          }
+        })
+      };
+    }
+    throw new Error('Unexpected URL');
+  });
+  ctxInvalid.window.KSUAI.saveAgentConfig({ geminiApiKeys: 'bad_key_only' });
+  const authFailRes = await ctxInvalid.window.KSUAI.analyzeInspectionImage({ image: 'data:image/jpeg;base64,SU5WQUxJRF80MDA=' });
+  assert.equal(authFailRes.success, false);
+  assert.equal(authFailRes.error_code, 'ERR_GEMINI_AUTH_401_403');
+  assert.equal(invalidKeyCalls, 1, 'HTTP 400 API_KEY_INVALID must cool down bad_key_only across all remaining models (1 call, not 5)');
+
+  // 10c: Empty vault -> ERR_NO_AI_KEYS; unauthenticated vault 401 -> ERR_CLOUD_AUTH_REQUIRED; all 429 -> ERR_QUOTA_EXHAUSTED_429
+  const ctxEmpty = createQuotaShieldSandbox(async (url) => {
+    if (String(url).includes('firebaseio.com')) {
+      return { ok: true, status: 200, json: async () => null };
+    }
+    throw new Error('Should not fetch Gemini without keys');
+  });
+  const noKeyRes = await ctxEmpty.window.KSUAI.analyzeInspectionImage({ image: 'data:image/jpeg;base64,Tk9fS0VZ' });
+  assert.equal(noKeyRes.success, false);
+  assert.equal(noKeyRes.error_code, 'ERR_NO_AI_KEYS');
+
+  const ctxCloud401 = createQuotaShieldSandbox(async (url) => {
+    if (String(url).includes('firebaseio.com')) {
+      return { ok: false, status: 401, json: async () => ({ error: 'Permission denied' }) };
+    }
+    throw new Error('Should not fetch Gemini when cloud sync returned 401');
+  });
+  const cloudAuthRes = await ctxCloud401.window.KSUAI.analyzeInspectionImage({ image: 'data:image/jpeg;base64,Q0xPVURfNDAx' });
+  assert.equal(cloudAuthRes.success, false);
+  assert.equal(cloudAuthRes.error_code, 'ERR_CLOUD_AUTH_REQUIRED');
+
+  const ctxQuota = createQuotaShieldSandbox(async () => ({
+    ok: false,
+    status: 429,
+    text: async () => JSON.stringify({ error: { code: 429, message: 'Quota exceeded', details: [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '30s' }] } })
+  }));
+  ctxQuota.window.KSUAI.saveAgentConfig({ geminiApiKeys: 'quota_key_1' });
+  const quotaRes = await ctxQuota.window.KSUAI.analyzeInspectionImage({ image: 'data:image/jpeg;base64,UVVPVEFfNDI5' });
+  assert.equal(quotaRes.success, false);
+  assert.equal(quotaRes.error_code, 'ERR_QUOTA_EXHAUSTED_429');
+});
+
+// 11. M1 Regression: demo/demo Visual Observer runs with sessionStorage key and makes ZERO RTDB/localStorage writes
+test('11. M1 Regression: demo/demo Visual Observer uses sessionStorage isolation with zero RTDB fetches or localStorage writes', async () => {
+  const vm = require('node:vm');
+  const ksuClientJs = fs.readFileSync(path.join(__dirname, '../assets/js/ksu-ai-client.js'), 'utf8');
+  const mkStore = (init = {}) => {
+    const map = new Map(Object.entries(init));
+    return {
+      _map: map,
+      getItem: (k) => (map.has(k) ? map.get(k) : null),
+      setItem: (k, v) => map.set(k, String(v)),
+      removeItem: (k) => map.delete(k),
+      clear: () => map.clear(),
+      get length() { return map.size; }
+    };
+  };
+  const localStorage = mkStore();
+  const sessionStorage = mkStore({
+    ksu_active_user: JSON.stringify({ username: 'demo', role: 'field_inspector', isDemoAccount: true }),
+    demo_ksumc_gemini_api_keys: 'AQ.Ab8RN6K_DemoSessionKey_01'
+  });
+
+  let rtdbFetches = 0;
+  let geminiFetches = 0;
+  const ctx = vm.createContext({
+    console,
+    setTimeout,
+    clearTimeout,
+    TextEncoder,
+    AbortController,
+    URL,
+    localStorage,
+    sessionStorage,
+    navigator: { userAgent: 'NodeDemoTest', onLine: true },
+    location: { hostname: 'rsd-ksu.web.app', protocol: 'https:', href: 'https://rsd-ksu.web.app/field' },
+    document: {
+      createElement: () => ({ style: {}, classList: { add: () => {}, remove: () => {} }, setAttribute: () => {}, appendChild: () => {} }),
+      body: { appendChild: () => {} },
+      getElementById: () => null,
+      querySelectorAll: () => []
+    },
+    window: null,
+    fetch: async (url) => {
+      if (String(url).includes('firebaseio.com')) {
+        rtdbFetches++;
+        throw new Error('demo account must NEVER hit Firebase RTDB');
+      }
+      if (String(url).includes('generativelanguage.googleapis.com')) {
+        geminiFetches++;
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            candidates: [{ content: { parts: [{ text: '{"status":"مطابق","title":"تجربة معزولة","summary":"نجح الفحص التجريبي عبر sessionStorage","severity":"low"}' }] } }]
+          })
+        };
+      }
+      throw new Error('Unexpected fetch URL: ' + url);
+    }
+  });
+  ctx.window = ctx;
+  ctx.self = ctx;
+  vm.runInContext(ksuClientJs, ctx);
+
+  const cloudSynced = await ctx.window.KSUAI.fetchCloudKeysSilently();
+  assert.equal(cloudSynced, undefined, 'demo user fetchCloudKeysSilently must return early without syncing');
+  assert.equal(rtdbFetches, 0, 'demo user must perform ZERO Firebase RTDB fetches');
+
+  const keys = Array.from(ctx.window.KSUAI.getGeminiKeys());
+  assert.deepEqual(keys, ['AQ.Ab8RN6K_DemoSessionKey_01']);
+
+  const demoRes = await ctx.window.KSUAI.analyzeInspectionImage({ image: 'data:image/jpeg;base64,REVNTw==' });
+  assert.equal(demoRes.success, true);
+  assert.equal(geminiFetches, 1);
+  assert.equal(rtdbFetches, 0);
+  assert.equal(localStorage.length, 0, 'demo Visual Observer test must write ZERO keys to persistent localStorage');
 });
 

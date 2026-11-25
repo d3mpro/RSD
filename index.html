@@ -64,9 +64,9 @@
   <link rel="stylesheet" href="assets/css/styles.css?v=6.3" />
   <link rel="stylesheet" href="assets/css/core-theme.css?v=3.0" />
   <!-- Core & Auth -->
-  <script src="assets/js/auth-guard.js?v=6.0"></script>
+  <script src="assets/js/auth-guard.js?v=8.0.0"></script>
   <script src="assets/js/ksumc-data-bridge.js?v=6.3.1"></script>
-  <script src="assets/js/ksu-firebase-realtime.js?v=6.9.1"></script>
+  <script src="assets/js/ksu-firebase-realtime.js?v=8.0.0"></script>
 </head>
 
 <body class="bg-[#F4F7FA] font-cairo text-on-surface antialiased min-h-screen flex flex-col justify-between selection:bg-secondary-fixed selection:text-primary">
@@ -417,6 +417,17 @@
 
           // مصادقة Firebase الحقيقية (Email/Password + Custom Claims) مع ربط الرقم الوظيفي تلقائياً
           const isDemoLogin = Boolean(window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser(user));
+          if (!isDemoLogin && username.trim().toLowerCase() !== 'demo' && (typeof firebase === 'undefined' || typeof firebase.auth !== 'function')) {
+            if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.loadFirebaseSDK === 'function') {
+              await Promise.race([
+                window.ksuFirebaseSync.loadFirebaseSDK().catch(() => null),
+                new Promise(resolve => setTimeout(resolve, 4000))
+              ]);
+              if (typeof firebase !== 'undefined' && (!firebase.apps || !firebase.apps.length) && typeof window.ksuFirebaseSync.connectDatabase === 'function') {
+                window.ksuFirebaseSync.connectDatabase();
+              }
+            }
+          }
           if (!isDemoLogin && username.trim().toLowerCase() !== 'demo' && typeof firebase !== 'undefined' && typeof firebase.auth === 'function') {
             try {
               const typedLower = username.trim().toLowerCase();

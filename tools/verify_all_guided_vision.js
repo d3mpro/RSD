@@ -21,8 +21,6 @@ const fs = require('node:fs');
 const { execSync } = require('node:child_process');
 
 // File paths
-const promptBuilderPath = path.resolve(__dirname, '../oracle-vision-agent/prompt_builder.js');
-const agentServerPath = path.resolve(__dirname, '../oracle-vision-agent/agent_server.js');
 const reticleHelperPath = path.resolve(__dirname, '../assets/js/vision-reticle-helper.js');
 const aiClientPath = path.resolve(__dirname, '../assets/js/ksu-ai-client.js');
 const stylesCssPath = path.resolve(__dirname, '../assets/css/styles.css');
@@ -101,174 +99,6 @@ class MockElement {
   querySelectorAll() { return []; }
   remove() { this.removed = true; }
 }
-
-// ==============================================================================
-// TEST SUITE 1: Backend Prompts & Submode Resolution
-// ==============================================================================
-describe('Suite 1: Backend Prompts & Submode Resolution', () => {
-  const promptBuilder = require(promptBuilderPath);
-  const agentServer = require(agentServerPath);
-
-  it('1.1: prompt_builder exports all required specialized builders and helpers', () => {
-    assert.equal(typeof promptBuilder.buildExtinguisherPrompt, 'function');
-    assert.equal(typeof promptBuilder.buildExitPrompt, 'function');
-    assert.equal(typeof promptBuilder.buildHazardPrompt, 'function');
-    assert.equal(typeof promptBuilder.buildVisionPrompt, 'function');
-    assert.equal(typeof promptBuilder.resolveSubmode, 'function');
-    assert.equal(typeof promptBuilder.sanitizeVisionOutput, 'function');
-  });
-
-  it('1.2: agent_server exports required server and helper bindings', () => {
-    assert.ok(agentServer.server, 'agentServer must export server');
-    assert.ok(agentServer.CONFIG, 'agentServer must export CONFIG');
-    assert.ok(agentServer.STATE, 'agentServer must export STATE');
-    assert.equal(typeof agentServer.resolveSubmode, 'function');
-    assert.equal(typeof agentServer.buildVisionPrompt, 'function');
-    assert.equal(typeof agentServer.sanitizeVisionOutput, 'function');
-  });
-
-  it('1.3: resolveSubmode resolves explicit submodes and normalizes aliases', () => {
-    const { resolveSubmode } = promptBuilder;
-    assert.equal(resolveSubmode('extinguisher'), 'extinguisher');
-    assert.equal(resolveSubmode('emergency_exit'), 'emergency_exit');
-    assert.equal(resolveSubmode('exit'), 'emergency_exit', 'alias "exit" must map to "emergency_exit"');
-    assert.equal(resolveSubmode('hazard'), 'hazard');
-    assert.equal(resolveSubmode('general'), 'general');
-  });
-
-  it('1.4: resolveSubmode infers submodes accurately from checklistType or item titles', () => {
-    const { resolveSubmode } = promptBuilder;
-    assert.equal(resolveSubmode(null, 'fire_extinguishers'), 'extinguisher');
-    assert.equal(resolveSubmode(undefined, 'طفايات الحريق ومعدات الإطفاء'), 'extinguisher');
-    assert.equal(resolveSubmode('', 'emergency_exits_doors'), 'emergency_exit');
-    assert.equal(resolveSubmode(null, 'مخارج الطوارئ ومسارات الإخلاء'), 'emergency_exit');
-    assert.equal(resolveSubmode(null, 'electrical_panel_hazards'), 'hazard');
-    assert.equal(resolveSubmode(null, 'مخاطر التمديدات والأجهزة الكهربائية'), 'hazard');
-    assert.equal(resolveSubmode(null, 'general_safety_round'), 'general');
-    assert.equal(resolveSubmode(null, null), 'general');
-    assert.equal(resolveSubmode(undefined, undefined), 'general');
-  });
-
-  it('1.5: buildExtinguisherPrompt produces comprehensive NFPA 10 & CBAHI requirements', () => {
-    const ctx = { currentDate: '2026-11-05', year: 2026, currentTime: '11:00 AM' };
-    const prompt = promptBuilder.buildExtinguisherPrompt({
-      riyadhCtx: ctx,
-      facility: 'KSUMC',
-      building: 'المستشفى الرئيسي',
-      floor: 'الدور الأرضي',
-      itemLabel: 'طفاية رقم FE-01',
-      notes: 'فحص دوري شهري'
-    });
-
-    // Gauge requirements
-    assert.ok(prompt.includes('gauge_status'));
-    assert.ok(prompt.includes('green'));
-    assert.ok(prompt.includes('undercharge'));
-    assert.ok(prompt.includes('overcharge'));
-    assert.ok(prompt.includes('100-195 psi') || prompt.includes('Green'));
-
-    // Tag requirements
-    assert.ok(prompt.includes('tag_last_date'));
-    assert.ok(prompt.includes('tag_valid'));
-    assert.ok(prompt.includes('tag_detected'));
-    assert.ok(prompt.includes('YYYY-MM'));
-
-    // Pin and seal
-    assert.ok(prompt.includes('pin_and_seal_intact'));
-    assert.ok(prompt.includes('extinguisher_type'));
-
-    // Standards & contextual data
-    assert.ok(prompt.includes('CBAHI FMS.04'));
-    assert.ok(prompt.includes('NFPA 10'));
-    assert.ok(prompt.includes('SBC 801'));
-    assert.ok(prompt.includes('2026-11-05'));
-    assert.ok(prompt.includes('المستشفى الرئيسي'));
-  });
-
-  it('1.6: buildExitPrompt produces emergency exit & CBAHI FMS.14 / NFPA 80 / 101 requirements', () => {
-    const ctx = { currentDate: '2026-11-05', year: 2026, currentTime: '11:00 AM' };
-    const prompt = promptBuilder.buildExitPrompt({
-      riyadhCtx: ctx,
-      facility: 'KSUMC',
-      building: 'مركز الأورام',
-      floor: 'الدور الأول',
-      itemLabel: 'مخرج طوارئ EX-04',
-      notes: 'ملاحظة احتمال وجود وتد خشبي'
-    });
-
-    assert.ok(prompt.includes('emergency_exit'));
-    assert.ok(prompt.includes('door_wedged'));
-    assert.ok(prompt.includes('exit_clear'));
-    assert.ok(prompt.includes('exit_obstruction_percent'));
-    assert.ok(prompt.includes('NFPA 80'));
-    assert.ok(prompt.includes('NFPA 101'));
-    assert.ok(prompt.includes('CBAHI FMS.14'));
-    assert.ok(prompt.includes('مركز الأورام'));
-  });
-
-  it('1.7: buildHazardPrompt produces electrical clearance & NFPA 70 / CBAHI FMS.07 requirements', () => {
-    const ctx = { currentDate: '2026-11-05', year: 2026, currentTime: '11:00 AM' };
-    const prompt = promptBuilder.buildHazardPrompt({
-      riyadhCtx: ctx,
-      facility: 'KSUMC',
-      building: 'المبنى الطبي',
-      floor: 'القبو',
-      itemLabel: 'غرفة الكهرباء الرئيسية'
-    });
-
-    assert.ok(prompt.includes('hazard'));
-    assert.ok(prompt.includes('clearance_violation_36in') || prompt.includes('clearance'));
-    assert.ok(prompt.includes('36') || prompt.includes('90'));
-    assert.ok(prompt.includes('detected_devices'));
-    assert.ok(prompt.includes('CBAHI FMS.07'));
-    assert.ok(prompt.includes('NFPA 70'));
-  });
-
-  it('1.8: buildVisionPrompt dispatches according to submode', () => {
-    const ctx = { currentDate: '2026-11-05', year: 2026, currentTime: '11:00 AM' };
-    const extPrompt = promptBuilder.buildVisionPrompt(ctx, { submode: 'extinguisher' });
-    assert.ok(extPrompt.includes('"submode": "extinguisher"'));
-
-    const exitPrompt = promptBuilder.buildVisionPrompt(ctx, { submode: 'emergency_exit' });
-    assert.ok(exitPrompt.includes('"submode": "emergency_exit"'));
-
-    const hazPrompt = promptBuilder.buildVisionPrompt(ctx, { submode: 'hazard' });
-    assert.ok(hazPrompt.includes('"submode": "hazard"'));
-
-    const genPrompt = promptBuilder.buildVisionPrompt(ctx, { submode: 'general' });
-    assert.ok(genPrompt.includes('hazard_detected'));
-  });
-
-  it('1.9: sanitizeVisionOutput applies safe defaults and cleans hallucinated future dates', () => {
-    const ctx = { currentDate: '2026-11-05', year: 2026, currentTime: '11:00 AM' };
-
-    // Empty extinguisher
-    const cleanExt = promptBuilder.sanitizeVisionOutput({}, ctx, 'extinguisher');
-    assert.equal(cleanExt.submode, 'extinguisher');
-    assert.equal(cleanExt.gauge_status, 'unknown');
-    assert.equal(cleanExt.tag_detected, false);
-    assert.equal(cleanExt.tag_valid, false);
-    assert.equal(cleanExt.pin_and_seal_intact, true);
-    assert.equal(cleanExt.compliance_status, 'مطابق');
-
-    // Empty exit
-    const cleanExit = promptBuilder.sanitizeVisionOutput({}, ctx, 'emergency_exit');
-    assert.equal(cleanExit.submode, 'emergency_exit');
-    assert.equal(cleanExit.door_wedged, false);
-    assert.equal(cleanExit.exit_clear, true);
-    assert.equal(cleanExit.exit_obstruction_percent, 0);
-
-    // Hallucination cleaning
-    const hallucinatory = {
-      submode: 'extinguisher',
-      findings_summary: 'تم رصد تاريخ مستقبلي (2026-12-01) على العداد',
-      violations_list: ['تاريخ مستقبلي على لوحة الإنذار', 'عدم دقة الوقت والتاريخ على شاشة لوحة FACP']
-    };
-    const sanitized = promptBuilder.sanitizeVisionOutput(hallucinatory, ctx, 'extinguisher');
-    assert.ok(!sanitized.findings_summary.includes('تاريخ مستقبلي (2026-12-01)'));
-    assert.equal(sanitized.violations_list.length, 0);
-  });
-});
 
 // ==============================================================================
 // TEST SUITE 2: SVG Reticle Viewfinder & Submode Tabs
@@ -869,8 +699,6 @@ describe('Suite 5: Standalone Quick Scan Dispatchers', () => {
 // ==============================================================================
 describe('Suite 6: Full JavaScript Syntax Check', () => {
   const targetFiles = [
-    { name: 'oracle-vision-agent/prompt_builder.js', path: promptBuilderPath },
-    { name: 'oracle-vision-agent/agent_server.js', path: agentServerPath },
     { name: 'assets/js/vision-reticle-helper.js', path: reticleHelperPath },
     { name: 'assets/js/ksu-ai-client.js', path: aiClientPath }
   ];

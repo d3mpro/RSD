@@ -324,14 +324,13 @@ test('Task 2.4: printSafetyViolation in app.js dynamically reconstructs and prin
   assert.equal(printedHtml.includes('تخزين كراتين أمام لوحة التوزيع الكهربائية'), true);
 });
 
-test('Task 2.5: callGeminiDirectly breaks immediately on network AbortError/TypeError instead of multiplying timeouts across keys, and exports window.compressImageForAI', async () => {
-  let geminiAttempts = 0;
-  const mockAbortFetch = async (url) => {
+test('Task 2.5: callGeminiDirectly breaks on network TypeError without multiplying across models, rotates transient AbortError, and exports window.compressImageForAI', async () => {
+  // 1) Offline or network TypeError must break cleanly instead of multiplying 3 keys x 5 models = 15 attempts
+  let typeErrAttempts = 0;
+  const mockTypeErrFetch = async (url) => {
     if (url.includes('generativelanguage.googleapis.com')) {
-      geminiAttempts++;
-      const abortErr = new Error('The operation was aborted');
-      abortErr.name = 'AbortError';
-      throw abortErr;
+      typeErrAttempts++;
+      throw new TypeError('Failed to fetch');
     }
     if (url.includes('/ai/analyze-inspection-image')) {
       return {
@@ -347,14 +346,70 @@ test('Task 2.5: callGeminiDirectly breaks immediately on network AbortError/Type
     throw new Error('Unexpected URL');
   };
 
-  const ctx = createBrowserSandbox(mockAbortFetch);
+  const ctx = createBrowserSandbox(mockTypeErrFetch);
   ctx.localStorage.setItem('ksumc_gemini_api_keys', 'key_a,key_b,key_c');
   ctx.localStorage.setItem('ksumc_oracle_agent_url', 'http://127.0.0.1:8000');
   vm.runInContext(ksuAiClientCode, ctx);
 
   assert.equal(typeof ctx.window.compressImageForAI, 'function', 'window.compressImageForAI must be exported');
 
-  const res = await ctx.window.KSUAI.analyzeInspectionImage({ image: 'data:image/jpeg;base64,QUJD' });
-  assert.equal(geminiAttempts, 1, 'Must break Gemini key loop immediately when network/firewall aborts connection');
-  assert.equal(res.success, true);
+  const resNetErr = await ctx.window.KSUAI.analyzeInspectionImage({ image: 'data:image/jpeg;base64,QUJD' });
+  assert.equal(typeErrAttempts, 3, 'Must break Gemini loop after Math.max(2, keys.length)=3 TypeErrors instead of 15 across 5 models');
+  assert.equal(resNetErr.success, true);
+
+  // 2) When browser reports offline + TypeError, break immediately on first attempt
+  let offlineAttempts = 0;
+  const ctxOffline = createBrowserSandbox(async (url) => {
+    if (url.includes('generativelanguage.googleapis.com')) {
+      offlineAttempts++;
+      throw new TypeError('Network offline');
+    }
+    if (url.includes('/ai/analyze-inspection-image')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          success: true,
+          source: 'GitHub Models (openai/gpt-4o)',
+          data: { status: 'مطابق', title: 'فحص سليم', summary: 'لا توجد مخالفة' }
+        })
+      };
+    }
+    throw new Error('Unexpected URL');
+  });
+  ctxOffline.navigator.onLine = false;
+  ctxOffline.localStorage.setItem('ksumc_gemini_api_keys', 'key_a,key_b,key_c');
+  ctxOffline.localStorage.setItem('ksumc_oracle_agent_url', 'http://127.0.0.1:8000');
+  vm.runInContext(ksuAiClientCode, ctxOffline);
+
+  const resOffline = await ctxOffline.window.KSUAI.analyzeInspectionImage({ image: 'data:image/jpeg;base64,QUJDMg==' });
+  assert.equal(offlineAttempts, 1, 'Must break Gemini loop immediately (1 attempt) when offline');
+  assert.equal(resOffline.success, true);
+
+  // 3) Transient AbortError on first key/model must rotate to next healthy key/model instead of aborting prematurely
+  let abortThenOkCalls = 0;
+  const ctxRotate = createBrowserSandbox(async (url) => {
+    if (url.includes('generativelanguage.googleapis.com')) {
+      abortThenOkCalls++;
+      if (abortThenOkCalls === 1) {
+        const abortErr = new Error('The operation was aborted');
+        abortErr.name = 'AbortError';
+        throw abortErr;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: '{"status":"مطابق","title":"سليم","summary":"تم التدوير بعد timeout","severity":"low"}' }] } }]
+        })
+      };
+    }
+    throw new Error('Unexpected URL');
+  });
+  ctxRotate.localStorage.setItem('ksumc_gemini_api_keys', 'key_a,key_b');
+  vm.runInContext(ksuAiClientCode, ctxRotate);
+
+  const resRotate = await ctxRotate.window.KSUAI.analyzeInspectionImage({ image: 'data:image/jpeg;base64,QUJDMw==' });
+  assert.equal(abortThenOkCalls, 2, 'Transient AbortError on key_a must rotate to key_b');
+  assert.equal(resRotate.success, true);
 });

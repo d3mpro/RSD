@@ -184,8 +184,16 @@
     },
 
     "system_config": {
-      ".read": "auth != null && (auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer')",
-      ".write": "auth != null && newData.exists() && (auth.token.role == 'admin' || auth.token.role == 'developer')"
+      ".read": "auth != null && (auth.token.role == 'admin' || auth.token.role == 'developer')",
+      ".write": "auth != null && newData.exists() && (auth.token.role == 'admin' || auth.token.role == 'developer')",
+      "ai_keys": {
+        ".read": "auth != null && (auth.token.role == 'head' || auth.token.role == 'admin' || auth.token.role == 'developer' || auth.token.role == 'executive' || auth.token.role == 'quality' || auth.token.role == 'shift_supervisor' || auth.token.role == 'field_inspector')",
+        ".write": "auth != null && newData.exists() && (auth.token.role == 'admin' || auth.token.role == 'developer')"
+      },
+      "admin_auth": {
+        ".read": "auth != null && (auth.token.role == 'admin' || auth.token.role == 'developer')",
+        ".write": "auth != null && newData.exists() && (auth.token.role == 'admin' || auth.token.role == 'developer')"
+      }
     }
   }
 }

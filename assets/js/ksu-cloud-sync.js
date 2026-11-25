@@ -527,14 +527,22 @@ class KSUCloudSyncEngine {
       } catch (_) {}
     }
 
-    // 2. Vision Agent Cross-Device Archive Vault (direct HTTP -> Firebase Bridge fallback)
+    // 2. Custom Vision Agent Cross-Device Archive Vault (if configured -> Firebase Bridge fallback)
     if (cardId && /^[A-Za-z0-9_-]{1,80}$/.test(cardId)) {
       const token = (window.KSUAI && window.KSUAI.apiKeyHeader) || (typeof window !== 'undefined' && (window.KSU_AGENT_TOKEN || (window.localStorage && localStorage.getItem('ksu_agent_token')))) || '';
-      const agentBase = (window.KSUAI && typeof window.KSUAI.getApiUrl === 'function')
-        ? window.KSUAI.getApiUrl(`/archive/media/${encodeURIComponent(cardId)}`)
-        : `${(localStorage.getItem('ksumc_oracle_agent_url') || 'https://rsdsafety.online').replace(/\/+$/, '')}/safety/api/archive/media/${encodeURIComponent(cardId)}`;
+      const customAgentBase = (window.KSUAI && window.KSUAI.oracleAgentUrl)
+        || (typeof localStorage !== 'undefined' && localStorage.getItem('ksumc_oracle_agent_url'))
+        || '';
+      const agentBase = customAgentBase
+        ? ((window.KSUAI && typeof window.KSUAI.getApiUrl === 'function')
+            ? window.KSUAI.getApiUrl(`/archive/media/${encodeURIComponent(cardId)}`)
+            : `${customAgentBase.replace(/\/+$/, '')}/safety/api/archive/media/${encodeURIComponent(cardId)}`)
+        : '';
 
       try {
+        if (!agentBase) {
+          throw new Error('No custom archive agent configured');
+        }
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 12000);
         const resp = await fetch(agentBase, {
