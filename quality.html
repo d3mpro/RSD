@@ -437,6 +437,10 @@
               <span class="material-symbols-outlined text-sm">print</span>
               <span>طباعة سجل الوردية</span>
             </button>
+            <button type="button" id="btn-open-monthly-report-builder" onclick="switchTab('compliance-reports-logs'); setTimeout(() => document.getElementById('monthly-building-report-builder')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#C59B27] hover:bg-[#b58c1f] text-[#00162B] font-black text-xs shadow-xs transition-all cursor-pointer" title="إصدار وطباعة تقرير شهري مجمّع لأي نموذج ومبنى لجميع الأدوار">
+              <span class="material-symbols-outlined text-sm">summarize</span>
+              <span>تقرير شهري للمباني (سباهي / الدفاع المدني)</span>
+            </button>
           </div>
         </div>
 
@@ -1458,6 +1462,75 @@
       <div id="tab-compliance-reports-logs" class="tab-pane">
         <div class="w-full px-gutter-mobile md:px-margin-desktop py-space-md flex flex-col gap-space-lg max-w-5xl mx-auto">
           
+          <!-- Monthly Building & Form Report Builder (CBAHI & Civil Defense Multi-Floor Matrix + Details) -->
+          <section id="monthly-building-report-builder" class="bg-white rounded-3xl border border-[#C3C6CE] shadow-sm overflow-hidden no-print">
+            <div class="p-4 sm:p-5 text-white flex flex-col lg:flex-row lg:items-center justify-between gap-3" style="background: linear-gradient(135deg, #00162B, #082B49, #004B87);">
+              <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-white/10 border border-[#C59B27]/60 text-[#F9F1DC] flex items-center justify-center shrink-0">
+                  <span class="material-symbols-outlined text-2xl">summarize</span>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h2 class="text-sm sm:text-base font-black text-white">مولد التقارير الشهرية المجمّعة للمباني والنماذج</h2>
+                    <span class="px-2.5 py-0.5 rounded-full bg-[#C59B27]/20 text-[#F9F1DC] border border-[#C59B27]/60 text-[10px] font-black">CBAHI / الدفاع المدني</span>
+                  </div>
+                  <p class="text-[11px] text-[#D1E4FF] mt-0.5">اختر أي نموذج تفتيش وأي مبنى والشهر لطباعة تقرير يغطي جميع أدوار المبنى بصيغة رسمية معتمدة للتقديم.</p>
+                </div>
+              </div>
+              <button type="button" onclick="printMonthlyBuildingReport()" class="px-4 py-2.5 rounded-xl bg-[#C59B27] hover:bg-[#b58c1f] text-[#00162B] font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer shrink-0">
+                <span class="material-symbols-outlined text-base">print</span>
+                <span>طباعة التقرير الشهري المجمّع (PDF)</span>
+              </button>
+            </div>
+
+            <div class="p-4 sm:p-5 space-y-4">
+              <!-- Primary Filter Controls -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                  <label for="mr-form-type" class="block text-xs font-extrabold text-[#082B49] mb-1">1. نموذج التفتيش المطلوب</label>
+                  <select id="mr-form-type" onchange="renderMonthlyBuildingReportPreview()" class="w-full px-3 py-2 rounded-xl bg-[#F7F9FF] border border-[#C3C6CE] text-xs font-bold text-[#181C20] outline-none focus:border-[#004B87]"></select>
+                </div>
+                <div>
+                  <label for="mr-building" class="block text-xs font-extrabold text-[#082B49] mb-1">2. المبنى (شامل جميع الأدوار)</label>
+                  <select id="mr-building" onchange="renderMonthlyBuildingReportPreview()" class="w-full px-3 py-2 rounded-xl bg-[#F7F9FF] border border-[#C3C6CE] text-xs font-bold text-[#181C20] outline-none focus:border-[#004B87]"></select>
+                </div>
+                <div>
+                  <label for="mr-month" class="block text-xs font-extrabold text-[#082B49] mb-1">3. الشهر والسنة</label>
+                  <input type="month" id="mr-month" onchange="renderMonthlyBuildingReportPreview()" class="w-full px-3 py-2 rounded-xl bg-[#F7F9FF] border border-[#C3C6CE] text-xs font-bold text-[#181C20] font-mono outline-none focus:border-[#004B87]" />
+                </div>
+                <div>
+                  <label for="mr-status-filter" class="block text-xs font-extrabold text-[#082B49] mb-1">4. نطاق الاعتماد</label>
+                  <select id="mr-status-filter" onchange="renderMonthlyBuildingReportPreview()" class="w-full px-3 py-2 rounded-xl bg-[#F7F9FF] border border-[#C3C6CE] text-xs font-bold text-[#181C20] outline-none focus:border-[#004B87]">
+                    <option value="all">كافة الجولات المنفذة بالشهر</option>
+                    <option value="approved">الجولات المعتمدة فقط (Q1 / H1)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Switchers: Regulatory Profile (CBAHI vs Civil Defense) & Output Print Mode -->
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 p-3 rounded-2xl bg-[#F7F9FF] border border-[#E0E3E8]">
+                <div class="space-y-1.5">
+                  <span class="block text-[11px] font-black text-[#082B49]">الجهة المقدم لها التقرير (المعيار التنظيمي):</span>
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <button type="button" id="btn-mr-reg-cbahi" onclick="setMonthlyReportRegulatoryProfile('cbahi')" class="px-3 py-1.5 rounded-xl bg-[#082B49] text-[#F9F1DC] border border-[#082B49] font-black text-xs shadow-xs transition-all cursor-pointer">سباهي (CBAHI FMS)</button>
+                    <button type="button" id="btn-mr-reg-civil_defense" onclick="setMonthlyReportRegulatoryProfile('civil_defense')" class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-[#082B49] border border-slate-300 font-bold text-xs transition-all cursor-pointer">الدفاع المدني (SBC 801/201)</button>
+                    <button type="button" id="btn-mr-reg-unified" onclick="setMonthlyReportRegulatoryProfile('unified')" class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-[#082B49] border border-slate-300 font-bold text-xs transition-all cursor-pointer">موحّد (سباهي + الدفاع المدني)</button>
+                  </div>
+                </div>
+                <div class="space-y-1.5">
+                  <span class="block text-[11px] font-black text-[#082B49]">هيكل ملف الطباعة المصدّر (PDF):</span>
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <button type="button" id="btn-mr-mode-matrix_plus_details" onclick="setMonthlyReportPrintMode('matrix_plus_details')" class="px-3 py-1.5 rounded-xl bg-[#004B87] text-white border border-[#004B87] font-black text-xs shadow-xs transition-all cursor-pointer">تقرير متكامل (جدول الأدوار + تفاصيل بنود كل دور)</button>
+                    <button type="button" id="btn-mr-mode-summary_only" onclick="setMonthlyReportPrintMode('summary_only')" class="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-[#082B49] border border-slate-300 font-bold text-xs transition-all cursor-pointer">ملخص تنفيذي وجدول الأدوار فقط</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Live Multi-Floor Matrix Preview -->
+              <div id="mr-preview-container"></div>
+            </div>
+          </section>
+
           <!-- Actions Header -->
           <div class="flex items-center justify-between no-print">
             <div>
@@ -2617,6 +2690,7 @@
   <script src="assets/js/ksu-wet-chemical-assets.js?v=1.0" charset="UTF-8"></script>
   <script src="assets/js/ksu-facp-assets.js?v=2.0" charset="UTF-8"></script>
   <script src="assets/js/app.js?v=8.2.5"></script>
+  <script src="assets/js/ksu-monthly-reports.js?v=1.0" charset="UTF-8"></script>
   <script src="assets/js/vision-reticle-helper.js"></script>
   <script src="assets/js/ksu-ai-client.js?v=8.1.0" charset="UTF-8"></script>
   <script>
@@ -2945,6 +3019,9 @@
         try { _origRenderQualityWorkflowInbox(); } catch(e){}
       }
       renderQualityUnifiedWorkflow();
+      if (typeof window.renderMonthlyBuildingReportPreview === 'function') {
+        try { window.renderMonthlyBuildingReportPreview(); } catch(e){}
+      }
     };
 
     const _origRenderQualityDoorsAndPermitsInbox = window.renderQualityDoorsAndPermitsInbox;
@@ -2953,6 +3030,16 @@
         try { _origRenderQualityDoorsAndPermitsInbox(); } catch(e){}
       }
       renderQualityUnifiedWorkflow();
+    };
+
+    const _origRenderComplianceRegistryTable = window.renderComplianceRegistryTable;
+    window.renderComplianceRegistryTable = function() {
+      if (typeof _origRenderComplianceRegistryTable === 'function') {
+        try { _origRenderComplianceRegistryTable(); } catch(e){}
+      }
+      if (typeof window.renderMonthlyBuildingReportPreview === 'function') {
+        try { window.renderMonthlyBuildingReportPreview(); } catch(e){}
+      }
     };
 
     window.filterQualityUnifiedWorkflow = filterQualityUnifiedWorkflow;
@@ -4244,6 +4331,7 @@
           if (typeof updateAIScheduleTrackerUI === 'function') updateAIScheduleTrackerUI();
           if (typeof renderQualitySavedReports === 'function') renderQualitySavedReports();
           if (typeof renderComplianceRegistryTable === 'function') renderComplianceRegistryTable();
+          if (typeof initMonthlyBuildingReportBuilder === 'function') initMonthlyBuildingReportBuilder();
           updateQualityHeroCounters();
         } else {
           if (['field-inspection-rounds', 'safety-violations', 'smoking-violations'].includes(tabId)) {
@@ -4275,6 +4363,9 @@
         }
         if (typeof renderComplianceRegistryTable === 'function') {
           renderComplianceRegistryTable();
+        }
+        if (typeof initMonthlyBuildingReportBuilder === 'function') {
+          initMonthlyBuildingReportBuilder();
         }
         updateQualityHeroCounters();
       }, 50);
