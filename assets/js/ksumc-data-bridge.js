@@ -1863,29 +1863,35 @@
         }
 
         const dateStr = record.date || new Date().toISOString().split('T')[0];
+        const safeDateStr = String(dateStr).replace(/[\\/:*?"<>|#%\s]+/g, '-');
         const safeId = String(recordKey || Date.now()).replace(/[\\/:*?"<>|#%\s]+/g, '-').slice(0, 60);
         const typePrefix = type === 'inspection' ? 'INSP' : (type === 'capa' ? 'CAPA' : (type === 'asset' ? 'ASSET' : 'RSD'));
-        const reportFileName = `${typePrefix}-${dateStr}-${safeId}.html`;
+        const reportFileName = `${typePrefix}-${safeDateStr}-${safeId}.html`;
 
         const escHtml = (v) => String(v == null ? '' : v)
           .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-        const notesText = record.notes || record.description || record.itemDescription || record.findingsSummary || autoSummary || (record.findings ? `عدد الملاحظات: ${record.findings.length}` : 'تم التوثيق عبر منصة رصد');
+        const notesText = record.notes || record.deficiencyDescription || record.description || record.itemDescription || record.findingsSummary || autoSummary || (record.findings ? `عدد الملاحظات: ${record.findings.length}` : 'تم التوثيق عبر منصة رصد');
         let innerReportHtml = '';
         if (type === 'inspection' && typeof window !== 'undefined' && typeof window.generateOfficialInspectionCardHtml === 'function') {
           try {
-            innerReportHtml = window.generateOfficialInspectionCardHtml(record)
+            const slimCardRecord = Object.assign({}, record, {
+              photos: [],
+              photoDataUrl: '',
+              imageDataUrl: ''
+            });
+            innerReportHtml = window.generateOfficialInspectionCardHtml(slimCardRecord)
               .replace(/src=["'](?:\.\/)?assets\//g, `src="${baseUrl}/assets/`)
               .replace(/\sonerror="[^"]*"/gi, '')
               .replace(/\sonerror='[^']*'/gi, '')
-              .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '');
+              .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+              .replace(/data:image\/[^"'\s>)]+/gi, (match) => (match.length > 1024 ? '' : match));
           } catch (_) {
             innerReportHtml = '';
           }
         }
-        if (!innerReportHtml) {
-          const badgeTitle = type === 'capa' ? 'بطاقة إجراء تصحيحي ووقائي (CAPA)' : (type === 'asset' ? 'بطاقة سجل أصل سلامة' : 'محضر تفتيش ميداني رسمي');
-          innerReportHtml = `
+        const badgeTitle = type === 'capa' ? 'بطاقة إجراء تصحيحي ووقائي (CAPA)' : (type === 'asset' ? 'بطاقة سجل أصل سلامة' : 'محضر تفتيش ميداني رسمي');
+        const compactSummaryInner = `
             <div style="max-width:790px;margin:0 auto;border:1.5px solid #004B87;border-radius:10px;overflow:hidden;background:#fff;">
               <div style="background:#004B87;color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
                 <div>
@@ -1899,7 +1905,7 @@
                   <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;width:28%;">رقم السجل</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml(recordKey)}</td></tr>
                   <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">العنوان / النوع</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml(title)}</td></tr>
                   <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">المنشأة / المبنى / الدور</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml([facilityName || 'المدينة الطبية', record.building || record.zone || '', record.floor || ''].filter(Boolean).join(' — '))}</td></tr>
-                  <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">الموقع التفصيلي</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml(record.room || record.locationDetails || record.zone || record.facpName || '-')}</td></tr>
+                  <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">الموقع التفصيلي</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml(record.room || record.locationDetails || record.area || record.zone || record.facpName || '-')}</td></tr>
                   <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">المفتش / الوردية</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml(inspectorName)} ${record.shiftName || record.shift ? '— ' + escHtml(record.shiftName || record.shift) : ''}</td></tr>
                   <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">التاريخ والوقت</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml(dateStr)} — ${escHtml(timeStr)}</td></tr>
                   <tr><td style="padding:8px;border:1px solid #cbd5e1;background:#f8fafc;font-weight:700;">الحالة / الخطورة</td><td style="padding:8px;border:1px solid #cbd5e1;">${escHtml(statusLabel)}${severityLabel ? ' — ' + escHtml(severityLabel) : ''}</td></tr>
@@ -1907,9 +1913,11 @@
                 </table>
               </div>
             </div>`;
+        if (!innerReportHtml) {
+          innerReportHtml = compactSummaryInner;
         }
 
-        const reportHtml = `<!DOCTYPE html>
+        const wrapHtmlDoc = (bodyHtml) => `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8" />
@@ -1934,29 +1942,40 @@
       <a class="rsd-archive-btn" href="${escHtml(reportUrl)}" target="_blank" rel="noopener noreferrer">🖨️ فتح للطباعة / PDF</a>
     </div>
   </div>
-  ${innerReportHtml}
+  ${bodyHtml}
 </body>
 </html>`;
+
+        const compactReportHtml = wrapHtmlDoc(compactSummaryInner);
+        const reportHtml = wrapHtmlDoc(innerReportHtml);
+
+        const rawScoreCandidate = (record.score != null && record.score !== '')
+          ? record.score
+          : ((record.complianceScore != null && record.complianceScore !== '')
+              ? record.complianceScore
+              : record.complianceRate);
+        const numericScore = Number(rawScoreCandidate);
+        const resolvedComplianceScore = Number.isFinite(numericScore) ? numericScore : complianceScore;
 
         const payload = {
           Title: title,
           type: type,
           recordId: recordKey,
-          inspectionType: record.formTitle || record.formType || record.roundTitle || record.category || '',
+          inspectionType: record.formTitle || record.formType || record.roundTitle || record.modelName || record.category || '',
           inspector: inspectorName,
           inspectorSignature: record.signature || record.inspectorSignature || inspectorName,
           facility: facilityName || 'المدينة الطبية',
           building: record.building || record.zone || '',
           floor: record.floor || '',
-          detailedLocation: record.room || record.locationDetails || record.zone || record.facpName || '',
+          detailedLocation: record.room || record.locationDetails || record.area || record.zone || record.facpName || '',
           shift: record.shiftName || record.shift || record.reporterShift || '',
           status: statusLabel,
           qualityStatus: record.workflowStatusLabel || record.qualityStatus || 'بانتظار المراجعة',
-          complianceScore: complianceScore,
+          complianceScore: resolvedComplianceScore,
           overallRating: overallRating,
-          compliantCount: Number(record.compliantCount || 0),
-          observationCount: Number(record.observationCount || 0),
-          violationCount: Number(record.violationCount || 0),
+          compliantCount: Number(record.compliantCount) || 0,
+          observationCount: Number(record.observationCount) || 0,
+          violationCount: Number(record.violationCount) || 0,
           assetCategory: record.category || '',
           assetType: record.type || '',
           severity: severityLabel,
@@ -1969,22 +1988,129 @@
           notes: notesText
         };
 
-        const response = await fetch(SHAREPOINT_CONFIG.WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const postPayload = async (bodyObj) => {
+          const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+          const timer = controller ? setTimeout(() => controller.abort(), 15000) : null;
+          try {
+            const resp = await fetch(SHAREPOINT_CONFIG.WEBHOOK_URL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(bodyObj),
+              signal: controller ? controller.signal : undefined
+            });
+            if (timer) clearTimeout(timer);
+            return resp;
+          } catch (err) {
+            if (timer) clearTimeout(timer);
+            throw err;
+          }
+        };
 
-        if (response.ok || response.status === 202) {
-          return { success: true, payload };
-        } else {
-          console.warn('[KSU-SharePoint-Sync] استجابة شيربوينت:', response.status);
-          return { success: false, status: response.status };
+        const enqueueRetry = (targetPayload, reason) => {
+          if (isDemoModeActive() || typeof localStorage === 'undefined') return false;
+          try {
+            const qKey = 'ksumc_sharepoint_retry_queue';
+            const existing = JSON.parse(localStorage.getItem(qKey) || '[]');
+            const list = Array.isArray(existing) ? existing : [];
+            const dedupId = `${targetPayload.type || 'inspection'}:${targetPayload.recordId || targetPayload.Title || ''}`;
+            const filtered = list.filter(item => item && `${item.type || 'inspection'}:${item.recordId || item.Title || ''}` !== dedupId);
+            filtered.unshift({
+              queuedAt: new Date().toISOString(),
+              attempts: 1,
+              reason: String(reason || 'network'),
+              type: targetPayload.type || 'inspection',
+              recordId: targetPayload.recordId || '',
+              Title: targetPayload.Title || '',
+              payload: targetPayload
+            });
+            localStorage.setItem(qKey, JSON.stringify(filtered.slice(0, 50)));
+            return true;
+          } catch (_) {
+            return false;
+          }
+        };
+
+        const fallbackCompactPayload = Object.assign({}, payload, { reportHtml: compactReportHtml });
+
+        try {
+          const response = await postPayload(payload);
+          if (response && (response.ok || response.status === 202)) {
+            if (!record._fromSharePointQueue && typeof this.flushSharePointQueue === 'function') {
+              setTimeout(() => { try { this.flushSharePointQueue(); } catch (_) {} }, 50);
+            }
+            return { success: true, payload };
+          }
+
+          console.warn('[KSU-SharePoint-Sync] استجابة شيربوينت:', response ? response.status : 'unknown');
+          if (compactReportHtml.length < reportHtml.length) {
+            try {
+              const retryRes = await postPayload(fallbackCompactPayload);
+              if (retryRes && (retryRes.ok || retryRes.status === 202)) {
+                return { success: true, payload: fallbackCompactPayload, fallbackUsed: true };
+              }
+              const failStatus = retryRes ? retryRes.status : (response ? response.status : 0);
+              enqueueRetry(fallbackCompactPayload, `HTTP_${failStatus}`);
+              return { success: false, queued: true, status: failStatus };
+            } catch (retryErr) {
+              enqueueRetry(fallbackCompactPayload, retryErr && retryErr.message);
+              return { success: false, queued: true, error: retryErr && retryErr.message };
+            }
+          }
+
+          enqueueRetry(fallbackCompactPayload, `HTTP_${response ? response.status : 0}`);
+          return { success: false, queued: true, status: response ? response.status : 0 };
+        } catch (sendErr) {
+          console.warn('[KSU-SharePoint-Sync] تعذر الاتصال المباشر بشيربوينت:', sendErr && sendErr.message ? sendErr.message : sendErr);
+          enqueueRetry(fallbackCompactPayload, sendErr && sendErr.message);
+          return { success: false, queued: true, error: sendErr && sendErr.message };
         }
       } catch (err) {
         console.warn('[KSU-SharePoint-Sync] تعذر الاتصال المباشر بشيربوينت:', err);
         return { success: false, error: err.message };
       }
+    },
+
+    flushSharePointQueue: async function() {
+      if (isDemoModeActive() || !SHAREPOINT_CONFIG.ENABLED || !SHAREPOINT_CONFIG.WEBHOOK_URL || typeof localStorage === 'undefined') {
+        return { flushed: 0, remaining: 0 };
+      }
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        return { flushed: 0, remaining: 0, offline: true };
+      }
+      const qKey = 'ksumc_sharepoint_retry_queue';
+      let queue = [];
+      try {
+        queue = JSON.parse(localStorage.getItem(qKey) || '[]');
+        if (!Array.isArray(queue) || queue.length === 0) return { flushed: 0, remaining: 0 };
+      } catch (_) {
+        return { flushed: 0, remaining: 0 };
+      }
+
+      let flushed = 0;
+      const remaining = [];
+      for (const entry of queue) {
+        if (!entry || !entry.payload) continue;
+        try {
+          const resp = await fetch(SHAREPOINT_CONFIG.WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(entry.payload)
+          });
+          if (resp && (resp.ok || resp.status === 202)) {
+            flushed++;
+          } else {
+            entry.attempts = (entry.attempts || 1) + 1;
+            if (entry.attempts <= 5) remaining.push(entry);
+          }
+        } catch (_) {
+          entry.attempts = (entry.attempts || 1) + 1;
+          if (entry.attempts <= 5) remaining.push(entry);
+        }
+      }
+      try {
+        localStorage.setItem(qKey, JSON.stringify(remaining));
+      } catch (_) {}
+      return { flushed, remaining: remaining.length };
     },
 
     /**
@@ -2009,6 +2135,13 @@
   };
 
   window.KSUDataBridge = KSUDataBridge;
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('online', () => {
+      if (window.KSUDataBridge && typeof window.KSUDataBridge.flushSharePointQueue === 'function') {
+        window.KSUDataBridge.flushSharePointQueue().catch(() => {});
+      }
+    });
+  }
   window.KSUViolationPolicy = {
     escapeHtml: escapeHtml,
     getCurrentActiveUser: getCurrentActiveUser,

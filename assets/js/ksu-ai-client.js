@@ -746,6 +746,203 @@
       return false;
     },
 
+    getFirebaseConfig() {
+      try {
+        if (typeof window !== 'undefined') {
+          return window.KSU_FIREBASE_CONFIG || window.PROD_FIREBASE_CONFIG || null;
+        }
+        if (typeof globalThis !== 'undefined') {
+          return globalThis.KSU_FIREBASE_CONFIG || globalThis.PROD_FIREBASE_CONFIG || null;
+        }
+      } catch (_) {}
+      return null;
+    },
+
+    _getInjectedFirebaseAIBridge() {
+      try {
+        if (typeof window !== 'undefined' && window._ksuFirebaseAILogicBridge && typeof window._ksuFirebaseAILogicBridge.generateContent === 'function') {
+          return window._ksuFirebaseAILogicBridge;
+        }
+        if (typeof globalThis !== 'undefined' && globalThis.__KSU_FIREBASE_AI_BRIDGE__ && typeof globalThis.__KSU_FIREBASE_AI_BRIDGE__.generateContent === 'function') {
+          return globalThis.__KSU_FIREBASE_AI_BRIDGE__;
+        }
+      } catch (_) {}
+      return null;
+    },
+
+    isFirebaseAILogicEnabled() {
+      if (this._isDemoSession()) return false;
+      if (this._getInjectedFirebaseAIBridge()) return true;
+      const cfg = this.getFirebaseConfig();
+      if (!cfg || !cfg.apiKey || !cfg.projectId || !cfg.appId || !cfg.recaptchaEnterpriseSiteKey) return false;
+      if (cfg.firebaseAILogic && cfg.firebaseAILogic.enabled === false) return false;
+      return typeof document !== 'undefined';
+    },
+
+    getFirebaseAIModels() {
+      const cfg = this.getFirebaseConfig();
+      const configured = cfg && cfg.firebaseAILogic && Array.isArray(cfg.firebaseAILogic.modelHierarchy)
+        ? cfg.firebaseAILogic.modelHierarchy.filter(Boolean)
+        : [];
+      if (configured.length > 0) return configured;
+      return ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-4-hydrogen'];
+    },
+
+    async _ensureFirebaseAILogicRuntime() {
+      if (this._isDemoSession()) {
+        throw new Error('Firebase AI Logic disabled in demo sandbox mode');
+      }
+      if (this._firebaseAIRuntimePromise) {
+        return this._firebaseAIRuntimePromise;
+      }
+      const cfg = this.getFirebaseConfig();
+      if (!cfg || !cfg.apiKey || !cfg.projectId || !cfg.appId || !cfg.recaptchaEnterpriseSiteKey) {
+        throw new Error('Missing Firebase AI Logic or reCAPTCHA Enterprise configuration');
+      }
+      const rawVer = String((cfg.firebaseAILogic && cfg.firebaseAILogic.sdkVersion) || '13.4.0');
+      const sdkVer = /^\d+\.\d+\.\d+$/.test(rawVer) ? rawVer : '13.4.0';
+
+      this._firebaseAIRuntimePromise = (async () => {
+        const base = `https://www.gstatic.com/firebasejs/${sdkVer}`;
+        const [appMod, appCheckMod, aiMod] = await Promise.all([
+          import(`${base}/firebase-app.js`),
+          import(`${base}/firebase-app-check.js`),
+          import(`${base}/firebase-ai.js`)
+        ]);
+
+        const appConfig = {
+          apiKey: cfg.apiKey,
+          authDomain: cfg.authDomain,
+          projectId: cfg.projectId,
+          storageBucket: cfg.storageBucket,
+          messagingSenderId: cfg.messagingSenderId,
+          appId: cfg.appId,
+          ...(cfg.measurementId ? { measurementId: cfg.measurementId } : {}),
+          ...(cfg.databaseURL ? { databaseURL: cfg.databaseURL } : {})
+        };
+
+        const existing = typeof appMod.getApps === 'function'
+          ? appMod.getApps().find(a => a && a.name === 'ksu-ai-logic')
+          : null;
+        const app = existing || appMod.initializeApp(appConfig, 'ksu-ai-logic');
+
+        if (!this._firebaseAppCheckInitialized && appCheckMod && typeof appCheckMod.initializeAppCheck === 'function' && typeof appCheckMod.ReCaptchaEnterpriseProvider === 'function') {
+          try {
+            appCheckMod.initializeAppCheck(app, {
+              provider: new appCheckMod.ReCaptchaEnterpriseProvider(cfg.recaptchaEnterpriseSiteKey),
+              isTokenAutoRefreshEnabled: true
+            });
+          } catch (acErr) {
+            const acMsg = String((acErr && acErr.message) || acErr || '');
+            if (!/already\s+been\s+initialized/i.test(acMsg)) {
+              throw acErr;
+            }
+          }
+          this._firebaseAppCheckInitialized = true;
+        }
+
+        const useLimited = !(cfg.firebaseAILogic && cfg.firebaseAILogic.useLimitedUseAppCheckTokens === false);
+        const ai = aiMod.getAI(app, {
+          backend: new aiMod.GoogleAIBackend(),
+          useLimitedUseAppCheckTokens: useLimited
+        });
+
+        return {
+          app,
+          ai,
+          getGenerativeModel: aiMod.getGenerativeModel
+        };
+      })().catch((err) => {
+        this._firebaseAIRuntimePromise = null;
+        throw err;
+      });
+
+      return this._firebaseAIRuntimePromise;
+    },
+
+    _extractFirebaseAIResponseText(res) {
+      const resp = res && res.response ? res.response : res;
+      if (!resp) return '';
+      const extracted = this._extractGeminiResponseText(resp);
+      if (extracted && extracted.text) return extracted.text;
+      if (typeof resp.text === 'function') {
+        try {
+          return String(resp.text() || '');
+        } catch (_) {}
+      }
+      return '';
+    },
+
+    async _callFirebaseAILogicWithRotation({ parts, expectJson = false, maxOutputTokens = 2048, timeoutMs = 25000, systemInstruction = '' } = {}) {
+      if (this._isDemoSession()) {
+        throw new Error('Firebase AI Logic disabled in demo sandbox mode');
+      }
+      if (!this.isFirebaseAILogicEnabled()) {
+        throw new Error('Firebase AI Logic not enabled in this runtime');
+      }
+
+      const bridge = this._getInjectedFirebaseAIBridge();
+      const runtime = bridge ? null : await this._ensureFirebaseAILogicRuntime();
+      const models = this.getFirebaseAIModels();
+      const sysText = (typeof systemInstruction === 'string')
+        ? systemInstruction
+        : (systemInstruction && systemInstruction.parts && systemInstruction.parts[0] && systemInstruction.parts[0].text ? systemInstruction.parts[0].text : '');
+
+      let lastErr = null;
+      for (const currentModel of models) {
+        if (this._isGeminiCoolingDown(currentModel, 'firebase_ai_logic')) {
+          this._quotaStats.cooldownSkips++;
+          continue;
+        }
+        const generationConfig = this._buildGeminiGenerationConfig(currentModel, { expectJson, maxOutputTokens });
+        let timer = null;
+        try {
+          const callPromise = bridge
+            ? bridge.generateContent({
+                model: currentModel,
+                systemInstruction: sysText,
+                generationConfig,
+                contents: [{ role: 'user', parts }]
+              })
+            : runtime.getGenerativeModel(runtime.ai, {
+                model: currentModel,
+                ...(sysText ? { systemInstruction: sysText } : {}),
+                generationConfig
+              }).generateContent({ contents: [{ role: 'user', parts }] });
+
+          const timeoutPromise = new Promise((_, reject) => {
+            timer = setTimeout(() => {
+              const tErr = new Error(`Firebase AI Logic ${currentModel} timed out after ${timeoutMs}ms`);
+              tErr.name = 'AbortError';
+              reject(tErr);
+            }, timeoutMs);
+          });
+
+          const res = await Promise.race([callPromise, timeoutPromise]);
+          if (timer) clearTimeout(timer);
+
+          const text = this._extractFirebaseAIResponseText(res);
+          if (text && text.trim()) {
+            return { text: text.trim(), model: currentModel, provider: 'firebase-ai-logic' };
+          }
+          lastErr = new Error(`Firebase AI Logic ${currentModel} returned empty text`);
+        } catch (err) {
+          if (timer) clearTimeout(timer);
+          lastErr = err;
+          const errStatus = Number(err && (err.status || err.code || (err.customErrorData && err.customErrorData.status))) || 0;
+          const errMsg = String((err && err.message) || err || '');
+          if (errStatus === 429 || /429|RESOURCE_EXHAUSTED|quota/i.test(errMsg)) {
+            this._markGeminiCooldown(currentModel, 'firebase_ai_logic', 429, errMsg);
+          } else if (errStatus === 404 || /404|not found/i.test(errMsg)) {
+            this._markGeminiCooldown(currentModel, 'firebase_ai_logic', 404, errMsg);
+          } else if (errStatus === 401 || errStatus === 403 || /app.?check|recaptcha|permission/i.test(errMsg)) {
+            break;
+          }
+        }
+      }
+      throw lastErr || new Error('Firebase AI Logic exhausted available models');
+    },
+
     /**
      * إرسال طلب الذكاء الاصطناعي عبر جسر الفايربيس اللحظي (Firebase RTDB Bridge)
      * مخصص لشبكة الجامعة والمدينة الطبية لتجاوز أي حظر جدار حماية خارجي نهائياً عبر نطاق web.app المعتمد
@@ -1070,9 +1267,11 @@
           }
         }
 
+        const useFirebaseAI = this.isFirebaseAILogicEnabled();
+
         // جلب المفاتيح المركزية سحابياً من Firebase في الخلفية إن لم تكن محملة
         let geminiKeys = this.getGeminiKeys();
-        if (!geminiKeys.length) {
+        if (!useFirebaseAI && !geminiKeys.length) {
           await this.fetchCloudKeysSilently();
           geminiKeys = this.getGeminiKeys();
         }
@@ -1081,8 +1280,8 @@
         let qwenFailure = null;
         let customAgentFailure = null;
 
-        // المسار 1 (الأولوية القصوى والسريعة المعتمدة): الاستدعاء المباشر لمحرك Google Gemini Vision مع التدرج الصامت ودرع الحصة
-        if (geminiKeys.length > 0) {
+        // المسار 1 (الأولوية القصوى والسريعة المعتمدة): Firebase AI Logic (App Check) مع التدرج الصامت إلى مفاتيح Gemini /api
+        if (useFirebaseAI || geminiKeys.length > 0) {
           try {
             if (typeof onProgress === 'function') onProgress('جاري التحليل البصري الذكي ورصد المخالفة عبر Gemini Vision...');
             const geminiRes = await this.callGeminiDirectly({
@@ -1189,7 +1388,7 @@
           errorCode = 'ERR_OFFLINE';
           honestFailureMsg = 'لا يوجد اتصال بالإنترنت حالياً؛ تم حفظ الصورة في المسودات المحلية لمزامنتها لاحقاً عند عودة الاتصال.';
           diagnosticDetail = 'navigator.onLine === false';
-        } else if (geminiKeys.length === 0 && qwenKeys.length === 0 && !hasCustomAgent) {
+        } else if (!geminiFailure && geminiKeys.length === 0 && qwenKeys.length === 0 && !hasCustomAgent) {
           if (this._lastCloudKeySyncError === 'NETWORK_ERROR') {
             errorCode = 'ERR_ALL_PROVIDERS_UNREACHABLE';
             honestFailureMsg = 'تعذر الاتصال بخادم الذكاء الاصطناعي أو جلب مفاتيح التشغيل السحابية، يرجى التحقق من الشبكة والمحاولة مجدداً.';
@@ -1315,12 +1514,13 @@
      * الاستدعاء السحابي المباشر لـ Google Gemini مع التدرج الصامت عبر سلسلة نماذج 2026 النشطة ودرع الحصة وتدوير المفاتيح
      */
     async callGeminiDirectly({ images, checklistType, submode, itemLabel, facility, building, floor, notes, onProgress }) {
+      const useFirebaseAI = this.isFirebaseAILogicEnabled();
       let keys = this.getGeminiKeys();
-      if (!keys.length) {
+      if (!useFirebaseAI && !keys.length) {
         await this.fetchCloudKeysSilently();
         keys = this.getGeminiKeys();
       }
-      if (!keys.length) {
+      if (!useFirebaseAI && !keys.length) {
         const noKeyErr = new Error('لم يتم ضبط مفاتيح Gemini API صالحة في الخزينة السحابية');
         noKeyErr.errorCode = 'ERR_NO_AI_KEYS';
         throw noKeyErr;
@@ -1369,6 +1569,62 @@
       const systemInstruction = {
         parts: [{ text: `${this.VISION_SYSTEM_PROMPT}${focusedStandardText}` }]
       };
+
+      if (useFirebaseAI) {
+        let fbFallbackErr = null;
+        if (typeof onProgress === 'function') onProgress('جاري التحليل البصري الآمن عبر Firebase AI Logic...');
+        try {
+          const fbRes = await this._callFirebaseAILogicWithRotation({
+            parts,
+            systemInstruction,
+            expectJson: true,
+            maxOutputTokens: 1400,
+            timeoutMs: 22000
+          });
+          if (fbRes && fbRes.text) {
+            const parsedRaw = this.cleanAndParseJSON(fbRes.text);
+            if (parsedRaw) {
+              const parsedData = this.applyStaticReferenceMapping(parsedRaw, submode || checklistType);
+              parsedData.images_count = Array.isArray(images) ? images.length : 0;
+              parsedData.ai_engine_source = `Firebase AI Logic (${fbRes.model})`;
+              return {
+                success: true,
+                data: parsedData,
+                source: `Firebase AI Logic (${fbRes.model})`
+              };
+            }
+          }
+        } catch (fbErr) {
+          fbFallbackErr = fbErr;
+          console.warn('[KSUAI] Firebase AI Logic vision failed, falling back silently to /api Gemini keys:', fbErr && fbErr.message ? fbErr.message : fbErr);
+        }
+
+        if (!keys.length) {
+          await this.fetchCloudKeysSilently();
+          keys = this.getGeminiKeys();
+        }
+        if (!keys.length) {
+          const fbMsg = String((fbFallbackErr && fbFallbackErr.message) || '');
+          const fbStatus = Number(fbFallbackErr && (fbFallbackErr.status || fbFallbackErr.code)) || 0;
+          const errOut = fbFallbackErr || new Error('تعذر الفحص عبر Firebase AI Logic ولم يتم ضبط مفاتيح /api احتياطية');
+          if (fbStatus === 429 || /429|RESOURCE_EXHAUSTED|quota/i.test(fbMsg)) {
+            errOut.errorCode = 'ERR_QUOTA_EXHAUSTED_429';
+          } else if (fbStatus === 401 || fbStatus === 403 || /app.?check|recaptcha|permission/i.test(fbMsg)) {
+            errOut.errorCode = 'ERR_GEMINI_AUTH_401_403';
+          } else if (this._lastCloudKeySyncError === 'AUTH_REQUIRED' || this._lastCloudKeySyncError === 'HTTP_401' || this._lastCloudKeySyncError === 'HTTP_403') {
+            errOut.errorCode = 'ERR_CLOUD_AUTH_REQUIRED';
+          } else {
+            errOut.errorCode = 'ERR_ALL_PROVIDERS_UNREACHABLE';
+          }
+          errOut.diagnosticDetail = fbMsg || errOut.message;
+          this._lastVisionErrorInfo = {
+            errorCode: errOut.errorCode,
+            diagnosticDetail: errOut.diagnosticDetail,
+            message: errOut.message
+          };
+          throw errOut;
+        }
+      }
 
       // سلسلة النماذج النشطة (لكل نموذج كوتا وحصة يومية/دقيقة مستقلة)
       const MODELS_HIERARCHY = (Array.isArray(this.MODELS_HIERARCHY) && this.MODELS_HIERARCHY.length)
@@ -1540,13 +1796,32 @@
     /**
      * مساعد مشترك لطلبات Gemini النصية والمرئية الخفيفة مع تدوير المفاتيح وتدرج النماذج ودرع التهدئة
      */
-    async _callGeminiWithRotation({ parts, expectJson = false, maxOutputTokens = 2048, timeoutMs = 25000 }) {
+    async _callGeminiWithRotation({ parts, expectJson = false, maxOutputTokens = 2048, timeoutMs = 25000, systemInstruction = '' }) {
+      let fbErr = null;
+      if (this.isFirebaseAILogicEnabled()) {
+        try {
+          const fbRes = await this._callFirebaseAILogicWithRotation({
+            parts,
+            expectJson,
+            maxOutputTokens,
+            timeoutMs,
+            systemInstruction
+          });
+          if (fbRes && fbRes.text) {
+            return { text: fbRes.text, model: fbRes.model, provider: 'firebase-ai-logic' };
+          }
+        } catch (err) {
+          fbErr = err;
+          console.warn('[KSUAI] Firebase AI Logic failed in _callGeminiWithRotation, falling back silently to /api keys:', err && err.message ? err.message : err);
+        }
+      }
+
       let keys = this.getGeminiKeys();
       if (!keys.length) {
         await this.fetchCloudKeysSilently();
         keys = this.getGeminiKeys();
       }
-      if (!keys.length) throw new Error('لم يتم ضبط مفاتيح Gemini API');
+      if (!keys.length) throw fbErr || new Error('لم يتم ضبط مفاتيح Gemini API');
 
       const models = (Array.isArray(this.MODELS_HIERARCHY) && this.MODELS_HIERARCHY.length)
         ? this.MODELS_HIERARCHY
@@ -1931,12 +2206,13 @@
      * 4. المساعد الاستشاري لمعايير السلامة (CBAHI / SBC Safety Assistant)
      */
     async askSafetyAssistant(question) {
+      const useFirebaseAI = this.isFirebaseAILogicEnabled();
       let geminiKeys = this.getGeminiKeys();
-      if (!geminiKeys.length) {
+      if (!useFirebaseAI && !geminiKeys.length) {
         await this.fetchCloudKeysSilently();
         geminiKeys = this.getGeminiKeys();
       }
-      if (geminiKeys.length > 0) {
+      if (useFirebaseAI || geminiKeys.length > 0) {
         try {
           const prompt = `أنت المستشار والخبير الذكي للسلامة وإدارة المرافق بالمدينة الطبية بجامعة الملك سعود.
 أجب عن استفسار السلامة التالي بدقة بالاعتماد على معايير سباهي (CBAHI FMS) وكود الحريق السعودي (SBC 801):
@@ -1948,7 +2224,11 @@
             timeoutMs: 18000
           });
           if (res && res.text) {
-            return { success: true, answer: res.text, source: `Google ${res.model}` };
+            return {
+              success: true,
+              answer: res.text,
+              source: res.provider === 'firebase-ai-logic' ? `Firebase AI Logic (${res.model})` : `Google ${res.model}`
+            };
           }
         } catch (err) {
           console.warn('[KSUAI] Direct assistant call failed:', err.message);
@@ -1977,12 +2257,13 @@
      * 5. المحور الثالث: تفكيك وهيكلة الإملاء الصوتي الميداني (Voice-to-Report with Gemini)
      */
     async structureVoiceRecord(transcript, formType = 'safety_violation') {
+      const useFirebaseAI = this.isFirebaseAILogicEnabled();
       let geminiKeys = this.getGeminiKeys();
-      if (!geminiKeys.length) {
+      if (!useFirebaseAI && !geminiKeys.length) {
         await this.fetchCloudKeysSilently();
         geminiKeys = this.getGeminiKeys();
       }
-      if (geminiKeys.length > 0) {
+      if (useFirebaseAI || geminiKeys.length > 0) {
         try {
           const prompt = `أنت مساعد ذكي للأمن والسلامة بالمدينة الطبية بجامعة الملك سعود.
 المطلوب: تفكيك وتحويل النص الصوتي التالي إلى حقول منظمة لبلاغ (${formType}):
@@ -2012,7 +2293,7 @@
             return {
               success: true,
               data: this.cleanAndParseJSON(res.text),
-              source: `Google ${res.model}`
+              source: res.provider === 'firebase-ai-logic' ? `Firebase AI Logic (${res.model})` : `Google ${res.model}`
             };
           }
         } catch (geminiErr) {
@@ -2385,12 +2666,13 @@
      */
     async callGeminiCBAHIAudit(building = 'كافة مباني المدينة الطبية (KSUMC)', days = 30, stats = null) {
       stats = stats || this._collectBuildingStats(building, days);
+      const useFirebaseAI = this.isFirebaseAILogicEnabled();
       let geminiKeys = this.getGeminiKeys();
-      if (!geminiKeys.length) {
+      if (!useFirebaseAI && !geminiKeys.length) {
         await this.fetchCloudKeysSilently();
         geminiKeys = this.getGeminiKeys();
       }
-      if (!geminiKeys.length) {
+      if (!useFirebaseAI && !geminiKeys.length) {
         throw new Error('لم يتم ضبط مفاتيح Gemini API صالحة');
       }
 
@@ -2565,7 +2847,7 @@
         building,
         time_window_days: days,
         data: parsedData,
-        source: `Google ${res.model || 'Gemini'}`
+        source: res.provider === 'firebase-ai-logic' ? `Firebase AI Logic (${res.model})` : `Google ${res.model || 'Gemini'}`
       };
     },
 
@@ -3687,6 +3969,7 @@
     const totalKeys = gemCount + qwenCount;
     const hasCustomAgent = Boolean(KSUAI && KSUAI.oracleAgentUrl);
     const isDemo = Boolean(KSUAI && typeof KSUAI._isDemoSession === 'function' && KSUAI._isDemoSession());
+    const hasFirebaseAILogic = !isDemo && Boolean(KSUAI && typeof KSUAI.isFirebaseAILogicEnabled === 'function' && KSUAI.isFirebaseAILogicEnabled());
 
     if (demoPanel) {
       if (isDemo) demoPanel.classList.remove('hidden');
@@ -3707,7 +3990,15 @@
       return;
     }
 
-    if (totalKeys > 0) {
+    if (hasFirebaseAILogic) {
+      badge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-emerald-300 text-[11px] font-bold border border-white/15';
+      if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+      text.textContent = totalKeys > 0
+        ? `الراصد الذكي جاهز (Firebase AI Logic + ${totalKeys} احتياطي)`
+        : 'الراصد الذكي جاهز (Firebase AI Logic)';
+      if (footerDot) footerDot.className = 'inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+      if (footerText) footerText.textContent = 'محرك Firebase AI Logic متصل ومؤمّن بـ App Check (reCAPTCHA Enterprise)';
+    } else if (totalKeys > 0) {
       badge.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 text-emerald-300 text-[11px] font-bold border border-white/15';
       if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
       text.textContent = `الراصد الذكي جاهز (${totalKeys} ${totalKeys === 1 ? 'مفتاح' : 'مفاتيح'})`;
@@ -6639,17 +6930,18 @@
       }
     }
 
+    const useFirebaseAI = typeof KSUAI.isFirebaseAILogicEnabled === 'function' && KSUAI.isFirebaseAILogicEnabled();
     let geminiKeys = (typeof KSUAI.getGeminiKeys === 'function')
       ? KSUAI.getGeminiKeys()
       : KSUAI.getSanitizedKeys(KSUAI.geminiApiKey || '');
-    if (!geminiKeys.length && typeof KSUAI.fetchCloudKeysSilently === 'function') {
+    if (!useFirebaseAI && !geminiKeys.length && typeof KSUAI.fetchCloudKeysSilently === 'function') {
       await KSUAI.fetchCloudKeysSilently();
       geminiKeys = (typeof KSUAI.getGeminiKeys === 'function')
         ? KSUAI.getGeminiKeys()
         : KSUAI.getSanitizedKeys(KSUAI.geminiApiKey || '');
     }
 
-    if (geminiKeys.length > 0) {
+    if (useFirebaseAI || geminiKeys.length > 0) {
       const promptText = `أنت خبير واستشاري السلامة والصحة المهنية بالمدينة الطبية بجامعة الملك سعود (KSUMC).
 أمامك صورة جدول التشغيل والتفتيش الشهري للورديات المعتمد (جدول التفتيش اليومي لشهر نوفمبر 2026).
 الوردية المستهدفة لهذا الجدول هي: "${sNames[sKey]}".
@@ -6712,7 +7004,7 @@
             return {
               success: true,
               data: parsed,
-              source: `Google ${res.model} Vision`
+              source: res.provider === 'firebase-ai-logic' ? `Firebase AI Logic (${res.model})` : `Google ${res.model} Vision`
             };
           }
         }

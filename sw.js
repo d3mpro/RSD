@@ -3,7 +3,7 @@
  * المدينة الطبية بجامعة الملك سعود - محرك العمل دون اتصال
  */
 
-const CACHE_NAME = 'rsd-ksu-cache-v3.3.0-vision-recovery';
+const CACHE_NAME = 'rsd-ksu-cache-v3.4.0-ai-logic-sharepoint';
 const FIREBASE_NOTIFS_URL = 'https://rsd-ksu-default-rtdb.firebaseio.com/notifications.json';
 
 // سجل الإشعارات التي تم عرضها عبر Service Worker لمنع التكرار
@@ -224,12 +224,19 @@ self.addEventListener('fetch', (event) => {
   
   if (req.method !== 'GET') return;
 
-  // Ignore API calls, WebSockets, MSAL auth endpoints, or Firebase Realtime DB
+  // Ignore API calls, WebSockets, MSAL auth endpoints, Google APIs, reCAPTCHA, Firebase App Check / AI Logic, or Power Automate
   if (
     req.url.includes('/api/') ||
     req.url.includes('login.microsoftonline.com') ||
     req.url.includes('graph.microsoft.com') ||
-    req.url.includes('firebaseio.com')
+    req.url.includes('firebaseio.com') ||
+    req.url.includes('googleapis.com') ||
+    req.url.includes('google.com/recaptcha') ||
+    req.url.includes('recaptcha.net') ||
+    req.url.includes('gstatic.com/recaptcha') ||
+    req.url.includes('firebaseappcheck') ||
+    req.url.includes('firebasevertexai') ||
+    req.url.includes('powerplatform.com')
   ) {
     return;
   }

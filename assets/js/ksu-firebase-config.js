@@ -15,7 +15,19 @@
     measurementId: "G-HW9W0W6NFH",
     databaseURL: (typeof window !== 'undefined' && window.KSU_FIREBASE_RTDB_URL)
       || (typeof localStorage !== 'undefined' && localStorage.getItem('ksumc_rtdb_url'))
-      || "https://rsd-ksu-default-rtdb.firebaseio.com"
+      || "https://rsd-ksu-default-rtdb.firebaseio.com",
+    recaptchaEnterpriseSiteKey: "6LdbAzMuAAAAAA1rwj9YZfWTW1HSu9FtmAjzrtTh",
+    firebaseAILogic: {
+      enabled: true,
+      backend: "googleai",
+      useLimitedUseAppCheckTokens: true,
+      sdkVersion: "13.4.0",
+      modelHierarchy: [
+        "gemini-3.5-flash-lite",
+        "gemini-3.8-flash",
+        "gemini-4-hydrogen"
+      ]
+    }
   };
 
   window.PROD_FIREBASE_CONFIG = PROD_FIREBASE_CONFIG;

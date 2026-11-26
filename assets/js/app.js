@@ -16407,6 +16407,9 @@ function submitSafetyDeptReport() {
   if (!isDemo && window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncSafetyDeptReport === 'function') {
     window.ksuFirebaseSync.syncSafetyDeptReport(reportToSave);
   }
+  if (!isDemo && !window._ksumcApplyingRemoteSync && window.KSUDataBridge && typeof window.KSUDataBridge.syncToSharePoint === 'function') {
+    try { window.KSUDataBridge.syncToSharePoint(reportToSave, 'inspection'); } catch (_) {}
+  }
 
   notifyCloudSync();
   renderSafetyDeptReportsTable();
@@ -21789,7 +21792,7 @@ function getShiftInspectionRecords() {
   return syncRoundsToShiftInspectionLog(true);
 }
 
-function saveShiftInspectionRecords(records) {
+function saveShiftInspectionRecords(records, targetRecord) {
   const isDemo = isDemoSandboxSession();
   setOperationalStorageItem(STORAGE_KEY_SHIFT_INSPECTION_LOGS, JSON.stringify(records));
   if (!isDemo && !window._ksumcApplyingRemoteSync && window.KSUOracleSync && typeof window.KSUOracleSync.saveShiftLog === 'function') {
@@ -21797,6 +21800,9 @@ function saveShiftInspectionRecords(records) {
   }
   if (!isDemo && window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncShiftLogs === 'function') {
     window.ksuFirebaseSync.syncShiftLogs(records);
+  }
+  if (!isDemo && !window._ksumcApplyingRemoteSync && targetRecord && window.KSUDataBridge && typeof window.KSUDataBridge.syncToSharePoint === 'function') {
+    try { window.KSUDataBridge.syncToSharePoint(targetRecord, 'inspection'); } catch (_) {}
   }
   notifyCloudSync();
 }
@@ -22464,12 +22470,13 @@ function saveNewShiftInspectionRecord(event) {
     workflowStatusLabel: 'بانتظار اعتماد قسم الجودة وتقييم الأداء',
     supervisor: state.currentUser ? state.currentUser.name : 'مشرف الوردية',
     duration: '15 دقيقة',
+    timestamp: nowIso,
     updatedAt: nowIso,
     updatedAtMs: Date.now()
   };
 
   records.unshift(newRec);
-  saveShiftInspectionRecords(records);
+  saveShiftInspectionRecords(records, newRec);
   closeAddShiftInspectionModal();
   renderQualityShiftInspectionLog();
   if (typeof renderQualityWorkflowInbox === 'function') renderQualityWorkflowInbox();

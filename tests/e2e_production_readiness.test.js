@@ -458,7 +458,7 @@ test('Tier 1.7: Production Hosting Configuration & Security Parity', () => {
 
   // Check sw.js cache bump
   assert.ok(
-    swJsSource.includes('rsd-ksu-cache-v3.3.0-vision-recovery') || swJsSource.includes('rsd-ksu-cache-v3.2.0-governance') || swJsSource.includes('rsd-ksu-cache-v3.1.0-official-launch') || swJsSource.includes('rsd-ksu-cache-v3.0.0-prod-launch'),
+    swJsSource.includes('rsd-ksu-cache-v3.4.0-ai-logic-sharepoint') || swJsSource.includes('rsd-ksu-cache-v3.3.0-vision-recovery') || swJsSource.includes('rsd-ksu-cache-v3.2.0-governance') || swJsSource.includes('rsd-ksu-cache-v3.1.0-official-launch') || swJsSource.includes('rsd-ksu-cache-v3.0.0-prod-launch'),
     'sw.js must use bumped production CACHE_NAME'
   );
 });
