@@ -13567,6 +13567,12 @@ function initModalSignaturePads(canvasIds) {
 // =============================================================
 // HOT WORK PERMIT MODULE (Official Document 4 Replica)
 // =============================================================
+function setPermitsFilter(filterKey) {
+  state.permitsFilter = filterKey || 'all';
+  renderPermitsList();
+}
+window.setPermitsFilter = setPermitsFilter;
+
 function renderPermitsList() {
   const containers = [
     document.getElementById('permits-list-container'),
@@ -13582,52 +13588,85 @@ function renderPermitsList() {
     } catch(e) {}
   }
 
-  const permits = (state.permits || []).slice().sort((a, b) => {
+  const allPermits = (state.permits || []).slice().sort((a, b) => {
     const tA = new Date(a.createdAt || a.updatedAt || a.date || 0).getTime() || 0;
     const tB = new Date(b.createdAt || b.updatedAt || b.date || 0).getTime() || 0;
     return tB - tA;
   });
 
+  const isActivePermit = (p) => !p.status || p.status.includes('ساري') || p.status.includes('معتمد') || p.status.includes('مطابق');
+  const activeFilter = state.permitsFilter || 'all';
+  const permits = allPermits.filter(p => {
+    if (activeFilter === 'active') return isActivePermit(p);
+    if (activeFilter === 'expired') return !isActivePermit(p);
+    return true;
+  });
+
+  // Update quick filter button states if present
+  const filterBtnMap = {
+    all: document.getElementById('btn-permit-filter-all'),
+    active: document.getElementById('btn-permit-filter-active'),
+    expired: document.getElementById('btn-permit-filter-expired')
+  };
+  Object.keys(filterBtnMap).forEach(key => {
+    const b = filterBtnMap[key];
+    if (!b) return;
+    if (key === activeFilter) {
+      b.className = 'px-3 py-1.5 rounded-lg bg-[#082B49] text-white font-bold text-xs shadow-2xs transition-all cursor-pointer';
+    } else {
+      b.className = 'px-3 py-1.5 rounded-lg bg-[#EBEEF3] hover:bg-slate-200 text-[#082B49] font-semibold text-xs transition-all cursor-pointer';
+    }
+  });
+
   const htmlContent = (permits.length === 0) ? `
-    <div class="p-8 text-center bg-surface-container-lowest rounded-2xl border border-outline-variant/30 text-on-surface-variant">
-      <span class="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-2">local_fire_department</span>
-      <p class="font-bold text-sm">لا توجد تصاريح عمل ساخن مسجلة حالياً</p>
+    <div class="p-8 text-center bg-white rounded-2xl border border-[#C3C6CE]/60 text-[#5B626C] shadow-2xs">
+      <span class="material-symbols-outlined text-4xl text-[#004B87]/35 mb-2 block">verified_user</span>
+      <p class="font-bold text-sm text-[#082B49]">${allPermits.length === 0 ? 'لا توجد تصاريح عمل مسجلة حالياً' : 'لا توجد تصاريح مطابقة للتصفية المختارة'}</p>
     </div>
-  ` : permits.map(p => `
-    <div class="p-4 sm:p-5 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 border-r-4 border-r-amber-500 shadow-xs hover:shadow-md transition-all flex flex-col gap-3.5 hover:border-amber-400/50">
+  ` : permits.map(p => {
+    const isPermitActive = isActivePermit(p);
+    const statusText = isPermitActive
+      ? (p.status && p.status.includes('ساري') ? p.status : 'ساري ومعتمد في الأرشيف ✓')
+      : (p.status || 'منتهي الصلاحية');
+    const statusPillClass = isPermitActive
+      ? 'bg-[#E8F5E9] text-[#1E7E34] border-[#1E7E34]/30'
+      : 'bg-slate-100 text-slate-700 border-slate-300';
+
+    return `
+    <div class="p-4 sm:p-5 rounded-2xl bg-white border border-[#C3C6CE]/70 border-r-4 border-r-[#004B87] shadow-xs hover:shadow-md transition-all flex flex-col gap-3.5 hover:border-[#004B87]/60">
       <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
         <div class="flex items-start gap-3 w-full lg:w-auto">
-          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-            <span class="material-symbols-outlined text-headline-sm">local_fire_department</span>
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#004B87] to-[#082B49] text-[#F9F1DC] flex items-center justify-center shrink-0 shadow-sm border border-[#C59B27]/30">
+            <span class="material-symbols-outlined text-headline-sm">verified_user</span>
           </div>
           <div class="flex flex-col flex-grow">
             <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="font-title-md text-primary font-black text-sm sm:text-base">${p.workType || 'أعمال ساخنة'}</span>
-              <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-black border border-emerald-300 flex items-center gap-1">
+              <span class="font-title-md text-[#082B49] font-black text-sm sm:text-base">${p.workType || 'أعمال ساخنة'}</span>
+              <span class="px-2.5 py-0.5 rounded-full ${statusPillClass} text-[11px] font-black border flex items-center gap-1">
                 <span class="material-symbols-outlined text-xs">verified</span>
-                <span>${p.status && p.status.includes('ساري') ? p.status : 'ساري ومعتمد في الأرشيف ✓'}</span>
+                <span>${statusText}</span>
               </span>
-              <span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 text-[11px] font-mono font-bold">${p.id}</span>
-              ${p.applicantSignature ? '<span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[10px] font-bold flex items-center gap-1"><span class="material-symbols-outlined text-xs">draw</span> توقيع رقمي معتمد</span>' : ''}
-              <span class="px-2 py-0.5 rounded-md bg-surface-container text-on-surface-variant text-[10px] font-mono font-semibold">${p.date || ''}</span>
+              <span class="px-2 py-0.5 rounded-md bg-[#F9F1DC] text-[#7c5806] border border-[#C59B27]/50 text-[11px] font-mono font-bold">${p.id}</span>
+              ${p.applicantSignature ? '<span class="px-2 py-0.5 rounded-full bg-[#D1E4FF]/50 text-[#004B87] border border-[#004B87]/20 text-[10px] font-bold flex items-center gap-1"><span class="material-symbols-outlined text-xs">draw</span> توقيع رقمي معتمد</span>' : ''}
+              <span class="px-2 py-0.5 rounded-md bg-[#F7F9FF] text-[#5B626C] border border-[#E0E3E8] text-[10px] font-mono font-semibold">${p.date || ''}</span>
             </div>
-            <div class="text-[11px] text-on-surface-variant font-semibold mt-0.5">
-              ترخيص عمل ساخن معتمد ومؤرشف رسمياً • الإدارة العامة للأمن والسلامة الميدانية
+            <div class="text-[11px] text-[#5B626C] font-semibold mt-0.5">
+              الإدارة العامة للأمن والسلامة • تصريح عمل معتمد ومؤرشف رسمياً
             </div>
           </div>
         </div>
         
         <!-- Action Buttons (Permanent: No Delete Button) -->
         <div class="flex items-center gap-2 self-end lg:self-center shrink-0 flex-wrap">
-          <button type="button" onclick="openOfficialPermitCardModal('${p.id}')" class="px-3 py-1.5 rounded-xl bg-[#004B87] hover:bg-[#003B6B] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer">
-            <span class="material-symbols-outlined text-sm">verified</span>
-            <span>عرض كرت التصريح المعتمد 🛡️</span>
+          <button type="button" onclick="openOfficialPermitCardModal('${p.id}')" class="px-3.5 py-1.5 rounded-xl bg-[#004B87] hover:bg-[#082B49] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer">
+            <span class="material-symbols-outlined text-sm text-[#F9F1DC]">verified_user</span>
+            <span>عرض الكرت المعتمد</span>
           </button>
-          <button type="button" onclick="printHotWorkPermit('${p.id}')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold text-xs shadow-xs transition-colors cursor-pointer">
-            <span class="material-symbols-outlined text-sm text-amber-700">print</span>
-            <span>طباعة (PDF)</span>
+          <button type="button" onclick="printHotWorkPermit('${p.id}')" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F7F9FF] hover:bg-[#EBEEF3] text-[#082B49] border border-[#C3C6CE] font-bold text-xs shadow-xs transition-colors cursor-pointer">
+            <span class="material-symbols-outlined text-sm text-[#004B87]">print</span>
+            <span>طباعة (A4)</span>
           </button>
-          <button type="button" onclick="scanQRPermit('${p.id}')" class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-primary font-bold text-xs transition-colors cursor-pointer" title="التحقق من رمز QR">
+          <button type="button" onclick="scanQRPermit('${p.id}')" class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#EBEEF3] hover:bg-slate-200 text-[#082B49] font-bold text-xs transition-colors cursor-pointer" title="التحقق من رمز QR">
             <span class="material-symbols-outlined text-sm">qr_code_2</span>
             <span>QR</span>
           </button>
@@ -13635,68 +13674,69 @@ function renderPermitsList() {
       </div>
 
       <!-- Structured Metadata Grid Chips -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-1 border-t border-outline-variant/20">
-        <div class="flex items-center gap-2 p-2 rounded-xl bg-surface-container-low/60 border border-outline-variant/30 text-xs">
-          <span class="material-symbols-outlined text-primary text-base shrink-0">engineering</span>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-2 border-t border-[#E0E3E8]">
+        <div class="flex items-center gap-2 p-2.5 rounded-xl bg-[#F7F9FF] border border-[#E0E3E8] text-xs">
+          <span class="material-symbols-outlined text-[#004B87] text-base shrink-0">engineering</span>
           <div class="truncate">
-            <span class="text-on-surface-variant text-[10px] block leading-none">طالب التصريح / الفني</span>
-            <span class="font-bold text-primary truncate block mt-0.5">${p.applicant || p.contractor || 'فني صيانة معتمد'}</span>
+            <span class="text-[#5B626C] text-[10px] block leading-none">طالب التصريح / الفني</span>
+            <span class="font-extrabold text-[#082B49] truncate block mt-0.5">${p.applicant || p.contractor || 'فني صيانة معتمد'}</span>
           </div>
         </div>
 
-        <div class="flex items-center gap-2 p-2 rounded-xl bg-surface-container-low/60 border border-outline-variant/30 text-xs">
-          <span class="material-symbols-outlined text-primary text-base shrink-0">location_on</span>
+        <div class="flex items-center gap-2 p-2.5 rounded-xl bg-[#F7F9FF] border border-[#E0E3E8] text-xs">
+          <span class="material-symbols-outlined text-[#004B87] text-base shrink-0">location_on</span>
           <div class="truncate">
-            <span class="text-on-surface-variant text-[10px] block leading-none">الموقع والنطاق</span>
-            <span class="font-bold text-on-surface truncate block mt-0.5">${p.location || (p.zone ? `${p.zone} - ${p.floor}` : 'المبنى الرئيسي')}</span>
+            <span class="text-[#5B626C] text-[10px] block leading-none">الموقع والنطاق</span>
+            <span class="font-extrabold text-[#181C20] truncate block mt-0.5">${p.location || (p.zone ? `${p.zone} - ${p.floor}` : 'المبنى الرئيسي')}</span>
           </div>
         </div>
 
-        <div class="flex items-center gap-2 p-2 rounded-xl bg-amber-50/70 border border-amber-200/60 text-xs">
-          <span class="material-symbols-outlined text-amber-700 text-base shrink-0">local_fire_department</span>
+        <div class="flex items-center gap-2 p-2.5 rounded-xl bg-[#F9F1DC]/45 border border-[#C59B27]/40 text-xs">
+          <span class="material-symbols-outlined text-[#7c5806] text-base shrink-0">local_fire_department</span>
           <div class="truncate">
-            <span class="text-amber-900/80 text-[10px] block leading-none">مراقب الحريق المعين</span>
-            <span class="font-bold text-amber-950 truncate block mt-0.5">${p.fireWatch || 'مراقب سلامة معتمد'}</span>
+            <span class="text-[#7c5806] text-[10px] block leading-none">مراقب الحريق المعين</span>
+            <span class="font-extrabold text-[#082B49] truncate block mt-0.5">${p.fireWatch || 'مراقب سلامة معتمد'}</span>
           </div>
         </div>
 
-        <div class="flex items-center gap-2 p-2 rounded-xl bg-emerald-50/70 border border-emerald-200/60 text-xs">
-          <span class="material-symbols-outlined text-emerald-700 text-base shrink-0">shield_person</span>
+        <div class="flex items-center gap-2 p-2.5 rounded-xl bg-[#E8F5E9]/70 border border-[#1E7E34]/30 text-xs">
+          <span class="material-symbols-outlined text-[#1E7E34] text-base shrink-0">shield_person</span>
           <div class="truncate">
-            <span class="text-emerald-900/80 text-[10px] block leading-none">مصدر التصريح والمفتش</span>
-            <span class="font-bold text-emerald-950 truncate block mt-0.5">${p.inspector || p.supervisedBy || 'مفتش السلامة المناوب'}</span>
+            <span class="text-[#1E7E34] text-[10px] block leading-none">مصدر التصريح والمفتش</span>
+            <span class="font-extrabold text-[#082B49] truncate block mt-0.5">${p.inspector || p.supervisedBy || 'مفتش السلامة المناوب'}</span>
           </div>
         </div>
       </div>
 
       <!-- Footer Bar with Validity and Archive Status -->
-      <div class="flex items-center justify-between gap-2 flex-wrap pt-1 text-[11px] text-on-surface-variant border-t border-dashed border-outline-variant/30">
+      <div class="flex items-center justify-between gap-2 flex-wrap pt-1.5 text-[11px] text-[#5B626C] border-t border-dashed border-[#C3C6CE]">
         <div class="flex items-center gap-2 flex-wrap">
-          <span class="flex items-center gap-1 font-bold text-amber-900">
-            <span class="material-symbols-outlined text-xs text-amber-700">schedule</span>
+          <span class="flex items-center gap-1 font-bold text-[#082B49]">
+            <span class="material-symbols-outlined text-xs text-[#004B87]">schedule</span>
             <span>الصلاحية سارية حتى:</span>
-            <span class="font-mono text-amber-900 font-extrabold">${p.validUntil || (p.date + ' ' + (p.endTime || '16:00'))}</span>
+            <span class="font-mono text-[#004B87] font-extrabold">${p.validUntil || (p.date + ' ' + (p.endTime || '16:00'))}</span>
           </span>
           ${p.fireEquipment ? `
-            <span class="text-gray-300">|</span>
-            <span class="flex items-center gap-1 text-gray-600">
-              <span class="material-symbols-outlined text-xs text-gray-500">fire_extinguisher</span>
+            <span class="text-slate-300">|</span>
+            <span class="flex items-center gap-1 text-[#5B626C]">
+              <span class="material-symbols-outlined text-xs text-[#004B87]">fire_extinguisher</span>
               <span>معدات الإطفاء: ${p.fireEquipment}</span>
             </span>
           ` : ''}
         </div>
-        <span class="font-semibold text-emerald-800 flex items-center gap-1">
+        <span class="font-bold text-[#1E7E34] flex items-center gap-1">
           <span class="material-symbols-outlined text-xs">task_alt</span>
-          <span>محفوظ في أرشيف التصاريح الرسمية</span>
+          <span>محفوظ في السجل الرسمي + SharePoint</span>
         </span>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   containers.forEach(c => { c.innerHTML = htmlContent; });
 
-  // Update permit KPIs in ALL views and Bento cards
-  const activeCount = permits.filter(p => !p.status || p.status.includes('ساري') || p.status.includes('معتمد') || p.status.includes('مطابق')).length;
+  // Update permit KPIs in ALL views and Bento cards from full collection
+  const activeCount = allPermits.filter(isActivePermit).length;
   const countLabel = activeCount + ' سارية';
 
   const fieldKpi = document.getElementById('field-kpi-permits-count');
@@ -13717,8 +13757,8 @@ function selectPermitWorkType(type) {
     'غير ذلك': document.getElementById('btn-hw-opt-other')
   };
 
-  const activeClasses = ['border-amber-600', 'bg-amber-600', 'text-white', 'font-black', 'shadow-xs', 'ring-2', 'ring-amber-200'];
-  const inactiveClasses = ['border-gray-200', 'bg-white', 'hover:bg-amber-50', 'text-gray-800', 'font-bold', 'shadow-2xs'];
+  const activeClasses = ['border-[#082B49]', 'bg-[#082B49]', 'text-[#F9F1DC]', 'font-black', 'shadow-sm', 'ring-2', 'ring-[#C59B27]/40'];
+  const inactiveClasses = ['border-[#C3C6CE]', 'bg-white', 'hover:bg-[#F7F9FF]', 'text-[#082B49]', 'font-bold', 'shadow-2xs'];
 
   Object.keys(btns).forEach(key => {
     const btn = btns[key];
@@ -13740,11 +13780,11 @@ function selectPermitWorkType(type) {
     inp.value = '';
     inp.placeholder = 'يرجى كتابة نوع ووصف العمل الساخن بالتفصيل (مثل: تجليخ أسطح، تسخين حراري، عزل مضخات...)...';
     inp.focus();
-    if (hint) hint.innerHTML = '<span class="text-amber-800 font-bold">يرجى كتابة نوع ووصف العمل المطلوب بدقة في الحقل أعلاه.</span>';
+    if (hint) hint.innerHTML = '<span class="text-[#082B49] font-bold">يرجى كتابة نوع ووصف العمل المطلوب بدقة في الحقل أعلاه.</span>';
   } else {
     inp.value = type;
     inp.placeholder = `أعمال ${type} (يمكنك إضافة تفاصيل إضافية مثل: خط الأنابيب، التكييف...)`;
-    if (hint) hint.innerHTML = `النوع المحدد: <strong class="text-amber-800">${type}</strong>. يمكنك كتابة تفاصيل إضافية في الحقل أعلاه إن رغبت.`;
+    if (hint) hint.innerHTML = `النوع المحدد: <strong class="text-[#082B49]">${type}</strong>. يمكنك كتابة تفاصيل إضافية في الحقل أعلاه إن رغبت.`;
   }
 }
 window.selectPermitWorkType = selectPermitWorkType;
@@ -13805,8 +13845,8 @@ function openNewPermitModal() {
           'قص + لحام': document.getElementById('btn-hw-opt-cutweld'),
           'غير ذلك': document.getElementById('btn-hw-opt-other')
         };
-        const activeClasses = ['border-amber-600', 'bg-amber-600', 'text-white', 'font-black', 'shadow-xs', 'ring-2', 'ring-amber-200'];
-        const inactiveClasses = ['border-gray-200', 'bg-white', 'hover:bg-amber-50', 'text-gray-800', 'font-bold', 'shadow-2xs'];
+        const activeClasses = ['border-[#082B49]', 'bg-[#082B49]', 'text-[#F9F1DC]', 'font-black', 'shadow-sm', 'ring-2', 'ring-[#C59B27]/40'];
+        const inactiveClasses = ['border-[#C3C6CE]', 'bg-white', 'hover:bg-[#F7F9FF]', 'text-[#082B49]', 'font-bold', 'shadow-2xs'];
         let matched = (val === 'قص' || val === 'لحام' || val === 'قص + لحام') ? val : 'غير ذلك';
         Object.keys(btns).forEach(key => {
           const btn = btns[key];
@@ -17287,41 +17327,51 @@ function printHotWorkPermit(permitId) {
   <title>تصريح عمل على الساخن / HOT WORK PERMIT - ${p.id}</title>
   <style>
     @page { size: A4 landscape; margin: 6mm 8mm; }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; }
-    body { background: #fff; color: #000; font-size: 9px; line-height: 1.25; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif; }
+    body { background: #fff; color: #181C20; font-size: 9px; line-height: 1.25; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .sheet-frame {
       width: 100%;
-      border: 2px solid #000;
+      border: 2.5px solid #082B49;
+      border-radius: 6px;
       padding: 5px 8px;
       position: relative;
+      background: #fff;
     }
     .sheet-inner {
-      border: 1px solid #000;
+      border: 1px solid #C3C6CE;
+      border-radius: 4px;
       padding: 6px 8px;
     }
     .header-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 4px;
+      margin-bottom: 5px;
+      background: #082B49;
+      color: #fff;
+      border-bottom: 3px solid #C59B27;
+      border-radius: 4px;
     }
     .header-table td {
-      vertical-align: top;
+      vertical-align: middle;
+      padding: 6px 10px;
     }
     .col-container {
       display: flex;
       width: 100%;
-      border-top: 1.5px solid #000;
-      padding-top: 5px;
+      gap: 8px;
+      padding-top: 4px;
     }
     .col-half {
       width: 50%;
       box-sizing: border-box;
-      padding: 0 8px;
+      padding: 6px 8px;
+      background: #F7F9FF;
+      border: 1px solid #C3C6CE;
+      border-radius: 5px;
     }
     .col-left {
       direction: ltr;
       text-align: left;
-      border-right: 1.5px solid #000;
     }
     .col-right {
       direction: rtl;
@@ -17337,21 +17387,29 @@ function printHotWorkPermit(permitId) {
     }
     .field-label {
       font-weight: bold;
+      color: #334155;
     }
     .field-val {
-      border-bottom: 1px dotted #333;
+      border-bottom: 1px dotted #004B87;
       padding: 0 4px;
       font-weight: bold;
       color: #082B49;
     }
     .sec-title {
       font-weight: 900;
-      font-size: 9px;
+      font-size: 8.5px;
       margin: 5px 0 3px 0;
-      text-decoration: underline;
+      padding: 2px 5px;
+      background: #004B87;
+      color: #fff;
+      border-radius: 3px;
     }
     .chk-list {
       margin-bottom: 4px;
+      background: #fff;
+      padding: 3px 5px;
+      border-radius: 4px;
+      border: 1px solid #E0E3E8;
     }
     .chk-item {
       display: flex;
@@ -17360,24 +17418,34 @@ function printHotWorkPermit(permitId) {
       margin-bottom: 2px;
       font-size: 8px;
       line-height: 1.2;
+      border-bottom: 1px dashed #E0E3E8;
+      padding-bottom: 1px;
     }
     .officer-block {
-      border-top: 1px solid #000;
+      border-top: 1px solid #C3C6CE;
       padding-top: 3px;
-      margin-top: 5px;
+      margin-top: 4px;
+      background: #fff;
+      padding: 4px 6px;
+      border-radius: 4px;
     }
     .legal-note {
       font-size: 7.5px;
       line-height: 1.2;
       margin-top: 3px;
+      color: #334155;
     }
     .fire-call {
       text-align: center;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 900;
-      margin-top: 5px;
-      padding-top: 2px;
+      margin-top: 4px;
+      padding: 3px 6px;
       letter-spacing: 0.5px;
+      background: #FFEBEE;
+      color: #D32F2F;
+      border: 1px solid #FCA5A5;
+      border-radius: 4px;
     }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -17389,34 +17457,33 @@ function printHotWorkPermit(permitId) {
   <div class="sheet-frame">
     <div class="sheet-inner">
 
-      <!-- TOP BILINGUAL HEADER (Exact Replica of Document) -->
+      <!-- TOP BILINGUAL HEADER (KSUMC RSD Royal Navy & Gold Identity) -->
       <table class="header-table">
         <tr>
           <!-- Left: English Header -->
-          <td style="width: 38%; text-align: left; direction: ltr; font-size: 9px; line-height: 1.2;">
-            <div style="font-weight: bold; margin-bottom: 1px;">Certificate No. : ( <span style="font-family: monospace; font-size: 10.5px; color: #082B49;">${p.id}</span> )</div>
-            <div>Kingdome of Saudi Arabia</div>
-            <div>Ministry of Higher Education</div>
-            <div>King Saud University</div>
-            <div>College of Medicine and King Khalid University Hospital</div>
-            <div style="font-size: 13px; font-weight: 900; margin-top: 2px; letter-spacing: 0.5px;">HOT WORK PERMIT</div>
+          <td style="width: 38%; text-align: left; direction: ltr; font-size: 8.5px; line-height: 1.25;">
+            <div style="font-weight: bold; margin-bottom: 1px; color: #F9F1DC;">Certificate No.: ( <span style="font-family: monospace; font-size: 10.5px; color: #ffffff;">${p.id}</span> )</div>
+            <div>Kingdom of Saudi Arabia</div>
+            <div>Ministry of Education • King Saud University</div>
+            <div>King Khalid University Hospital (KSUMC)</div>
+            <div style="font-size: 12.5px; font-weight: 900; margin-top: 2px; letter-spacing: 0.5px; color: #F9F1DC;">HOT WORK PERMIT</div>
           </td>
 
-          <!-- Center: Official KSU Logo -->
+          <!-- Center: Official KSU Logo & QR -->
           <td style="width: 24%; text-align: center; vertical-align: middle;">
-            <img src="assets/images/ksu_official_logo.png" alt="جامعة الملك سعود" style="height: 48px; width: auto; max-width: 150px; object-fit: contain;" onerror="this.src='ksu_official_logo.png'">
-            ${qrSvg ? `<div style="margin-top: 1px;">${qrSvg}</div>` : ''}
+            <div style="display: inline-flex; align-items: center; gap: 6px; background: #fff; padding: 3px 8px; border-radius: 6px;">
+              <img src="assets/images/ksu_official_logo.png" alt="جامعة الملك سعود" style="height: 44px; width: auto; max-width: 130px; object-fit: contain;" onerror="this.style.display='none'">
+              ${qrSvg ? `<div style="display: inline-block;">${qrSvg}</div>` : ''}
+            </div>
           </td>
 
           <!-- Right: Arabic Header -->
-          <td style="width: 38%; text-align: right; direction: rtl; font-size: 9px; line-height: 1.2;">
-            <div style="font-weight: bold; margin-bottom: 1px;">شهادة رقم : ( <span style="font-family: monospace; font-size: 10.5px; color: #082B49;">${p.id}</span> )</div>
+          <td style="width: 38%; text-align: right; direction: rtl; font-size: 8.5px; line-height: 1.25;">
+            <div style="font-weight: bold; margin-bottom: 1px; color: #F9F1DC;">شهادة رقم : ( <span style="font-family: monospace; font-size: 10.5px; color: #ffffff;">${p.id}</span> )</div>
             <div>المملكة العربية السعودية</div>
-            <div>وزارة التعليم العالي</div>
-            <div>جامعة الملك سعود</div>
-            <div>الإدارة العامة للأمن والسلامة بالمدينة الطبية</div>
-            <div>قسم السلامة</div>
-            <div style="font-size: 14px; font-weight: 900; margin-top: 2px;">تصريح عمل على الساخن</div>
+            <div>وزارة التعليم • جامعة الملك سعود</div>
+            <div>الإدارة العامة للأمن والسلامة بالمدينة الطبية • إدارة السلامة</div>
+            <div style="font-size: 13.5px; font-weight: 900; margin-top: 2px; color: #F9F1DC;">تصريح عمل على الساخن</div>
           </td>
         </tr>
       </table>
@@ -17449,19 +17516,19 @@ function printHotWorkPermit(permitId) {
             <span><span class="field-label">Duration of work :</span> Starting time <span class="field-val">${p.startTime || '08:00'}</span></span>
             <span>End time <span class="field-val">${p.endTime || '16:00'}</span></span>
           </div>
-          <div style="font-size: 7.5px; color: #444; margin-top: -2px; margin-bottom: 3px;">(This permit is not valid for more than 8 hours)</div>
+          <div style="font-size: 7.5px; color: #475569; margin-top: -2px; margin-bottom: 3px;">(This permit is not valid for more than 8 hours)</div>
 
           <div class="field-row">
             <span style="width: 100%;"><span class="field-label">Description of Work:</span> <span class="field-val" style="display: inline-block; width: 75%;">${p.workType || 'Hot Works (Welding / Cutting / Grinding)'}</span></span>
           </div>
 
           <div class="field-row">
-            <span><span class="field-label">Location:</span> Zoon No. ( <span class="field-val">${p.zone || 'Zone A'}</span> )</span>
+            <span><span class="field-label">Location:</span> Zone No. ( <span class="field-val">${p.zone || 'Zone A'}</span> )</span>
             <span>Floor No. ( <span class="field-val">${p.floor || 'Ground'}</span> )</span>
-            <span>section \\ Room No. ( <span class="field-val">${p.room || '-'}</span> )</span>
+            <span>Section / Room No. ( <span class="field-val">${p.room || '-'}</span> )</span>
           </div>
 
-          <div class="sec-title">Answer all items Yes, No or N/A Filling by safety officer.</div>
+          <div class="sec-title">Answer all items Yes, No or N/A — Safety Officer Verification</div>
 
           <div class="chk-list">
             ${checklistDefs.map(item => `
@@ -17474,7 +17541,7 @@ function printHotWorkPermit(permitId) {
           </div>
 
           <div class="officer-block">
-            <div style="font-weight: bold; font-size: 8px;">Has been implemented the steps listed above by a representative of the department of safety and security : Officer preview</div>
+            <div style="font-weight: bold; font-size: 8px; color: #082B49;">Verified & Implemented by Safety Department Representative (Inspecting Officer):</div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
               <span><span class="field-label">Name:</span> <span class="field-val">${p.inspector || p.supervisedBy || 'Safety Inspector'}</span></span>
               <span><span class="field-label">Date:</span> <span class="field-val">${p.date || '-'}</span></span>
@@ -17483,43 +17550,43 @@ function printHotWorkPermit(permitId) {
           </div>
 
           <div class="legal-note">
-            <strong>Note:</strong> Keep this permit with the technical specialist during the implementation of hot work, and work certificate can cancel by the Department of safety and security in the event of failure to follow safety requirements.
+            <strong>Note:</strong> Keep this permit with the technical specialist during hot work. This permit may be revoked by the Safety Department in the event of non-compliance.
           </div>
 
           <div class="fire-call">
-            {{ IN CASE OF FIRE CALL (953) }}
+            IN CASE OF FIRE CALL EXT. (953) • SAFETY EMERGENCY
           </div>
         </div>
 
         <!-- RIGHT COLUMN: ARABIC (RTL) -->
         <div class="col-half col-right">
           <div class="field-row">
-            <span><span class="field-label">إسم مقدم الطلب (الشركة/القسم):</span> <span class="field-val">${p.contractor || p.applicant || 'المقاول المعتمد'}</span></span>
+            <span><span class="field-label">اسم مقدم الطلب (الشركة/القسم):</span> <span class="field-val">${p.contractor || p.applicant || 'المقاول المعتمد'}</span></span>
             <span><span class="field-label">التاريخ:</span> <span class="field-val">${p.date || '-'}</span></span>
           </div>
 
           <div class="field-row">
-            <span><span class="field-label">إسم الفني المختص:</span> <span class="field-val">${p.technician || p.applicant || 'فني الصيانة'}</span></span>
+            <span><span class="field-label">اسم الفني المختص:</span> <span class="field-val">${p.technician || p.applicant || 'فني الصيانة'}</span></span>
             <span><span class="field-label">الرقم الوظيفي:</span> <span class="field-val">${p.jobId || '-'}</span></span>
           </div>
 
           <div class="field-row">
-            <span><span class="field-label">التلفون:</span> <span class="field-val">${p.tel || '-'}</span></span>
+            <span><span class="field-label">رقم الهاتف:</span> <span class="field-val">${p.tel || '-'}</span></span>
           </div>
 
           <div class="field-row" style="align-items: center;">
-            <span><span class="field-label">يتم الإشراف بواسطة الفني (الإسم):</span> <span class="field-val">${p.supervisedBy || 'إدارة السلامة'}</span></span>
+            <span><span class="field-label">يتم الإشراف بواسطة (الاسم):</span> <span class="field-val">${p.supervisedBy || 'إدارة السلامة'}</span></span>
             <span><span class="field-label">التوقيع:</span> ${applicantSigImg}</span>
           </div>
 
           <div class="field-row">
-            <span><span class="field-label">الفترة الزمنية :</span> إبتداءً من الساعة: <span class="field-val">${p.startTime || '08:00'}</span></span>
-            <span>انتهى العمل بتمام الساعة: <span class="field-val">${p.endTime || '16:00'}</span></span>
+            <span><span class="field-label">الفترة الزمنية:</span> ابتداءً من الساعة: <span class="field-val">${p.startTime || '08:00'}</span></span>
+            <span>انتهاء العمل بتمام الساعة: <span class="field-val">${p.endTime || '16:00'}</span></span>
           </div>
-          <div style="font-size: 7.5px; color: #444; margin-top: -2px; margin-bottom: 3px;">(هذا التصريح غير صالح لأكثر من 8 ساعات)</div>
+          <div style="font-size: 7.5px; color: #475569; margin-top: -2px; margin-bottom: 3px;">(هذا التصريح غير صالح لأكثر من 8 ساعات)</div>
 
           <div class="field-row">
-            <span style="width: 100%;"><span class="field-label">وصف عمل :</span> <span class="field-val" style="display: inline-block; width: 78%;">${p.workType || 'أعمال ساخنة (قص / لحام / تجليخ)'}</span></span>
+            <span style="width: 100%;"><span class="field-label">وصف العمل:</span> <span class="field-val" style="display: inline-block; width: 78%;">${p.workType || 'أعمال ساخنة (قص / لحام / تجليخ)'}</span></span>
           </div>
 
           <div class="field-row">
@@ -17528,7 +17595,7 @@ function printHotWorkPermit(permitId) {
             <span>قسم / غرفة رقم ( <span class="field-val">${p.room || '-'}</span> )</span>
           </div>
 
-          <div class="sec-title">يجب الإجابة على هذه البنود بنعم أو لا أو غير مطابق من قبل السلامة:</div>
+          <div class="sec-title">تحقق مفتش السلامة (نعم / لا / لا ينطبق)</div>
 
           <div class="chk-list">
             ${checklistDefs.map(item => `
@@ -17541,20 +17608,20 @@ function printHotWorkPermit(permitId) {
           </div>
 
           <div class="officer-block">
-            <div style="font-weight: bold; font-size: 8px;">تم تنفيذ الخطوات المدونة أعلاه بواسطة ممثل إدارة السلامة والأمن : ضابط المعاينة</div>
+            <div style="font-weight: bold; font-size: 8px; color: #082B49;">تم تنفيذ والتحقق من البنود أعلاه بواسطة ممثل إدارة السلامة (ضابط المعاينة):</div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px;">
-              <span><span class="field-label">الإسم:</span> <span class="field-val">${p.inspector || p.supervisedBy || 'مفتش السلامة'}</span></span>
+              <span><span class="field-label">الاسم:</span> <span class="field-val">${p.inspector || p.supervisedBy || 'مفتش السلامة'}</span></span>
               <span><span class="field-label">التاريخ:</span> <span class="field-val">${p.date || '-'}</span></span>
               <span><span class="field-label">التوقيع:</span> ${safetySigImg}</span>
             </div>
           </div>
 
           <div class="legal-note">
-            <strong>ملاحظة:</strong> يبقى هذا التصريح مع الفني المختص أثناء تنفيذ العمل الساخن، ويمكن سحب شهادة العمل الساخن هذه بواسطة إدارة السلامة والأمن في حال عدم التقيد وإتباع إجراءات السلامة.
+            <strong>ملاحظة:</strong> يبقى هذا التصريح مع الفني المختص أثناء تنفيذ العمل الساخن، ويمكن سحب شهادة العمل الساخن بواسطة إدارة السلامة في حال عدم التقيد بإجراءات السلامة.
           </div>
 
           <div class="fire-call">
-            {{ في حال حدوث حريق إتصل على الرقم (953) }}
+            في حال حدوث حريق الاتصال على الرقم (953) • طوارئ السلامة
           </div>
         </div>
 
@@ -26982,7 +27049,7 @@ function renderQualityDoorsAndPermitsInbox() {
     return `
       <div class="p-4 rounded-2xl bg-white border ${isApproved ? 'border-emerald-200' : (isReturned ? 'border-rose-200' : 'border-outline-variant/40')} shadow-2xs flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
         <div class="flex items-start gap-3">
-          <div class="w-11 h-11 rounded-xl ${item._type === 'door' ? 'bg-teal-100 text-teal-800' : 'bg-amber-100 text-amber-800'} flex items-center justify-center shrink-0">
+          <div class="w-11 h-11 rounded-xl ${item._type === 'door' ? 'bg-teal-100 text-teal-800' : 'bg-[#082B49] text-[#F9F1DC]'} flex items-center justify-center shrink-0">
             <span class="material-symbols-outlined">${item.icon}</span>
           </div>
           <div class="space-y-1">
@@ -27005,13 +27072,13 @@ function renderQualityDoorsAndPermitsInbox() {
             <span>سجل معتمد ومؤرشف</span>
           </span>
           ${item._type === 'permit' ? `
-            <button type="button" onclick="openOfficialPermitCardModal('${item.id}')" class="px-3 py-1.5 rounded-xl bg-[#004B87] hover:bg-[#003B6B] text-white font-bold text-xs flex items-center gap-1 shadow-xs transition-all active:scale-95 cursor-pointer">
-              <span class="material-symbols-outlined text-sm">verified</span>
-              <span>عرض كرت التصريح المعتمد 🛡️</span>
+            <button type="button" onclick="openOfficialPermitCardModal('${item.id}')" class="px-3.5 py-1.5 rounded-xl bg-[#004B87] hover:bg-[#082B49] text-white font-bold text-xs flex items-center gap-1 shadow-xs transition-all active:scale-95 cursor-pointer">
+              <span class="material-symbols-outlined text-sm text-[#F9F1DC]">verified_user</span>
+              <span>عرض الكرت المعتمد</span>
             </button>
-            <button type="button" onclick="printHotWorkPermit('${item.id}')" class="px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer">
-              <span class="material-symbols-outlined text-sm text-amber-700">print</span>
-              <span>طباعة التصريح (PDF)</span>
+            <button type="button" onclick="printHotWorkPermit('${item.id}')" class="px-2.5 py-1.5 rounded-xl bg-[#F7F9FF] hover:bg-[#EBEEF3] text-[#082B49] border border-[#C3C6CE] font-bold text-xs flex items-center gap-1 shadow-xs transition-colors cursor-pointer">
+              <span class="material-symbols-outlined text-sm text-[#004B87]">print</span>
+              <span>طباعة (A4)</span>
             </button>
           ` : ''}
           ${item._type === 'door' && typeof printDoorOpenRequest === 'function' ? `

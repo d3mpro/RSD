@@ -862,14 +862,14 @@
     const checklistHtml = checklistDefs.map((chk, idx) => {
       const isYes = chk.val === 'yes';
       return `
-        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 8px; padding: 2.5px 4px; border-bottom: 1px dashed #e2e8f0;">
-          <div style="max-width: 80%; display: flex; align-items: center; gap: 4px;">
-            <span style="font-weight: bold; color: #004B87;">[${idx + 1}]</span>
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 8px; padding: 3px 6px; border-bottom: 1px dashed #e2e8f0; background: #ffffff;">
+          <div style="max-width: 78%; display: flex; align-items: center; gap: 4px;">
+            <span style="font-weight: 800; color: #004B87;">[${idx + 1}]</span>
             <span style="color: #1e293b; font-weight: 600;">${chk.ar}</span>
           </div>
-          <span style="color: ${isYes ? '#16a34a' : '#dc2626'}; font-weight: 900; font-family: monospace; display: flex; align-items: center; gap: 2px;">
+          <span style="color: ${isYes ? '#16a34a' : '#dc2626'}; font-weight: 900; font-family: monospace; display: inline-flex; align-items: center; gap: 2px; white-space: nowrap;">
             <span>${isYes ? '✓' : '✕'}</span>
-            <span>${isYes ? 'نعم (مطابق)' : 'لا'}</span>
+            <span>${isYes ? 'نعم' : 'لا'}</span>
           </span>
         </div>
       `;
@@ -883,8 +883,10 @@
       ? `<img src="${permit.safetySignature}" style="max-height: 38px; max-width: 130px; display: inline-block; vertical-align: middle;" alt="توقيع مسؤول السلامة">`
       : `<div style="font-size: 7.5px; color: #16a34a; font-weight: bold; margin-top: 4px;">✓ اعتماد رسمي فوري صادر ومؤرشف</div>`;
 
+    const shieldIconSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F9F1DC" stroke-width="2" style="display:block;"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"/></svg>`;
+
     return `
-      <div class="ksu-card-sheet" style="box-sizing: border-box; width: 100%; max-width: 820px; margin: 0 auto; font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; text-align: right; background: #fff; color: #0f172a; border: 2.5px solid #d97706; border-radius: 8px; padding: 12px 16px; position: relative; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);">
+      <div class="ksu-card-sheet" style="box-sizing: border-box; width: 100%; max-width: 820px; margin: 0 auto; font-family: 'Cairo', 'Segoe UI', Tahoma, Arial, sans-serif; direction: rtl; text-align: right; background: #fff; color: #0f172a; border: 2.5px solid #004B87; border-radius: 8px; padding: 12px 16px; position: relative; box-shadow: 0 10px 25px -5px rgba(8,43,73,0.12);">
         
         <!-- HEADER -->
         <table style="width: 100%; border-collapse: collapse; border-bottom: 2px solid #004B87; padding-bottom: 6px; margin-bottom: 8px;">
@@ -893,17 +895,17 @@
               <div style="font-weight: 900; font-size: 9.5px; color: #004B87;">المملكة العربية السعودية</div>
               <div>وزارة التعليم - جامعة الملك سعود</div>
               <div style="font-weight: bold;">المدينة الطبية الجامعية (KSUMC)</div>
-              <div>الإدارة العامة للأمن والسلامة الميدانية</div>
+              <div>الإدارة العامة للأمن والسلامة</div>
               <div style="color: #64748b; font-size: 8px;">إدارة السلامة والوقاية من الحريق</div>
             </td>
             <td style="width: 34%; text-align: center; vertical-align: middle;">
               <img src="assets/images/ksu_official_logo.png" alt="شعار جامعة الملك سعود" style="height: 52px; width: auto; max-width: 145px; object-fit: contain; display: inline-block;" onerror="this.outerHTML='<div style=\\'font-weight:900;color:#004B87;font-size:14px;\\'>جامعة الملك سعود<br><span style=\\'font-size:9px;color:#64748b;\\'>المدينة الطبية الجامعية</span></div>'">
-              <div style="font-size: 7.5px; color: #64748b; font-weight: bold; margin-top: 2px;">نظام تصاريح العمل ومعايير السلامة المهنية المعتمدة</div>
+              <div style="font-size: 7.5px; color: #64748b; font-weight: bold; margin-top: 2px;">نظام تصاريح العمل ومعايير السلامة المعتمدة</div>
             </td>
             <td style="width: 33%; text-align: left; vertical-align: middle; direction: ltr; font-size: 8.5px; line-height: 1.35;">
               <div style="display: flex; align-items: center; justify-content: flex-end; gap: 6px;">
                 <div>
-                  <div style="font-weight: bold; font-family: monospace; font-size: 11px; color: #d97706;">${pId}</div>
+                  <div style="font-weight: 900; font-family: monospace; font-size: 11px; color: #004B87;">${pId}</div>
                   <div>Issued: <span style="font-weight: bold;">${today}</span></div>
                   <div>Valid: <span style="font-weight: bold; color: #16a34a;">${validUntil}</span></div>
                 </div>
@@ -915,20 +917,20 @@
           </tr>
         </table>
 
-        <!-- BANNER -->
-        <div style="background: linear-gradient(135deg, #b45309 0%, #002B49 100%); color: #fff; border-radius: 6px; padding: 7px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <!-- BANNER (Unified KSUMC Royal Navy Identity) -->
+        <div style="background: linear-gradient(135deg, #004B87 0%, #002B49 100%); color: #fff; border-radius: 6px; padding: 7px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #C59B27;">
           <div style="display: flex; align-items: center; gap: 8px;">
-            <span style="font-size: 20px;">🔥</span>
+            <span style="width: 30px; height: 30px; border-radius: 8px; background: rgba(255,255,255,0.12); border: 1px solid rgba(197,155,39,0.55); display: inline-flex; align-items: center; justify-content: center;">${shieldIconSvg}</span>
             <div>
-              <div style="font-size: 13px; font-weight: 900; letter-spacing: 0.3px;">كرت تصريح العمل على الساخن المعتمد (Hot Work Permit)</div>
-              <div style="font-size: 8px; color: #fed7aa; font-weight: bold;">Official Safety Permit • ترخيص اللحام والقص والعزل الحراري المعتمد بالأرشيف</div>
+              <div style="font-size: 12.5px; font-weight: 900; letter-spacing: 0.3px;">كرت تصريح العمل على الساخن المعتمد (Hot Work Permit)</div>
+              <div style="font-size: 8px; color: #93c5fd; font-weight: bold;">Official KSUMC Safety Permit • ترخيص اللحام والقص والعزل الحراري المعتمد بالأرشيف</div>
             </div>
           </div>
           <div style="display: flex; align-items: center; gap: 6px;">
             <span style="background: #16a34a; color: #fff; padding: 3px 8px; border-radius: 4px; font-weight: 900; font-size: 10px;">
               ✓ ساري ومعتمد بالأرشيف
             </span>
-            <span style="background: #fef3c7; color: #92400e; padding: 3px 8px; border-radius: 4px; font-weight: 900; font-size: 10px; border: 1px solid #d97706;">
+            <span style="background: #F9F1DC; color: #082B49; padding: 3px 8px; border-radius: 4px; font-weight: 900; font-size: 10px; border: 1px solid #C59B27;">
               ${workType}
             </span>
           </div>
@@ -938,7 +940,7 @@
         <table style="width: 100%; border-collapse: collapse; font-size: 8.5px; margin-bottom: 8px; border: 1px solid #cbd5e1;">
           <tr style="background: #f8fafc;">
             <td style="padding: 4px 6px; font-weight: bold; width: 15%; border: 1px solid #cbd5e1; color: #334155;">طالب التصريح / الفني:</td>
-            <td style="padding: 4px 6px; width: 35%; border: 1px solid #cbd5e1; font-weight: 600; color: #004B87;">${applicant}</td>
+            <td style="padding: 4px 6px; width: 35%; border: 1px solid #cbd5e1; font-weight: 700; color: #004B87;">${applicant}</td>
             <td style="padding: 4px 6px; font-weight: bold; width: 15%; border: 1px solid #cbd5e1; color: #334155;">المقاول / الجهة:</td>
             <td style="padding: 4px 6px; width: 35%; border: 1px solid #cbd5e1; font-weight: 600;">${contractor}</td>
           </tr>
@@ -946,36 +948,36 @@
             <td style="padding: 4px 6px; font-weight: bold; border: 1px solid #cbd5e1; color: #334155;">الموقع والنطاق:</td>
             <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 600;">${location}</td>
             <td style="padding: 4px 6px; font-weight: bold; border: 1px solid #cbd5e1; color: #334155;">نوع العمل الساخن:</td>
-            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: bold; color: #b45309;">${workType}</td>
+            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 800; color: #7c5806;">${workType}</td>
           </tr>
           <tr style="background: #f8fafc;">
             <td style="padding: 4px 6px; font-weight: bold; border: 1px solid #cbd5e1; color: #334155;">مراقب الحريق المعين:</td>
-            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 600; color: #b45309;">${fireWatch}</td>
+            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 700; color: #082B49;">${fireWatch}</td>
             <td style="padding: 4px 6px; font-weight: bold; border: 1px solid #cbd5e1; color: #334155;">مصدر التصريح / المفتش:</td>
-            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 600; color: #16a34a;">${inspector}</td>
+            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 700; color: #16a34a;">${inspector}</td>
           </tr>
           <tr>
             <td style="padding: 4px 6px; font-weight: bold; border: 1px solid #cbd5e1; color: #334155;">فترة الصلاحية والتشغيل:</td>
-            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 600; font-family: monospace;">من ${today} ${nowTime} حتى ${validUntil}</td>
+            <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 700; font-family: monospace; color: #082B49;">من ${today} ${nowTime} حتى ${validUntil}</td>
             <td style="padding: 4px 6px; font-weight: bold; border: 1px solid #cbd5e1; color: #334155;">معدات مكافحة الحريق:</td>
             <td style="padding: 4px 6px; border: 1px solid #cbd5e1; font-weight: 600;">${fireEquip}</td>
           </tr>
         </table>
 
-        <!-- SAFETY CHECKLIST SUMMARY -->
+        <!-- SAFETY CHECKLIST SUMMARY (Clean Two-Column Matrix) -->
         <div style="border: 1px solid #cbd5e1; border-radius: 6px; padding: 7px 9px; background: #ffffff; margin-bottom: 8px;">
           <div style="font-size: 8.5px; font-weight: 900; color: #004B87; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
-            <span>🛡️ قائمة التحقق والاشتراطات الوقائية المعتمدة (8 معايير سلامة):</span>
+            <span>قائمة التحقق والاشتراطات الوقائية المعتمدة (8 معايير سلامة)</span>
             <span style="color: #16a34a; font-weight: bold;">كافة البنود مستوفاة ومعتمدة ✓</span>
           </div>
-          <div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px;">
             ${checklistHtml}
           </div>
         </div>
 
         <!-- SPECIAL PRECAUTIONS / DIRECTIVE -->
-        <div style="border: 1.5px solid #d97706; background: #fffbeb; border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; font-size: 8px; color: #92400e;">
-          <strong>توجيه السلامة والوقاية المعتمد: </strong>
+        <div style="border: 1.5px solid #C59B27; background: #FFFDF5; border-radius: 6px; padding: 6px 10px; margin-bottom: 8px; font-size: 8px; color: #082B49;">
+          <strong style="color: #7c5806;">توجيه السلامة والوقاية المعتمد: </strong>
           يُحظر ترك موقع العمل الساخن دون حراسة مراقب الحريق لمدة لا تقل عن 30 دقيقة بعد انتهاء الأعمال. يجب فحص المنطقة والمعدات والتأكد التام من برودتها وانعدام أي مصادر اشتعال.
         </div>
 
@@ -990,9 +992,9 @@
               <div style="font-weight: bold; color: #082B49; margin-top: 2px;">${applicant}</div>
             </td>
             <td style="width: 36%; text-align: center; vertical-align: middle; padding: 2px;">
-              <div style="border: 1.5px dashed #16a34a; border-radius: 6px; padding: 4px 8px; display: inline-block; min-width: 130px; background: #f0fdf4;">
-                <div style="font-size: 8.5px; font-weight: 900; color: #16a34a;">ختم الاعتماد والأرشفة الرقمية</div>
-                <div style="font-size: 7.5px; color: #334155; margin-top: 1px;">إدارة السلامة الميدانية - KSUMC</div>
+              <div style="border: 1.5px dashed #004B87; border-radius: 6px; padding: 4px 8px; display: inline-block; min-width: 135px; background: #F7F9FF;">
+                <div style="font-size: 8.5px; font-weight: 900; color: #004B87;">ختم الاعتماد والأرشفة الرقمية</div>
+                <div style="font-size: 7.5px; color: #334155; margin-top: 1px;">إدارة السلامة - KSUMC</div>
                 <div style="font-family: monospace; font-size: 7px; color: #16a34a; font-weight: bold; margin-top: 1px;">VERIFIED & ARCHIVED ✓</div>
               </div>
             </td>
@@ -1054,16 +1056,18 @@
     modal.innerHTML = `
       <div class="max-w-4xl w-full flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-200 my-auto">
         <!-- Top Action Bar -->
-        <div class="no-print bg-slate-800 text-white px-4 py-3 rounded-2xl flex items-center justify-between shadow-xl border border-slate-700">
-          <div class="flex items-center gap-2">
-            <span class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">🔥</span>
+        <div class="no-print bg-[#082B49] text-white px-4 py-3 rounded-2xl flex items-center justify-between shadow-xl border border-[#004B87]">
+          <div class="flex items-center gap-2.5">
+            <span class="w-9 h-9 rounded-xl bg-white/10 border border-[#C59B27]/50 text-[#F9F1DC] flex items-center justify-center">
+              <span class="material-symbols-outlined text-lg">verified_user</span>
+            </span>
             <div>
-              <h4 class="text-xs sm:text-sm font-black">كرت تصريح العمل على الساخن المعتمد (HWP)</h4>
-              <span class="text-[10px] text-slate-400">وثيقة رسمية معتمدة ومحفوظة في أرشيف التصاريح</span>
+              <h4 class="text-xs sm:text-sm font-black text-white">كرت تصريح العمل على الساخن المعتمد (HWP)</h4>
+              <span class="text-[10px] text-[#D1E4FF]">وثيقة رسمية معتمدة ومحفوظة في أرشيف منصة رصد (KSUMC)</span>
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <button onclick="window.printOfficialPermitCard()" class="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer">
+            <button onclick="window.printOfficialPermitCard()" class="px-3.5 py-2 rounded-xl bg-[#C59B27] hover:bg-[#b58c1f] text-[#00162B] font-black text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer">
               <span class="material-symbols-outlined text-sm">print</span>
               <span>طباعة كرت التصريح (A4)</span>
             </button>

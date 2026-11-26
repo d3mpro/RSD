@@ -493,15 +493,15 @@
           </div>
 
           <!-- Card 11: Hot Work Permits (تصاريح العمل على الساخن) -->
-          <div onclick="switchMobileTab('permits')" class="ksu-bento-card border-orange-300 hover:border-orange-500 text-orange-800 bg-gradient-to-br from-orange-50/70 via-white to-amber-50/40 cursor-pointer shadow-xs hover:shadow-md transition-all">
+          <div onclick="switchMobileTab('permits')" class="ksu-bento-card border-[#004B87]/30 hover:border-[#004B87] text-[#082B49] bg-gradient-to-br from-[#F7F9FF] via-white to-[#F9F1DC]/35 cursor-pointer shadow-xs hover:shadow-md transition-all">
             <div class="flex items-center justify-between mb-3">
-              <div class="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-sm">
-                <span class="material-symbols-outlined text-xl">local_fire_department</span>
+              <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#004B87] to-[#082B49] text-[#F9F1DC] flex items-center justify-center shadow-sm">
+                <span class="material-symbols-outlined text-xl">verified_user</span>
               </div>
-              <span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-black" id="bento-permits-badge">تصاريح سارية</span>
+              <span class="px-2 py-0.5 rounded-full bg-[#F9F1DC] text-[#7c5806] border border-[#C59B27]/40 text-[10px] font-black" id="bento-permits-badge">تصاريح سارية</span>
             </div>
             <div>
-              <h4 class="text-xs sm:text-sm font-black text-amber-950 leading-tight">تصاريح العمل الساخن</h4>
+              <h4 class="text-xs sm:text-sm font-black text-[#082B49] leading-tight">تصاريح العمل الساخن</h4>
               <p class="text-[10px] text-gray-500 mt-1">إصدار ومتابعة تصاريح اللحام والقص</p>
             </div>
           </div>
@@ -1355,11 +1355,11 @@
           <!-- Permits Section Header -->
           <div class="flex items-center justify-between flex-wrap gap-space-sm">
             <div>
-              <h2 class="text-xl font-bold text-primary">تصاريح العمل على الساخن (Hot Work Permits)</h2>
-              <p class="text-xs text-on-surface-variant">التحقق الميداني من تصاريح اللحام والقص ومطابقة وجود مراقب الحريق (Fire Watch).</p>
+              <h2 class="text-xl font-black text-[#082B49]">تصاريح العمل على الساخن (Hot Work Permits)</h2>
+              <p class="text-xs text-[#5B626C]">التحقق الميداني من تصاريح اللحام والقص ومطابقة وجود مراقب الحريق (Fire Watch).</p>
             </div>
-            <button onclick="openNewPermitModal()" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-on-primary font-bold text-xs shadow-sm">
-              <span class="material-symbols-outlined text-sm">add_circle</span>
+            <button onclick="openNewPermitModal()" class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#004B87] hover:bg-[#082B49] text-white font-bold text-xs shadow-sm transition-colors cursor-pointer">
+              <span class="material-symbols-outlined text-sm text-[#F9F1DC]">add_circle</span>
               <span>إصدار تصريح عمل ساخن</span>
             </button>
           </div>
@@ -2343,39 +2343,56 @@
 
     <!-- VIEW 9: HOT WORK PERMITS (تصاريح العمل على الساخن) -->
     <div id="view-permits" class="field-view hidden space-y-4">
-      <div class="flex items-center justify-between bg-white p-3.5 rounded-2xl border border-gray-200 shadow-xs">
-        <div class="flex items-center gap-2">
-          <button onclick="switchMobileTab('home')" class="p-1.5 rounded-xl hover:bg-gray-100 text-gray-600 transition-colors">
-            <span class="material-symbols-outlined text-xl">arrow_forward</span>
+      <!-- Unified RSD KSUMC Royal Navy Hero Banner -->
+      <div class="rounded-2xl text-white p-4 sm:p-5 shadow-sm border border-white/10" style="background: linear-gradient(to left, #00162B, #082B49, #004B87);">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <button type="button" onclick="switchMobileTab('home')" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors shrink-0 cursor-pointer" title="العودة للرئيسية">
+              <span class="material-symbols-outlined text-lg">arrow_forward</span>
+            </button>
+            <div class="w-11 h-11 rounded-2xl bg-white/10 border border-[#C59B27]/50 text-[#F9F1DC] flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-2xl">verified_user</span>
+            </div>
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h2 class="font-black text-sm sm:text-base text-white">تصاريح العمل على الساخن (Hot Work Permits)</h2>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border border-[#C59B27]/50 bg-[#C59B27]/20 text-[#F9F1DC]">HWP • SBC 801</span>
+              </div>
+              <p class="text-[11px] text-[#D1E4FF] mt-0.5">التحقق وإصدار تصاريح اللحام والقص ومراقبة الحريق (متاح للمفتش والمشرف)</p>
+            </div>
+          </div>
+
+          <button type="button" onclick="openNewPermitModal()" class="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#C59B27] hover:bg-[#b58c1f] text-[#00162B] font-black text-xs shadow-sm transition-all cursor-pointer shrink-0">
+            <span class="material-symbols-outlined text-sm">add_circle</span>
+            <span>إصدار تصريح عمل جديد</span>
           </button>
-          <div>
-            <h2 class="font-black text-sm sm:text-base text-[#082B49] flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-amber-600">local_fire_department</span>
-              <span>تصاريح العمل على الساخن (Hot Work Permits)</span>
-            </h2>
-            <p class="text-[11px] text-gray-500">التحقق وإصدار تصاريح اللحام والقص ومراقبة الحريق (متاح للمفتش والمشرف)</p>
+        </div>
+
+        <!-- Integrated KPI Strip -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 mt-4 pt-3 border-t border-white/15">
+          <div class="rounded-xl bg-white/10 px-3 py-2 border border-white/10">
+            <span class="text-[10px] text-[#D1E4FF] font-bold block">التصاريح السارية</span>
+            <span class="text-lg font-black text-[#F9F1DC] font-mono" id="field-kpi-permits-count">0 سارية</span>
+          </div>
+          <div class="rounded-xl bg-white/10 px-3 py-2 border border-white/10">
+            <span class="text-[10px] text-[#D1E4FF] font-bold block">صلاحية التخويل</span>
+            <span class="text-xs font-black text-white mt-0.5 block">مفتش + مشرف السلامة ✓</span>
+          </div>
+          <div class="rounded-xl bg-white/10 px-3 py-2 border border-white/10 col-span-2 sm:col-span-1">
+            <span class="text-[10px] text-[#D1E4FF] font-bold block">الأرشفة والمزامنة</span>
+            <span class="text-xs font-black text-[#86efac] mt-0.5 block">السجل الرسمي + SharePoint ✓</span>
           </div>
         </div>
-        <button onclick="openNewPermitModal()" class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-black text-xs shadow-xs transition-all">
-          <span class="material-symbols-outlined text-sm">add_circle</span>
-          <span>إصدار تصريح عمل ساخن</span>
-        </button>
       </div>
 
-      <!-- Quick KPI Counters -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-        <div class="p-3.5 rounded-2xl bg-white border border-gray-200 shadow-2xs">
-          <span class="text-[10px] text-gray-500 font-bold block">التصاريح السارية</span>
-          <span class="text-xl font-black text-amber-700" id="field-kpi-permits-count">0 سارية</span>
+      <!-- Quick Filter Bar matching RSD UI -->
+      <div class="flex items-center justify-between gap-2 flex-wrap bg-white px-3.5 py-2.5 rounded-2xl border border-[#C3C6CE]/60 shadow-2xs">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <button type="button" id="btn-permit-filter-all" onclick="setPermitsFilter('all')" class="px-3 py-1.5 rounded-lg bg-[#082B49] text-white font-bold text-xs shadow-2xs transition-all cursor-pointer">الكل</button>
+          <button type="button" id="btn-permit-filter-active" onclick="setPermitsFilter('active')" class="px-3 py-1.5 rounded-lg bg-[#EBEEF3] hover:bg-slate-200 text-[#082B49] font-semibold text-xs transition-all cursor-pointer">سارية</button>
+          <button type="button" id="btn-permit-filter-expired" onclick="setPermitsFilter('expired')" class="px-3 py-1.5 rounded-lg bg-[#EBEEF3] hover:bg-slate-200 text-[#082B49] font-semibold text-xs transition-all cursor-pointer">منتهية</button>
         </div>
-        <div class="p-3.5 rounded-2xl bg-white border border-gray-200 shadow-2xs">
-          <span class="text-[10px] text-gray-500 font-bold block">صلاحية التخويل</span>
-          <span class="text-xs font-black text-emerald-700 mt-1 block">مفتش + مشرف السلامة ✓</span>
-        </div>
-        <div class="p-3.5 rounded-2xl bg-white border border-gray-200 shadow-2xs col-span-2 sm:col-span-1">
-          <span class="text-[10px] text-gray-500 font-bold block">الامتثال والمعايير</span>
-          <span class="text-xs font-black text-blue-900 mt-1 block">تصاريح العمل ومعايير السلامة</span>
-        </div>
+        <span class="text-[11px] text-[#5B626C] font-semibold">نظام تصاريح العمل ومعايير السلامة المعتمدة</span>
       </div>
 
       <!-- Permits List Container -->
@@ -2867,98 +2884,117 @@
   </div>
 
   <!-- 4. Upgraded Hot Work Permit Modal (Official Document 4 Replica) -->
-  <div class="fixed inset-0 z-50 bg-primary/80 backdrop-blur-sm hidden items-center justify-center p-4 modal-backdrop" id="newPermitModal">
-    <div class="bg-surface-container-lowest rounded-2xl max-w-2xl w-full p-6 shadow-2xl flex flex-col gap-4 text-on-surface max-h-[90vh] overflow-y-auto">
-      <div class="flex items-center justify-between pb-3 border-b border-outline-variant/40">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center">
-            <span class="material-symbols-outlined text-2xl">local_fire_department</span>
+  <div class="fixed inset-0 z-[100] bg-[#00162B]/75 backdrop-blur-sm hidden items-center justify-center p-2 sm:p-4 modal-backdrop" id="newPermitModal">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl flex flex-col text-[#181C20] max-h-[92dvh] overflow-hidden border border-[#C3C6CE]">
+      <div class="flex items-center justify-between px-4 sm:px-5 py-3.5 shrink-0 text-white" style="background: linear-gradient(135deg, #00162B, #082B49, #004B87);">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-10 h-10 rounded-xl bg-white/15 border border-white/20 text-[#F9F1DC] flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-2xl">verified_user</span>
           </div>
-          <div>
-            <h3 class="text-base font-extrabold text-primary">تصريح عمل على الساخن / HOT WORK PERMIT</h3>
-            <span class="text-[11px] text-on-surface-variant">وفق اشتراطات الإدارة العامة للأمن والسلامة بالمدينة الطبية الجامعية</span>
+          <div class="min-w-0">
+            <h3 class="text-sm sm:text-base font-black text-white truncate">إصدار تصريح عمل على الساخن / HOT WORK PERMIT</h3>
+            <span class="text-[11px] text-[#D1E4FF] block truncate">نموذج منصة رصد الموحّد — الإدارة العامة للأمن والسلامة بالمدينة الطبية</span>
           </div>
         </div>
-        <button onclick="closeNewPermitModal()" class="w-8 h-8 rounded-full bg-surface-container hover:bg-surface-container-high flex items-center justify-center text-on-surface-variant">
+        <button onclick="closeNewPermitModal()" class="w-8 h-8 rounded-lg bg-white/15 hover:bg-white/25 flex items-center justify-center text-white shrink-0 transition-colors">
           <span class="material-symbols-outlined text-lg">close</span>
         </button>
       </div>
 
-      <div class="flex flex-col gap-4 text-xs">
+      <div class="p-4 sm:p-5 overflow-y-auto flex flex-col gap-4 text-xs">
         <!-- Certificate & Applicant Info -->
-        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-          <div>
-            <label class="font-bold text-on-surface block mb-1">شهادة رقم / Certificate No.</label>
-            <input id="inp-permit-cert-no" type="text" placeholder="مثال: HWP-2026-104" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 font-mono font-bold text-primary outline-none">
+        <div class="p-3.5 rounded-xl bg-[#F7F9FF] border border-[#E0E3E8] flex flex-col gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div>
+              <label class="font-bold text-[#082B49] block mb-1">شهادة رقم / Certificate No.</label>
+              <input id="inp-permit-cert-no" type="text" placeholder="مثال: HWP-2026-104" class="w-full px-3 py-2 rounded-lg bg-white border border-[#C3C6CE] font-mono font-bold text-[#004B87] outline-none focus:border-[#004B87] focus:ring-1 focus:ring-[#004B87]">
+            </div>
+            <div>
+              <label class="font-bold text-[#082B49] block mb-1">التاريخ / Date</label>
+              <input id="inp-permit-date" type="date" class="w-full px-3 py-2 rounded-lg bg-white border border-[#C3C6CE] outline-none font-semibold text-[#181C20] focus:border-[#004B87] focus:ring-1 focus:ring-[#004B87]">
+            </div>
+            <div class="sm:col-span-2">
+              <label class="font-bold text-[#082B49] block mb-1">اسم مقدم الطلب (الشركة / القسم) / Name of Applicant</label>
+              <input id="inp-permit-contractor" type="text" placeholder="مثال: شركة إسناد للمقاولات المعتمدة" class="w-full px-3 py-2 rounded-lg bg-white border border-[#C3C6CE] outline-none font-semibold text-[#181C20] focus:border-[#004B87] focus:ring-1 focus:ring-[#004B87]">
+            </div>
           </div>
-          <div>
-            <label class="font-bold text-on-surface block mb-1">التاريخ / Date</label>
-            <input id="inp-permit-date" type="date" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
-          </div>
-          <div class="sm:col-span-2">
-            <label class="font-bold text-on-surface block mb-1">اسم مقدم الطلب (الشركة / القسم) / Name of Applicant</label>
-            <input id="inp-permit-contractor" type="text" placeholder="مثال: شركة إسناد للمقاولات المعتمدة" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none font-semibold">
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="font-bold text-[#082B49] block mb-1">اسم الفني المختص / Technician Name</label>
+              <input id="inp-permit-technician" type="text" placeholder="اسم الفني المنفذ" class="w-full px-3 py-2 rounded-lg bg-white border border-[#C3C6CE] outline-none text-[#181C20] focus:border-[#004B87] focus:ring-1 focus:ring-[#004B87]">
+            </div>
+            <div>
+              <label class="font-bold text-[#082B49] block mb-1">الرقم الوظيفي / Job I.D No.</label>
+              <input id="inp-permit-job-id" type="text" placeholder="EMP-xxxxx" class="w-full px-3 py-2 rounded-lg bg-white border border-[#C3C6CE] outline-none text-[#181C20] focus:border-[#004B87] focus:ring-1 focus:ring-[#004B87]">
+            </div>
+            <div>
+              <label class="font-bold text-[#082B49] block mb-1">رقم الهاتف / Tel.</label>
+              <input id="inp-permit-tel" type="text" placeholder="05xxxxxxxx" class="w-full px-3 py-2 rounded-lg bg-white border border-[#C3C6CE] outline-none text-[#181C20] focus:border-[#004B87] focus:ring-1 focus:ring-[#004B87]">
+            </div>
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label class="font-bold text-on-surface block mb-1">اسم الفني المختص / Technician Name</label>
-            <input id="inp-permit-technician" type="text" placeholder="اسم الفني المنفذ" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none">
+        <!-- Duration, Supervision & Location -->
+        <div class="p-3.5 rounded-xl bg-[#D1E4FF]/25 border border-[#004B87]/25 flex flex-col gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="font-bold text-[#082B49] block mb-1">يتم الإشراف بواسطة / Supervised By</label>
+              <input id="inp-permit-supervisor" type="text" placeholder="اسم المشرف الفني" class="w-full px-3 py-2 rounded-lg bg-white border border-[#C3C6CE] outline-none text-[#181C20] focus:border-[#004B87] focus:ring-1 focus:ring-[#004B87]">
+            </div>
+            <div>
+              <label class="font-bold text-[#082B49] block mb-1">ابتداءً من الساعة / Starting Time</label>
+              <input id="inp-permit-start-time" type="time" class="w-full px-3 py-2 rounded-lg bg-white border border-[#C3C6CE] outline-none text-[#181C20] focus:border-[#004B87] focus:ring-1 focus:ring-[#004B87]">
+            </div>
+            <div>
+              <label class="font-bold text-[#082B49] block mb-1">حتى تمام الساعة / End Time (حد أقصى 8 ساعات)</label>
+              <input id="inp-permit-end-time" type="time" class="w-full px-3 py-2 rounded-lg bg-white border border-[#C3C6CE] outline-none text-[#181C20] focus:border-[#004B87] focus:ring-1 focus:ring-[#004B87]">
+            </div>
           </div>
-          <div>
-            <label class="font-bold text-on-surface block mb-1">الرقم الوظيفي / Job I.D No.</label>
-            <input id="inp-permit-job-id" type="text" placeholder="EMP-xxxxx" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none">
-          </div>
-          <div>
-            <label class="font-bold text-on-surface block mb-1">رقم الهاتف / Tel.</label>
-            <input id="inp-permit-tel" type="text" placeholder="05xxxxxxxx" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none">
-          </div>
-        </div>
 
-        <!-- Duration & Supervision -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-amber-50/50 p-3 rounded-xl border border-amber-200/60">
-          <div>
-            <label class="font-bold text-amber-900 block mb-1">يتم الإشراف بواسطة / Supervised By</label>
-            <input id="inp-permit-supervisor" type="text" placeholder="اسم المشرف الفني" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-amber-300 outline-none">
-          </div>
-          <div>
-            <label class="font-bold text-amber-900 block mb-1">ابتداءً من الساعة / Starting Time</label>
-            <input id="inp-permit-start-time" type="time" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-amber-300 outline-none">
-          </div>
-          <div>
-            <label class="font-bold text-amber-900 block mb-1">حتى تمام الساعة / End Time (حد أقصى 8 ساعات)</label>
-            <input id="inp-permit-end-time" type="time" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-amber-300 outline-none">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="font-bold text-[#082B49] block mb-1">زون رقم / Zone No.</label>
+              <input id="inp-permit-zone" type="text" placeholder="Zone A" class="w-full px-3 py-2 rounded-lg bg-white border border-[#C3C6CE] outline-none text-[#181C20] focus:border-[#004B87] focus:ring-1 focus:ring-[#004B87]">
+            </div>
+            <div>
+              <label class="font-bold text-[#082B49] block mb-1">طابق رقم / Floor No.</label>
+              <input id="inp-permit-floor" type="text" placeholder="الدور الثاني" class="w-full px-3 py-2 rounded-lg bg-white border border-[#C3C6CE] outline-none text-[#181C20] focus:border-[#004B87] focus:ring-1 focus:ring-[#004B87]">
+            </div>
+            <div>
+              <label class="font-bold text-[#082B49] block mb-1">قسم / غرفة رقم / Section/Room</label>
+              <input id="inp-permit-room" type="text" placeholder="غرفة المضخات 204" class="w-full px-3 py-2 rounded-lg bg-white border border-[#C3C6CE] outline-none text-[#181C20] focus:border-[#004B87] focus:ring-1 focus:ring-[#004B87]">
+            </div>
           </div>
         </div>
 
         <!-- Work Description & Quick Options / وصف العمل الساخن -->
         <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <label class="font-bold text-on-surface block text-xs">وصف العمل الساخن / Description of Work</label>
-            <span class="text-[10px] text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">اختر نوع النشاط</span>
+            <label class="font-bold text-[#082B49] block text-xs">وصف العمل الساخن / Description of Work</label>
+            <span class="text-[10px] text-[#082B49] font-bold bg-[#F9F1DC] px-2 py-0.5 rounded-md border border-[#C59B27]/50">اختر نوع النشاط</span>
           </div>
 
           <!-- خيارات وصف العمل الساخن (قص / لحام / قص + لحام / غير ذلك) -->
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="hw-worktype-pills">
             <button type="button" onclick="selectPermitWorkType('قص')" id="btn-hw-opt-cut"
-              class="hw-worktype-btn flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-amber-50 text-gray-800 text-xs font-bold transition-all shadow-2xs">
-              <span class="material-symbols-outlined text-sm text-amber-700">content_cut</span>
+              class="hw-worktype-btn flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-[#C3C6CE] bg-white hover:bg-[#F7F9FF] text-[#082B49] text-xs font-bold transition-all shadow-2xs">
+              <span class="material-symbols-outlined text-sm text-[#004B87]">content_cut</span>
               <span>قص</span>
             </button>
             <button type="button" onclick="selectPermitWorkType('لحام')" id="btn-hw-opt-weld"
-              class="hw-worktype-btn flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-amber-50 text-gray-800 text-xs font-bold transition-all shadow-2xs">
-              <span class="material-symbols-outlined text-sm text-amber-700">mode_heat</span>
+              class="hw-worktype-btn flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-[#C3C6CE] bg-white hover:bg-[#F7F9FF] text-[#082B49] text-xs font-bold transition-all shadow-2xs">
+              <span class="material-symbols-outlined text-sm text-[#004B87]">mode_heat</span>
               <span>لحام</span>
             </button>
             <button type="button" onclick="selectPermitWorkType('قص + لحام')" id="btn-hw-opt-cutweld"
-              class="hw-worktype-btn flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-amber-600 bg-amber-600 text-white text-xs font-black transition-all shadow-xs ring-2 ring-amber-200">
+              class="hw-worktype-btn flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-[#082B49] bg-[#082B49] text-[#F9F1DC] text-xs font-black transition-all shadow-sm ring-2 ring-[#C59B27]/40">
               <span class="material-symbols-outlined text-sm">construction</span>
               <span>قص + لحام</span>
             </button>
             <button type="button" onclick="selectPermitWorkType('غير ذلك')" id="btn-hw-opt-other"
-              class="hw-worktype-btn flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-amber-50 text-gray-800 text-xs font-bold transition-all shadow-2xs">
-              <span class="material-symbols-outlined text-sm text-gray-500">edit_note</span>
+              class="hw-worktype-btn flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-[#C3C6CE] bg-white hover:bg-[#F7F9FF] text-[#082B49] text-xs font-bold transition-all shadow-2xs">
+              <span class="material-symbols-outlined text-sm text-[#5B626C]">edit_note</span>
               <span>غير ذلك</span>
             </button>
           </div>
@@ -2967,82 +3003,67 @@
           <div>
             <input id="inp-permit-worktype" type="text" value="قص + لحام"
               placeholder="اكتب وصف العمل الساخن أو حدد تفاصيل إضافية..."
-              class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none text-xs font-semibold text-gray-800 focus:border-amber-600 focus:ring-1 focus:ring-amber-600 transition-all">
-            <span id="hw-worktype-hint" class="text-[10px] text-gray-500 mt-1 block">النوع المحدد: <strong class="text-amber-800">قص + لحام</strong>. يمكنك إضافة تفاصيل الموقع أو المعدة في الحقل أعلاه إن رغبت.</span>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label class="font-bold text-on-surface block mb-1">زون رقم / Zone No.</label>
-            <input id="inp-permit-zone" type="text" placeholder="Zone A" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none">
-          </div>
-          <div>
-            <label class="font-bold text-on-surface block mb-1">طابق رقم / Floor No.</label>
-            <input id="inp-permit-floor" type="text" placeholder="الدور الثاني" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none">
-          </div>
-          <div>
-            <label class="font-bold text-on-surface block mb-1">قسم / غرفة رقم / Section/Room</label>
-            <input id="inp-permit-room" type="text" placeholder="غرفة المضخات 204" class="w-full px-3 py-2 rounded-lg bg-surface-container-low border border-outline-variant/50 outline-none">
+              class="w-full px-3 py-2 rounded-lg bg-[#F7F9FF] border border-[#C3C6CE] outline-none text-xs font-semibold text-[#181C20] focus:border-[#004B87] focus:ring-1 focus:ring-[#004B87] transition-all">
+            <span id="hw-worktype-hint" class="text-[10px] text-[#5B626C] mt-1 block">النوع المحدد: <strong class="text-[#082B49]">قص + لحام</strong>. يمكنك إضافة تفاصيل الموقع أو المعدة في الحقل أعلاه إن رغبت.</span>
           </div>
         </div>
 
         <!-- 8 Safety Checklist Items -->
-        <div class="p-3.5 rounded-xl bg-surface-container-low border border-outline-variant/40 flex flex-col gap-2.5">
-          <div class="flex items-center justify-between pb-1 border-b border-outline-variant/30">
-            <span class="font-extrabold text-primary text-xs">بنود الفحص والمعاينة الميدانية (Checklist Items):</span>
-            <span class="text-[10px] text-on-surface-variant font-bold">نعم / لا / غير مطابق</span>
+        <div class="p-3.5 rounded-xl bg-[#F7F9FF] border border-[#E0E3E8] flex flex-col gap-2.5">
+          <div class="flex items-center justify-between pb-1.5 border-b border-[#E0E3E8]">
+            <span class="font-extrabold text-[#082B49] text-xs">بنود الفحص والمعاينة الميدانية (Checklist Items):</span>
+            <span class="text-[10px] text-[#5B626C] font-bold">نعم / لا / غير مطابق</span>
           </div>
 
           <div class="flex flex-col gap-2 text-[11px]" id="hot-work-checklist-container">
-            <div class="flex items-center justify-between gap-2 p-1.5 rounded bg-surface-container-lowest">
+            <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-white border border-[#E0E3E8]/80">
               <span>1. هل قام المصدر والمستلم بمعاينة مشتركة للموقع؟ (Joint site inspection)</span>
-              <select id="chk-hw-1" class="px-2 py-1 rounded border border-outline-variant text-[11px] font-bold"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
+              <select id="chk-hw-1" class="px-2 py-1 rounded border border-[#C3C6CE] bg-[#F7F9FF] text-[11px] font-bold text-[#082B49]"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
             </div>
-            <div class="flex items-center justify-between gap-2 p-1.5 rounded bg-surface-container-lowest">
+            <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-white border border-[#E0E3E8]/80">
               <span>2. هل الخطوط أو المواد مجففة ونظيفة ومستقرة؟ (Line depress/drained/purged)</span>
-              <select id="chk-hw-2" class="px-2 py-1 rounded border border-outline-variant text-[11px] font-bold"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
+              <select id="chk-hw-2" class="px-2 py-1 rounded border border-[#C3C6CE] bg-[#F7F9FF] text-[11px] font-bold text-[#082B49]"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
             </div>
-            <div class="flex items-center justify-between gap-2 p-1.5 rounded bg-surface-container-lowest">
+            <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-white border border-[#E0E3E8]/80">
               <span>3. هل المنطقة خالية من المواد القابلة للاشتعال؟ (Area free from flammables)</span>
-              <select id="chk-hw-3" class="px-2 py-1 rounded border border-outline-variant text-[11px] font-bold"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
+              <select id="chk-hw-3" class="px-2 py-1 rounded border border-[#C3C6CE] bg-[#F7F9FF] text-[11px] font-bold text-[#082B49]"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
             </div>
-            <div class="flex items-center justify-between gap-2 p-1.5 rounded bg-surface-container-lowest">
+            <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-white border border-[#E0E3E8]/80">
               <span>4. هل تم توفير مراقبة السلامة وتجهيز المعدات؟ (Safety watch provided)</span>
-              <select id="chk-hw-4" class="px-2 py-1 rounded border border-outline-variant text-[11px] font-bold"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
+              <select id="chk-hw-4" class="px-2 py-1 rounded border border-[#C3C6CE] bg-[#F7F9FF] text-[11px] font-bold text-[#082B49]"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
             </div>
-            <div class="flex items-center justify-between gap-2 p-1.5 rounded bg-surface-container-lowest">
+            <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-white border border-[#E0E3E8]/80">
               <span>5. هل يحمل العامل شهادة ترخيص عمل سارية المفعول؟ (Valid work permit)</span>
-              <select id="chk-hw-5" class="px-2 py-1 rounded border border-outline-variant text-[11px] font-bold"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
+              <select id="chk-hw-5" class="px-2 py-1 rounded border border-[#C3C6CE] bg-[#F7F9FF] text-[11px] font-bold text-[#082B49]"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
             </div>
-            <div class="flex items-center justify-between gap-2 p-1.5 rounded bg-surface-container-lowest">
+            <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-white border border-[#E0E3E8]/80">
               <span>6. هل تم إبعاد الأفراد غير الضروريين من موقع العمل؟ (Unnecessary personnel kept away)</span>
-              <select id="chk-hw-6" class="px-2 py-1 rounded border border-outline-variant text-[11px] font-bold"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
+              <select id="chk-hw-6" class="px-2 py-1 rounded border border-[#C3C6CE] bg-[#F7F9FF] text-[11px] font-bold text-[#082B49]"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
             </div>
-            <div class="flex items-center justify-between gap-2 p-1.5 rounded bg-surface-container-lowest">
+            <div class="flex items-center justify-between gap-2 p-2 rounded-lg bg-white border border-[#E0E3E8]/80">
               <span>7. هل يعلم الفني بوجوب إيقاف العمل إذا تغيرت الأحوال؟ (Stop work if conditions change)</span>
-              <select id="chk-hw-7" class="px-2 py-1 rounded border border-outline-variant text-[11px] font-bold"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
+              <select id="chk-hw-7" class="px-2 py-1 rounded border border-[#C3C6CE] bg-[#F7F9FF] text-[11px] font-bold text-[#082B49]"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
             </div>
-            <div class="flex flex-col gap-1.5 p-1.5 rounded bg-surface-container-lowest">
+            <div class="flex flex-col gap-1.5 p-2 rounded-lg bg-white border border-[#E0E3E8]/80">
               <div class="flex items-center justify-between gap-2">
                 <span>8. هل توجد معدات مكافحة الحريق؟ إذا كانت موجودة الرجاء تحديدها (Fire fighting equipment available)</span>
-                <select id="chk-hw-8" class="px-2 py-1 rounded border border-outline-variant text-[11px] font-bold"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
+                <select id="chk-hw-8" class="px-2 py-1 rounded border border-[#C3C6CE] bg-[#F7F9FF] text-[11px] font-bold text-[#082B49]"><option value="yes">نعم (Yes)</option><option value="no">لا (No)</option><option value="na">غير مطابق (N/A)</option></select>
               </div>
-              <input id="inp-permit-fire-equip" type="text" placeholder="تحديد معدات مكافحة الحريق المتوفرة بالموقع (مثال: طفاية بودرة 6 كجم + بطانية حريق وخراطيم)" class="w-full px-2.5 py-1.5 rounded bg-surface-container-low border border-outline-variant/60 text-[11px] outline-none">
+              <input id="inp-permit-fire-equip" type="text" placeholder="تحديد معدات مكافحة الحريق المتوفرة بالموقع (مثال: طفاية بودرة 6 كجم + بطانية حريق وخراطيم)" class="w-full px-2.5 py-1.5 rounded bg-[#F7F9FF] border border-[#C3C6CE] text-[11px] outline-none focus:border-[#004B87]">
             </div>
           </div>
         </div>
 
         <!-- Live Signature Pads for Hot Work -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
           <!-- 1. Applicant / Technician Signature Pad -->
           <div class="flex flex-col gap-1.5">
             <div class="flex items-center justify-between">
-              <label class="font-bold text-primary flex items-center gap-1">
-                <span class="material-symbols-outlined text-sm text-secondary">draw</span>
+              <label class="font-bold text-[#082B49] flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm text-[#004B87]">draw</span>
                 <span>توقيع طالب التصريح / الفني المختص:</span>
               </label>
-              <button type="button" onclick="clearSignaturePad('canvas-hw-applicant')" class="text-[10px] text-error font-bold hover:underline">مسح التوقيع</button>
+              <button type="button" onclick="clearSignaturePad('canvas-hw-applicant')" class="text-[10px] text-[#D32F2F] font-bold hover:underline">مسح التوقيع</button>
             </div>
             <div class="sig-pad-box" id="box-hw-applicant">
               <canvas id="canvas-hw-applicant" class="sig-canvas"></canvas>
@@ -3053,11 +3074,11 @@
           <!-- 2. Safety Representative Signature Pad -->
           <div class="flex flex-col gap-1.5">
             <div class="flex items-center justify-between">
-              <label class="font-bold text-primary flex items-center gap-1">
-                <span class="material-symbols-outlined text-sm text-emerald-600">verified</span>
+              <label class="font-bold text-[#082B49] flex items-center gap-1">
+                <span class="material-symbols-outlined text-sm text-[#1E7E34]">verified</span>
                 <span>توقيع ممثل إدارة السلامة والأمن:</span>
               </label>
-              <button type="button" onclick="clearSignaturePad('canvas-hw-safety')" class="text-[10px] text-error font-bold hover:underline">مسح التوقيع</button>
+              <button type="button" onclick="clearSignaturePad('canvas-hw-safety')" class="text-[10px] text-[#D32F2F] font-bold hover:underline">مسح التوقيع</button>
             </div>
             <div class="sig-pad-box" id="box-hw-safety">
               <canvas id="canvas-hw-safety" class="sig-canvas"></canvas>
@@ -3066,19 +3087,19 @@
           </div>
         </div>
 
-        <div class="p-2.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-200 text-[11px] text-center font-bold">
+        <div class="p-2.5 rounded-lg bg-[#FFFDF5] text-[#082B49] border border-[#C59B27] text-[11px] text-center font-bold">
           ملاحظة: يبقى هذا التصريح مع الفني المختص أثناء تنفيذ العمل الساخن، ويمكن سحب شهادة العمل من قبل إدارة السلامة في حال عدم التقيد بإجراءات السلامة.
         </div>
 
-        <div class="p-2.5 rounded-xl bg-red-700 text-white text-center font-black text-xs tracking-wider shadow-xs flex items-center justify-center gap-2">
+        <div class="p-2.5 rounded-xl bg-[#FFEBEE] text-[#D32F2F] border border-[#FCA5A5] text-center font-black text-xs tracking-wider shadow-2xs flex items-center justify-center gap-2">
           <span class="material-symbols-outlined text-base">emergency_home</span>
           <span>{{ في حال حدوث حريق إتصل على الرقم (953) }} &nbsp;|&nbsp; {{ IN CASE OF FIRE CALL (953) }}</span>
         </div>
       </div>
 
-      <div class="flex items-center justify-end gap-2 pt-3 border-t border-outline-variant/40">
-        <button onclick="closeNewPermitModal()" class="px-4 py-2 rounded-lg text-on-surface-variant hover:bg-surface-container text-xs font-semibold">إلغاء</button>
-        <button onclick="saveNewPermit()" class="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-on-primary text-xs font-bold shadow-md flex items-center gap-1.5">
+      <div class="flex items-center justify-end gap-2 px-4 sm:px-5 py-3 bg-[#F7F9FF] border-t border-[#E0E3E8] shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <button onclick="closeNewPermitModal()" class="px-4 py-2 rounded-lg text-[#5B626C] hover:bg-[#EBEEF3] text-xs font-bold transition-colors">إلغاء</button>
+        <button onclick="saveNewPermit()" class="px-5 py-2.5 rounded-xl bg-[#004B87] hover:bg-[#082B49] text-white text-xs font-bold shadow-md flex items-center gap-1.5 transition-colors">
           <span class="material-symbols-outlined text-base">verified</span>
           <span>اعتماد وإصدار التصريح الرسمي</span>
         </button>
@@ -4468,8 +4489,8 @@
   <script src="assets/js/ksu-wet-chemical-assets.js?v=1.0" charset="UTF-8"></script>
   <script src="assets/js/ksu-facp-assets.js?v=2.0" charset="UTF-8"></script>
   <script src="assets/js/qr-scanner.js?v=5.5" charset="UTF-8"></script>
-  <script src="assets/js/ksu-official-card.js?v=6.6.5" charset="UTF-8"></script>
-  <script src="assets/js/app.js?v=8.2.3" charset="UTF-8"></script>
+  <script src="assets/js/ksu-official-card.js?v=8.1.0" charset="UTF-8"></script>
+  <script src="assets/js/app.js?v=8.2.4" charset="UTF-8"></script>
   <script src="assets/js/ksu-integrations.js?v=6.0" charset="UTF-8"></script>
   <script src="assets/js/vision-reticle-helper.js?v=7.2.2" charset="UTF-8"></script>
   <script src="assets/js/ksu-ai-client.js?v=8.1.0" charset="UTF-8"></script>
