@@ -3,7 +3,7 @@
  * المدينة الطبية بجامعة الملك سعود - محرك العمل دون اتصال
  */
 
-const CACHE_NAME = 'rsd-ksu-cache-v3.5.0-permits-redesign';
+const CACHE_NAME = 'rsd-ksu-cache-v3.5.1-door-card-print';
 const FIREBASE_NOTIFS_URL = 'https://rsd-ksu-default-rtdb.firebaseio.com/notifications.json';
 
 // سجل الإشعارات التي تم عرضها عبر Service Worker لمنع التكرار

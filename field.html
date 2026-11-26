@@ -3276,21 +3276,21 @@
           </div>
 
           <!-- Preview Container -->
-          <div id="door-id-preview-box" class="hidden items-center justify-between gap-3 p-2.5 bg-white rounded-lg border border-teal-300 shadow-xs">
-            <div class="flex items-center gap-3">
-              <img id="img-door-id-preview" class="w-16 h-12 object-cover rounded-md border border-gray-300 shadow-2xs" src="" alt="معاينة بطاقة طالب فتح الباب">
+          <div id="door-id-preview-box" class="hidden flex-col gap-2.5 p-3 bg-white rounded-xl border border-teal-300 shadow-xs">
+            <img id="img-door-id-preview" class="w-full max-h-56 object-contain rounded-lg border border-teal-200 bg-slate-50 p-1 shadow-2xs" src="" alt="معاينة بطاقة طالب فتح الباب">
+            <div class="flex items-center justify-between gap-3 pt-1 border-t border-teal-100">
               <div>
                 <span class="text-xs font-bold text-emerald-800 flex items-center gap-1">
                   <span class="material-symbols-outlined text-sm text-emerald-600">check_circle</span>
                   <span>تم التقاط ودمج صورة البطاقة بنجاح</span>
                 </span>
-                <span class="text-[10px] text-gray-500 block">جاهزة للحفظ الميداني والطباعة في نموذج A4 الموحد</span>
+                <span class="text-[10px] text-gray-500 block">جاهزة للحفظ الميداني والطباعة بحجم واضح في نموذج A4 الموحد</span>
               </div>
+              <button type="button" onclick="removeDoorIdCardPhoto()" class="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[11px] border border-red-200 flex items-center gap-1 cursor-pointer shrink-0">
+                <span class="material-symbols-outlined text-sm">delete</span>
+                <span>حذف</span>
+              </button>
             </div>
-            <button type="button" onclick="removeDoorIdCardPhoto()" class="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[11px] border border-red-200 flex items-center gap-1 cursor-pointer">
-              <span class="material-symbols-outlined text-sm">delete</span>
-              <span>حذف</span>
-            </button>
           </div>
         </div>
       </div>
@@ -4490,7 +4490,7 @@
   <script src="assets/js/ksu-facp-assets.js?v=2.0" charset="UTF-8"></script>
   <script src="assets/js/qr-scanner.js?v=5.5" charset="UTF-8"></script>
   <script src="assets/js/ksu-official-card.js?v=8.1.0" charset="UTF-8"></script>
-  <script src="assets/js/app.js?v=8.2.4" charset="UTF-8"></script>
+  <script src="assets/js/app.js?v=8.2.5" charset="UTF-8"></script>
   <script src="assets/js/ksu-integrations.js?v=6.0" charset="UTF-8"></script>
   <script src="assets/js/vision-reticle-helper.js?v=7.2.2" charset="UTF-8"></script>
   <script src="assets/js/ksu-ai-client.js?v=8.1.0" charset="UTF-8"></script>

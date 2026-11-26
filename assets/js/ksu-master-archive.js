@@ -779,6 +779,11 @@
     const rec = findRecordByUid(uid || activeRecordUid);
     if (!rec) return;
 
+    if (rec.uid && rec.uid.startsWith('door::') && typeof window.printDoorOpenRequest === 'function') {
+      window.printDoorOpenRequest(rec.id);
+      return;
+    }
+
     const isSafetyCard = rec.uid && rec.uid.startsWith('safety_viol::');
     const hasCard = rec.raw && (rec.raw.cardInnerHtml || rec.raw.hasVisualInspectionCard);
     if ((hasCard || isSafetyCard) && (rec.raw?.cardInnerHtml || typeof window.buildCardHtmlFromViolation === 'function')) {

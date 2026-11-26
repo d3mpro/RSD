@@ -17671,9 +17671,10 @@ function printDoorOpenRequest(doorId) {
     .sig-card h4 { font-size: 9.5px; font-weight: 800; color: #0f766e; border-bottom: 1px dashed #cbd5e1; padding-bottom: 3px; margin-bottom: 4px; }
     .sig-img { max-height: 42px; max-width: 100%; display: block; margin: 3px auto; }
     .sig-line { border-bottom: 1px solid #94a3b8; height: 26px; margin-top: 4px; }
-    .id-attach-container { border: 1.5px solid #0d9488; border-radius: 6px; padding: 6px 8px; margin-top: 6px; background: #f0fdfa; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .id-img-box { text-align: center; flex-shrink: 0; }
-    .id-img-box img { max-height: 85px; max-width: 220px; object-fit: contain; border: 1px solid #0d9488; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: block; }
+    .id-attach-container { border: 1.5px solid #0d9488; border-radius: 8px; padding: 8px 10px; margin-top: 6px; background: #f0fdfa; display: flex; flex-direction: column; gap: 8px; page-break-inside: avoid; }
+    .id-attach-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-bottom: 1px dashed #99f6e4; padding-bottom: 6px; }
+    .id-img-box { width: 100%; background: #ffffff; border: 1.5px solid #0d9488; border-radius: 6px; padding: 8px; display: flex; align-items: center; justify-content: center; text-align: center; }
+    .id-img-box img { width: 100%; max-width: 100%; height: auto; max-height: 115mm; object-fit: contain; border-radius: 4px; display: block; margin: 0 auto; }
     .id-placeholder-box { width: 100%; display: flex; align-items: center; justify-content: space-between; background: #eff6ff; border: 1px dashed #93c5fd; border-radius: 6px; padding: 6px 10px; font-size: 9.5px; color: #1e40af; font-weight: 700; }
     @media print {
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -17761,15 +17762,17 @@ function printDoorOpenRequest(doorId) {
     <div class="section-title" style="margin-top: 8px;">4. إثبات الهوية المعتمد / Requester ID Verification:</div>
     ${d.idCardPhoto ? `
       <div class="id-attach-container">
-        <div style="flex: 1;">
-          <div style="font-size: 10.5px; font-weight: 800; color: #0f766e; margin-bottom: 2px;">
-            بطاقة العمل / الهوية الوطنية لمقدم الطلب (Attached ID Card):
+        <div class="id-attach-meta">
+          <div style="flex: 1; min-width: 220px;">
+            <div style="font-size: 10.5px; font-weight: 800; color: #0f766e; margin-bottom: 2px;">
+              بطاقة العمل / الهوية الوطنية لمقدم الطلب (Attached ID Card):
+            </div>
+            <div style="font-size: 9.5px; color: #334155; line-height: 1.35;">
+              تم تصوير ومطابقة بطاقة العمل/الهوية لمقدم الطلب [<strong>${d.requesterName}</strong>] والرقم الوظيفي [<strong>${d.employeeId}</strong>] ميدانياً وتأكيد أحقية الدخول للموقع.
+            </div>
           </div>
-          <div style="font-size: 9.5px; color: #334155; line-height: 1.35;">
-            تم تصوير ومطابقة بطاقة العمل/الهوية لمقدم الطلب [<strong>${d.requesterName}</strong>] والرقم الوظيفي [<strong>${d.employeeId}</strong>] ميدانياً وتأكيد أحقية الدخول للموقع.
-          </div>
-          <div style="font-size: 8.5px; color: #0d9488; font-family: monospace; font-weight: bold; margin-top: 3px;">
-            DIGITALLY CAPTURED & VERIFIED • KSUMC SAFETY DEPARTMENT
+          <div style="font-size: 8.5px; color: #0f766e; background: #ccfbf1; border: 1px solid #99f6e4; border-radius: 4px; padding: 3px 7px; font-family: monospace; font-weight: bold; white-space: nowrap;">
+            DIGITALLY CAPTURED &amp; VERIFIED • KSUMC
           </div>
         </div>
         <div class="id-img-box">
