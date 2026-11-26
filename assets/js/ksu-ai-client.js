@@ -785,7 +785,7 @@
         ? cfg.firebaseAILogic.modelHierarchy.filter(Boolean)
         : [];
       if (configured.length > 0) return configured;
-      return ['gemini-3.5-flash-lite', 'gemini-3.8-flash', 'gemini-4-hydrogen'];
+      return ['gemini-3.8-flash', 'gemini-4-hydrogen', 'gemini-4-argon', 'gemini-3.5-flash-lite'];
     },
 
     async _ensureFirebaseAILogicRuntime() {
@@ -2115,55 +2115,150 @@
      * 2. توليد التقرير التنفيذي اليومي الشامل (Gemini AI Daily Insights)
      */
     async generateDailyExecutiveReport(date, manualStats = null) {
-      const isFirebase = window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com');
-      if (!isFirebase) {
+      const targetDate = date || this.getRiyadhDate();
+      const liveState = (typeof window !== 'undefined' && window.state) ? window.state : {};
+      const rounds = Array.isArray(liveState.rounds) ? liveState.rounds : [];
+      const safetyViols = Array.isArray(liveState.safetyViolations) ? liveState.safetyViolations : [];
+      const smokingViols = Array.isArray(liveState.smokingViolations) ? liveState.smokingViolations : [];
+      const alarms = Array.isArray(liveState.alarms) ? liveState.alarms : [];
+      const capaList = Array.isArray(liveState.capa) ? liveState.capa : [];
+      const deptReports = Array.isArray(liveState.safetyDeptReports) ? liveState.safetyDeptReports : [];
+
+      const openCapa = capaList.filter(c => {
+        const s = String((c && c.status) || '').toLowerCase();
+        return s !== 'closed' && s !== 'مغلق';
+      });
+      const avgScore = rounds.length > 0
+        ? Math.round(rounds.reduce((sum, r) => sum + (typeof r.score === 'number' ? r.score : (typeof r.complianceRate === 'number' ? r.complianceRate : 100)), 0) / rounds.length)
+        : 100;
+      const buildingsSet = new Set(rounds.map(r => r && r.building).filter(Boolean));
+      const inspectorsSet = new Set(rounds.map(r => r && r.inspector).filter(Boolean));
+
+      const baseStats = {
+        rounds_count: rounds.length,
+        avg_score: avgScore,
+        safety_violations_count: safetyViols.length,
+        smoking_violations_count: smokingViols.length,
+        incidents_count: alarms.length,
+        open_capa_count: openCapa.length,
+        dept_reports_count: deptReports.length,
+        active_inspectors_count: inspectorsSet.size,
+        buildings_covered: Array.from(buildingsSet)
+      };
+      const stats = (manualStats && typeof manualStats === 'object')
+        ? Object.assign({}, baseStats, manualStats)
+        : baseStats;
+
+      const recentFindings = [];
+      rounds.filter(r => r && ((r.observationCount || 0) > 0 || (r.violationCount || 0) > 0 || (r.notes && r.score < 100))).slice(0, 6).forEach(r => {
+        recentFindings.push(`جولة (${r.building || 'المستشفى'} - ${r.floor || ''}): نسبة ${r.score}% - ${r.notes || 'ملاحظات مرصودة'}`);
+      });
+      safetyViols.slice(0, 4).forEach(v => {
+        recentFindings.push(`مخالفة (${v.building || v.location || 'المستشفى'}): ${v.title || v.description || 'مخالفة سلامة'}`);
+      });
+      openCapa.slice(0, 3).forEach(c => {
+        recentFindings.push(`CAPA مفتوحة (${c.building || 'الموقع'}): ${c.title || c.description || 'إجراء تصحيحي'}`);
+      });
+
+      const useFirebaseAI = this.isFirebaseAILogicEnabled();
+      let geminiKeys = this.getGeminiKeys();
+      if (!useFirebaseAI && !this._isDemoSession() && !geminiKeys.length) {
+        await this.fetchCloudKeysSilently();
+        geminiKeys = this.getGeminiKeys();
+      }
+
+      if (!this._isDemoSession() && (useFirebaseAI || geminiKeys.length > 0)) {
+        try {
+          const prompt = `أنت الخبير التنفيذي لإدارة السلامة والجودة (CBAHI FMS & Saudi Civil Defense SBC 801) في المدينة الطبية بجامعة الملك سعود (KSUMC).
+أعد تقريراً تنفيذياً يومياً موجزاً لتاريخ (${targetDate}) استناداً حصرياً للإحصائيات والوقائع الفعلية أدناه دون اختلاق أرقام:
+- عدد الجولات المسجلة: ${stats.rounds_count}
+- متوسط نسبة الامتثال: ${stats.avg_score}%
+- مخالفات السلامة: ${stats.safety_violations_count} | مخالفات التدخين (م/56): ${stats.smoking_violations_count}
+- البلاغات/الإنذارات: ${stats.incidents_count} | إجراءات CAPA المفتوحة: ${stats.open_capa_count}
+- المباني المغطاة: ${stats.buildings_covered.length ? stats.buildings_covered.join('، ') : 'لم تسجل جولات بعد'}
+- أبرز الملاحظات والمخالفات الفعلية: ${recentFindings.length ? recentFindings.join(' | ') : 'لا توجد مخالفات حرجة مسجلة حالياً'}
+
+أجب بكائن JSON صالح فقط:
+{
+  "executive_headline": "عنوان تنفيذي موجز ودقيق للحالة",
+  "safety_health_score": ${stats.avg_score},
+  "operational_summary": "ملخص تشغيلي من جملتين يعكس الأرقام الفعلية",
+  "key_strengths": ["نقطة قوة 1", "نقطة قوة 2"],
+  "critical_alerts": ["تنبيه مبني على الملاحظات الفعلية أو التأكيد على خلو الموقع من تنبيهات حرجة"],
+  "capa_recommendations": ["توصية عملية 1", "توصية عملية 2"],
+  "compliance_overview": "تقييم موجز للامتثال وفق CBAHI FMS وSBC 801",
+  "supervisor_brief": "رسالة موجزة رسمية لسعادة المشرف العام على إدارة السلامة"
+}`;
+
+          const res = await this._callGeminiWithRotation({
+            parts: [{ text: prompt }],
+            expectJson: true,
+            maxOutputTokens: 1200,
+            timeoutMs: 22000
+          });
+          if (res && res.text) {
+            const parsed = this.cleanAndParseJSON(res.text);
+            if (parsed && typeof parsed === 'object') {
+              const normalized = {
+                executive_headline: parsed.executive_headline || `التقرير التنفيذي ليوم ${targetDate} — نسبة الامتثال ${stats.avg_score}%`,
+                safety_health_score: typeof parsed.safety_health_score === 'number' ? parsed.safety_health_score : stats.avg_score,
+                operational_summary: parsed.operational_summary || `تم رصد ${stats.rounds_count} جولة ميدانية بمتوسط امتثال ${stats.avg_score}%.`,
+                key_strengths: Array.isArray(parsed.key_strengths) && parsed.key_strengths.length ? parsed.key_strengths : ['استمرار المتابعة الميدانية عبر الورديات'],
+                critical_alerts: Array.isArray(parsed.critical_alerts) && parsed.critical_alerts.length ? parsed.critical_alerts : ['لا توجد تنبيهات حرجة جديدة'],
+                capa_recommendations: Array.isArray(parsed.capa_recommendations) && parsed.capa_recommendations.length ? parsed.capa_recommendations : ['متابعة إغلاق الملاحظات الميدانية أولاً بأول'],
+                compliance_overview: parsed.compliance_overview || 'متوافق مع معايير سباهي (CBAHI FMS) وكود الحريق السعودي (SBC 801).',
+                supervisor_brief: parsed.supervisor_brief || `سعادة المشرف العام: تم رصد ${stats.rounds_count} جولة بنسبة امتثال ${stats.avg_score}% بتاريخ ${targetDate}.`
+              };
+              return {
+                success: true,
+                data: normalized,
+                stats,
+                source: res.provider === 'firebase-ai-logic' ? `Firebase AI Logic (${res.model})` : `Google ${res.model}`
+              };
+            }
+          }
+        } catch (aiErr) {
+          console.warn('[KSUAI] Daily executive AI generation failed, falling back to live statistical summary:', aiErr && aiErr.message ? aiErr.message : aiErr);
+        }
+      }
+
+      const isFirebase = (typeof window !== 'undefined' && window.location && (window.location.hostname.includes('web.app') || window.location.hostname.includes('firebaseapp.com')));
+      if (!isFirebase && !this._isDemoSession() && this.oracleAgentUrl) {
         try {
           return await this.request('/ai/generate-executive-report', {
             method: 'POST',
             body: JSON.stringify({
-              date: date || new Date().toISOString().split('T')[0],
-              manualStats
+              date: targetDate,
+              manualStats: stats
             })
           }, 30000);
         } catch (e) {
-          console.warn('[KSUAI] Backend executive report failed, using client-side generator:', e.message);
+          console.warn('[KSUAI] Backend executive report failed, using client-side statistical generator:', e.message);
         }
       }
-      // Client-side generation fallback with live state
-      const rounds = window.state?.rounds || [];
-      const safetyViols = window.state?.safetyViolations || [];
-      const smokingViols = window.state?.smokingViolations || [];
-      const alarms = window.state?.alarms || [];
+
       return {
         success: true,
         data: {
-          executive_headline: "استقرار الحالة العامة وجاهزية منظومات السلامة الميدانية (CBAHI / NFPA)",
-          safety_health_score: 97,
-          operational_summary: "أظهرت نتائج التدقيق الميداني استيفاء المنشآت الطبية لاشتراطات السلامة والوقاية من الحريق مع استمرار تنفيذ جولات الورديات المجدولة ومتابعة مسالك ومخارج الطوارئ ومحطات الإطفاء.",
+          executive_headline: stats.rounds_count > 0
+            ? `ملخص الرصد الميداني ليوم ${targetDate} — متوسط الامتثال ${stats.avg_score}%`
+            : `التقرير التنفيذي ليوم ${targetDate} (لا توجد جولات مسجلة بعد)`,
+          safety_health_score: stats.avg_score,
+          operational_summary: `سجلت المنظومة ${stats.rounds_count} جولة ميدانية بمتوسط امتثال ${stats.avg_score}%، و${stats.safety_violations_count} مخالفة سلامة، و${stats.smoking_violations_count} مخالفة تدخين، و${stats.open_capa_count} إجراء تصحيحي مفتوح (CAPA).`,
           key_strengths: [
-            "خلو مسالك ومخارج الطوارئ من أي عوائق تخزينية بنسبة 100%",
-            "جاهزية شبكات الإطفاء ومضخات الحريق وضغط مستقر عند 7-8 بار",
-            "التزام الكوادر الطبية بتعليمات مكافحة التدخين والاشتراطات النظامية"
+            stats.rounds_count > 0 ? `تغطية ${stats.buildings_covered.length} مبنى عبر ${stats.rounds_count} جولة ميدانية` : 'المنظومة جاهزة لاستقبال جولات التفتيش الميداني',
+            'توثيق الملاحظات والمخالفات ومتابعة خطط التصحيح (CAPA)'
           ],
-          critical_alerts: [],
+          critical_alerts: recentFindings.length > 0 ? recentFindings.slice(0, 4) : ['لا توجد تنبيهات أو مخالفات حرجة مسجلة حالياً'],
           capa_recommendations: [
-            "استمرار الجولات الميدانية المكثفة في مبنى العيادات الخارجية ومبنى المستشفى الرئيسي",
-            "متابعة دورية للأختام المطاطية للأبواب المقاومة للحريق (NFPA 80)"
+            stats.open_capa_count > 0 ? `متابعة إغلاق ${stats.open_capa_count} إجراء تصحيحي مفتوح في سجل CAPA` : 'الاستمرار في جولات التحقق الوقائية اليومية وفق الجدول المعتمد',
+            'التحقق المستمر من جاهزية مخارج الطوارئ ومعدات الإطفاء (CBAHI FMS / SBC 801)'
           ],
-          compliance_overview: "مطابقة عالية لاشتراطات سباهي (CBAHI FMS) وكود البناء السعودي (SBC 801).",
-          supervisor_brief: "سعادة المشرف العام على إدارة السلامة (aalsaqri@ksu.edu.sa): نود إحاطتكم باكتمال التفتيش الدوري واستقرار كافة المؤشرات التشغيلية بنسبة امتثال ممتازة."
+          compliance_overview: 'المتابعة مستمرة وفق متطلبات سباهي (CBAHI FMS) وكود الحريق السعودي (SBC 801).',
+          supervisor_brief: `سعادة المشرف العام على إدارة السلامة: متوسط الامتثال التشغيلي ${stats.avg_score}% عبر ${stats.rounds_count} جولة مسجلة بتاريخ ${targetDate}.`
         },
-        stats: {
-          rounds_count: rounds.length || 18,
-          avg_score: 98.5,
-          safety_violations_count: safetyViols.length || 0,
-          smoking_violations_count: smokingViols.length || 0,
-          incidents_count: alarms.length || 0,
-          elevator_entrapments_count: 0,
-          dept_reports_count: 2,
-          active_inspectors_count: 6,
-          buildings_covered: ["المستشفى", "التوسعة الشرقية", "كلية الطب", "المبنى الإداري", "مبنى العيادات", "مبنى الاسنان"]
-        }
+        stats,
+        source: this._isDemoSession() ? 'Demo Sandbox Engine' : 'KSUMC Statistical Engine'
       };
     },
 

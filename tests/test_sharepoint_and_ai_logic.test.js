@@ -460,3 +460,83 @@ test('AI-4: demo/demo session NEVER calls Firebase AI Logic bridge (0 billed cal
   await assert.rejects(() => sandbox.KSUAI.callGeminiCBAHIAudit('الكل', 30, {}));
   assert.equal(billedCalls, 0, 'Demo session must trigger ZERO billed Firebase AI Logic calls');
 });
+
+test('AI-5: ksu-firebase-config.js prioritizes paid high-intelligence Gemini 3.8/4 models first without deprecated 2.x strings', () => {
+  const cfgCtx = vm.createContext({ window: {}, localStorage: makeStorage() });
+  cfgCtx.window = cfgCtx;
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'assets/js/ksu-firebase-config.js'), 'utf8'), cfgCtx);
+
+  const hierarchy = cfgCtx.KSU_FIREBASE_CONFIG.firebaseAILogic.modelHierarchy;
+  assert.deepEqual(
+    Array.from(hierarchy),
+    ['gemini-3.8-flash', 'gemini-4-hydrogen', 'gemini-4-argon', 'gemini-3.5-flash-lite'],
+    'Paid Firebase AI Logic modelHierarchy must start with flagship gemini-3.8-flash and Gemini 4 models'
+  );
+  for (const m of hierarchy) {
+    assert.ok(!m.includes('gemini-2.'), `Deprecated model must not be in firebaseAILogic hierarchy: ${m}`);
+  }
+});
+
+test('AI-6: generateDailyExecutiveReport uses real operational stats & Firebase AI Logic on web.app while isolating demo', async () => {
+  const execCalls = [];
+  const { sandbox } = createAISandbox({
+    bridge: {
+      async generateContent({ model, generationConfig, contents }) {
+        execCalls.push({ model, generationConfig, contents });
+        return {
+          response: {
+            text: () => JSON.stringify({
+              executive_headline: 'تقرير تنفيذي بالذكاء الاصطناعي لسلامة المدينة الطبية',
+              safety_health_score: 92,
+              operational_summary: 'تم رصد 2 جولة ميدانية ومخالفة واحدة بالعيادات.',
+              key_strengths: ['جاهزية مخارج الطوارئ في المستشفى'],
+              critical_alerts: ['ملاحظة توصيلة كهربائية في مبنى العيادات'],
+              capa_recommendations: ['إغلاق تذكرة CAPA خلال 24 ساعة'],
+              compliance_overview: 'متوافق مع CBAHI FMS',
+              supervisor_brief: 'ملخص تنفيذي يومي مخصص للمشرف العام'
+            })
+          }
+        };
+      }
+    }
+  });
+
+  sandbox.state = {
+    rounds: [
+      { id: 'R1', building: 'مبنى العيادات', score: 85, inspector: 'أ. أحمد الأكلبي', notes: 'توصيلة كهربائية مخالفة', observationCount: 1 },
+      { id: 'R2', building: 'المستشفى', score: 100, inspector: 'أ. حسن دعاك', observationCount: 0 }
+    ],
+    safetyViolations: [{ id: 'SV-1', building: 'مبنى العيادات', title: 'غلاية غير مصرحة' }],
+    smokingViolations: [],
+    alarms: [],
+    capa: [{ id: 'C-1', status: 'open' }],
+    safetyDeptReports: []
+  };
+
+  const res = await sandbox.KSUAI.generateDailyExecutiveReport('2026-11-26');
+  assert.equal(res.success, true);
+  assert.ok(execCalls.length >= 1, 'generateDailyExecutiveReport must call Firebase AI Logic bridge on web.app');
+  assert.equal(execCalls[0].model, 'gemini-3.8-flash', 'Must try gemini-3.8-flash first');
+  assert.ok(res.source && res.source.includes('Firebase AI Logic'), `Expected Firebase AI Logic source, got: ${res.source}`);
+  assert.equal(res.stats.rounds_count, 2, 'Must reflect actual state.rounds.length (2), not hardcoded 18');
+  assert.equal(res.stats.avg_score, 93, 'Must reflect real rounded avg score across rounds');
+  assert.equal(res.stats.safety_violations_count, 1);
+  assert.equal(res.data.executive_headline, 'تقرير تنفيذي بالذكاء الاصطناعي لسلامة المدينة الطبية');
+
+  // Demo isolation for generateDailyExecutiveReport
+  let demoAiCalls = 0;
+  const { sandbox: demoSandbox } = createAISandbox({
+    sessionInit: { ksu_active_user: JSON.stringify({ username: 'demo', isDemoAccount: true }) },
+    bridge: {
+      async generateContent() {
+        demoAiCalls++;
+        throw new Error('Demo must not call Firebase AI Logic');
+      }
+    }
+  });
+  demoSandbox.state = { rounds: [{ id: 'DR1', building: 'المستشفى', score: 100 }], safetyViolations: [], smokingViolations: [], alarms: [] };
+  const demoRes = await demoSandbox.KSUAI.generateDailyExecutiveReport('2026-11-26');
+  assert.equal(demoRes.success, true);
+  assert.equal(demoAiCalls, 0, 'Demo generateDailyExecutiveReport must make 0 billed AI calls');
+  assert.equal(demoRes.stats.rounds_count, 1);
+});
