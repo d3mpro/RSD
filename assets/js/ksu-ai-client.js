@@ -7134,26 +7134,32 @@
   };
 
   /**
-   * التحقق البصري الذكي من إغلاق الإجراء التصحيحي (قبل / بعد الإصلاح - Closed-Loop CAPA)
+   * التحليل البصري الاستشاري لصورة ما بعد الإصلاح في الإجراءات التصحيحية (CAPA Advisory Vision)
+   * ملاحظة حوكمة v8.3.1: التحليل استشاري فقط ولا يغلق السجل تلقائياً؛ عند الفشل لا تُعاد أي نتيجة إيجابية أو درجة ثقة.
    */
   KSUAI.verifyCapaClosureImage = async function({ beforeImage = '', afterImage = '', title = '', description = '', location = '' } = {}) {
     if (!afterImage || typeof afterImage !== 'string') {
       return {
         success: false,
-        verified: false,
-        confidence: 0,
-        summary: 'يرجى إرفاق صورة ما بعد الإصلاح لإتمام التحقق البصري.'
+        available: false,
+        advisoryOnly: true,
+        verified: null,
+        confidence: null,
+        safetyStatus: 'بانتظار إرفاق الدليل المصور',
+        summary: 'يرجى إرفاق صورة ما بعد الإصلاح كدليل ميداني.'
       };
     }
 
     if (this._isDemoSession()) {
       return {
         success: true,
-        verified: true,
+        available: true,
+        advisoryOnly: true,
         demoSimulated: true,
-        confidence: 94,
-        safetyStatus: 'مطابق (محاكاة تجريبية معزولة)',
-        summary: `محاكاة تجريبية معزولة: تم استلام صورة ما بعد المعالجة لبند (${title || 'ملاحظة سلامة'}) دون أي استدعاء سحابي.`
+        verified: null,
+        confidence: null,
+        safetyStatus: 'محاكاة استشارية معزولة — بانتظار مراجعة المشرف',
+        summary: `وضع تجريبي معزول: تم حفظ صورة ما بعد الإصلاح لبند (${title || 'ملاحظة سلامة'}) بانتظار مراجعة المشرف دون استدعاء سحابي.`
       };
     }
 
@@ -7168,11 +7174,13 @@
     const afterPart = extractInline(afterImage);
     if (!afterPart) {
       return {
-        success: true,
-        verified: true,
-        confidence: 80,
-        safetyStatus: 'موثق بصورة مرجعية',
-        summary: 'تم إرفاق صورة المعالجة الميدانية وحفظها في السجل.'
+        success: false,
+        available: false,
+        advisoryOnly: true,
+        verified: null,
+        confidence: null,
+        safetyStatus: 'بانتظار مراجعة المشرف',
+        summary: 'تعذر قراءة بيانات الصورة للتحليل الآلي — يبقى السجل بانتظار مراجعة المشرف المختص.'
       };
     }
 
@@ -7181,14 +7189,14 @@
     if (beforePart) {
       parts.push({ text: 'الصورة الأولى (قبل الإصلاح - الملاحظة المرصودة):' });
       parts.push({ inlineData: beforePart });
-      parts.push({ text: 'الصورة الثانية (بعد الإصلاح - التحقق من الإزالة والمعالجة):' });
+      parts.push({ text: 'الصورة الثانية (بعد الإصلاح - رأي استشاري للمشرف):' });
     }
     parts.push({ inlineData: afterPart });
     parts.push({
-      text: `أنت مدقق سلامة معتمد (CBAHI FMS / SBC 801) في المدينة الطبية بجامعة الملك سعود.
+      text: `أنت مستشار سلامة فني في المدينة الطبية بجامعة الملك سعود. دورك استشاري فقط لمساعدة المشرف المخول بالمراجعة.
 الملاحظة الأصلية: "${title || 'ملاحظة سلامة'}" — "${description || ''}" في موقع "${location || 'المستشفى'}".
-تحقق من صورة ما بعد الإصلاح وأعد JSON فقط بالشكل:
-{"verified": true, "confidence": 95, "safetyStatus": "تمت المعالجة ومطابق", "summary": "وصف مختصر بالعربية يؤكد إزالة الخطر أو يوضح سبب الرفض إن بقي الخطر قائماً"}`
+افحص صورة ما بعد الإصلاح وأعد JSON فقط بالشكل:
+{"verified": true, "confidence": 90, "safetyStatus": "رأي استشاري: يظهر زوال الملاحظة", "summary": "ملاحظة فنية موجزة بالعربية للمشرف المعتمد"}`
     });
 
     try {
@@ -7201,45 +7209,53 @@
         });
         const cleaned = String(aiRes.text || '').replace(/```json|```/gi, '').trim();
         const parsed = JSON.parse(cleaned);
+        const rawConf = Number(parsed.confidence);
         return {
           success: true,
-          verified: parsed.verified !== false,
-          confidence: Number(parsed.confidence) || 92,
-          safetyStatus: String(parsed.safetyStatus || (parsed.verified !== false ? 'تمت المعالجة ومطابق' : 'يتطلب استكمال الإصلاح')),
-          summary: String(parsed.summary || 'تم التحقق من صورة ما بعد الإصلاح عبر Firebase AI Logic.'),
+          available: true,
+          advisoryOnly: true,
+          verified: typeof parsed.verified === 'boolean' ? parsed.verified : null,
+          confidence: Number.isFinite(rawConf) && rawConf >= 0 ? rawConf : null,
+          safetyStatus: String(parsed.safetyStatus || 'رأي استشاري جاهز لمراجعة المشرف'),
+          summary: String(parsed.summary || 'تحليل استشاري آلي جاهز للعرض على المشرف المختص.'),
           source: `Firebase AI Logic (${aiRes.model})`
         };
       }
     } catch (_) {}
 
-    // Fallback via Smart Visual Observer pipeline if available
+    // Fallback via Smart Visual Observer pipeline ONLY if real AI source responded (never heuristic/fake)
     try {
       const fallbackRes = await this.analyzeInspectionImage({
         image: afterImage,
         submode: 'general',
-        itemLabel: `التحقق من إغلاق إجراء تصحيحي: ${title}`,
+        itemLabel: `مراجعة استشارية لإغلاق إجراء تصحيحي: ${title}`,
         notes: description
       });
-      if (fallbackRes && fallbackRes.success && fallbackRes.data) {
+      if (fallbackRes && fallbackRes.success && !fallbackRes.fallback && fallbackRes.data) {
         const d = fallbackRes.data;
         const isClean = !String(d.status || '').includes('غير مطابق') && !String(d.risk || '').includes('حرج');
+        const rawConf = Number(d.confidence);
         return {
           success: true,
+          available: true,
+          advisoryOnly: true,
           verified: isClean,
-          confidence: Number(d.confidence) || 88,
-          safetyStatus: isClean ? 'تمت المعالجة ومطابق' : 'لا تزال هناك ملاحظة بالصورة',
-          summary: String(d.summary || 'تم فحص صورة ما بعد الإصلاح بنجاح.'),
-          source: fallbackRes.source || 'Gemini Vision Fallback'
+          confidence: Number.isFinite(rawConf) && rawConf >= 0 ? rawConf : null,
+          safetyStatus: isClean ? 'رأي استشاري: مؤشرات معالجة إيجابية' : 'رأي استشاري: يُنصح بالتحقق الميداني الإضافي',
+          summary: String(d.summary || 'تحليل استشاري آلي جاهز لمراجعة المشرف.'),
+          source: fallbackRes.source || 'Gemini Vision Advisory'
         };
       }
     } catch (_) {}
 
     return {
-      success: true,
-      verified: true,
-      confidence: 85,
-      safetyStatus: 'موثق بصورة ميدانية (بانتظار المراجعة)',
-      summary: 'تم حفظ صورة ما بعد الإصلاح وتوثيقها في بطاقة الإغلاق.'
+      success: false,
+      available: false,
+      advisoryOnly: true,
+      verified: null,
+      confidence: null,
+      safetyStatus: 'بانتظار مراجعة المشرف',
+      summary: 'تعذر توفر نتيجة التحليل الآلي — يبقى السجل بانتظار مراجعة واعتماد المشرف المختص.'
     };
   };
 

@@ -252,6 +252,7 @@ test('UPG-4: KSUOps enforces Before/After visual verification for Critical/High 
   assert.ok(fs.existsSync(opsPath), 'assets/js/ksu-ops-enhancements.js must exist');
 
   const updatedRecords = [];
+  let allowSupervisorApproval = false;
   const sandbox = {
     console,
     Date,
@@ -268,7 +269,13 @@ test('UPG-4: KSUOps enforces Before/After visual verification for Critical/High 
     Intl,
     localStorage: makeStorage(),
     sessionStorage: makeStorage(),
+    KSUAuth: {
+      getUser: () => (allowSupervisorApproval
+        ? { id: 'USR-H2', empId: 'H2', name: 'أ. مصعب الحماد', roleCategory: 'head', shift: 'all' }
+        : { id: 'USR-M1', empId: 'M1', name: 'أ. عادل العنزي', roleCategory: 'field_inspector', shift: '1' })
+    },
     KSUDataBridge: {
+      canUserApproveCAPAClosure: () => allowSupervisorApproval,
       updateCAPARecord: (id, patch) => {
         updatedRecords.push({ id, patch });
         return true;
@@ -278,9 +285,11 @@ test('UPG-4: KSUOps enforces Before/After visual verification for Critical/High 
       async verifyCapaClosureImage({ afterImage, title }) {
         return {
           success: true,
+          available: true,
+          advisoryOnly: true,
           verified: Boolean(afterImage && afterImage.startsWith('data:image/')),
           confidence: 95,
-          summary: `تم التحقق بصرياً من إزالة الخطر: ${title}`
+          summary: `رأي استشاري بصري لإزالة الخطر: ${title}`
         };
       }
     }
@@ -309,17 +318,28 @@ test('UPG-4: KSUOps enforces Before/After visual verification for Critical/High 
   assert.equal(failRes.success, false, 'Must block closing Critical CAPA without after-fix image');
   assert.equal(updatedRecords.length, 0);
 
-  // Succeed when afterImage is provided + AI verified
+  // Inspector submitting afterImage stays pending_supervisor_review
+  const pendingRes = await sandbox.KSUOps.validateAndCloseCAPA(criticalCapa, {
+    notes: 'تم إخلاء الممر وإرفاق الصورة للمشرف',
+    afterImage: 'data:image/jpeg;base64,/9j/AFTER_FIX_CLEAN'
+  });
+  assert.equal(pendingRes.success, true);
+  assert.equal(pendingRes.closed, false);
+  assert.equal(updatedRecords[0].patch.status, 'pending_supervisor_review');
+
+  // Authorized supervisor approves closure -> status becomes resolved
+  allowSupervisorApproval = true;
   const okRes = await sandbox.KSUOps.validateAndCloseCAPA(criticalCapa, {
-    notes: 'تم إخلاء الممر بالكامل',
+    notes: 'تمت المعاينة واعتماد الإغلاق من رئيس القسم',
     afterImage: 'data:image/jpeg;base64,/9j/AFTER_FIX_CLEAN',
     closedBy: 'أ. مصعب الحماد'
   });
   assert.equal(okRes.success, true);
-  assert.equal(updatedRecords.length, 1);
-  assert.equal(updatedRecords[0].patch.status, 'resolved');
-  assert.equal(updatedRecords[0].patch.afterImage, 'data:image/jpeg;base64,/9j/AFTER_FIX_CLEAN');
-  assert.equal(updatedRecords[0].patch.aiClosureVerification.verified, true);
+  assert.equal(okRes.closed, true);
+  assert.equal(updatedRecords.length, 2);
+  assert.equal(updatedRecords[1].patch.status, 'resolved');
+  assert.equal(updatedRecords[1].patch.afterImage, 'data:image/jpeg;base64,/9j/AFTER_FIX_CLEAN');
+  assert.equal(updatedRecords[1].patch.aiClosureVerification.advisoryOnly, true);
 
   const headHtml = fs.readFileSync(path.join(ROOT, 'head.html'), 'utf8');
   assert.ok(headHtml.includes('id="modal-close-capa-verified"'), 'head.html must provide Before/After CAPA closure modal');
@@ -368,9 +388,9 @@ test('UPG-5: KSUOps.computeMonthlyAssetCoverage tracks remaining uninspected ass
 });
 
 // =============================================================================
-// 6. Hot Work Permit Post-Work Fire-Watch Timer (NFPA 51B)
+// 6. Hot Work Permit Post-Work Fire-Watch Timer (Strict Timing + KSUMC SOP Gate)
 // =============================================================================
-test('UPG-6: KSUOps.evaluatePermitFireWatch tracks 30m and 60m post-work checks per NFPA 51B', () => {
+test('UPG-6: KSUOps.evaluatePermitFireWatch tracks post-work checks strictly and enforces KSUMC SOP verification gate', () => {
   const sandbox = { console, Date, Math, JSON, Object, Array, String, Number, Boolean, Set, Map, Intl };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
@@ -404,11 +424,21 @@ test('UPG-6: KSUOps.evaluatePermitFireWatch tracks 30m and 60m post-work checks 
   assert.equal(st65.stage, 'overdue_60m');
   assert.equal(st65.isOverdue, true);
 
-  // Record 60m check -> completed!
+  // Record 60m check -> without verified KSUMC SOP, must stay pending_sop_verification (not falsely completed!)
   sandbox.KSUOps.recordPermitFireWatchCheck(permit, '60m', 'أ. حسن دعاك', endMs + 66 * 60 * 1000);
-  const stDone = sandbox.KSUOps.evaluatePermitFireWatch(permit, endMs + 70 * 60 * 1000);
-  assert.equal(stDone.stage, 'completed');
-  assert.equal(stDone.isOverdue, false);
+  const stPendingSop = sandbox.KSUOps.evaluatePermitFireWatch(permit, endMs + 70 * 60 * 1000);
+  assert.equal(stPendingSop.stage, 'pending_sop_verification');
+  assert.equal(stPendingSop.isComplete, false);
+  assert.equal(stPendingSop.complianceBlocked, true);
+
+  // When verified SOP config + verified device lock-screen alert are explicitly supplied, stage reaches completed
+  const stVerified = sandbox.KSUOps.evaluatePermitFireWatch(permit, endMs + 70 * 60 * 1000, {
+    requiredMinutes: [30, 60],
+    sopVerified: true,
+    lockScreenAlertVerifiedOnDevice: true
+  });
+  assert.equal(stVerified.stage, 'completed');
+  assert.equal(stVerified.isComplete, true);
 });
 
 // =============================================================================

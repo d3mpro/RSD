@@ -929,41 +929,61 @@
             return item;
         }
 
-        markLocalPendingState(storageKeys, stateProp, itemObj, isPending) {
+        markLocalPendingState(storageKeys, stateProp, itemObj, isPending, extraFields = null) {
             if (!itemObj || typeof itemObj !== 'object') return;
             const itemId = String(itemObj.id || itemObj.roundId || itemObj.reportId || '');
             if (!itemId) return;
 
+            const syncMeta = isPending
+                ? Object.assign({ _isOfflinePending: true, rsdSyncStatus: 'pending_sync' }, extraFields || {})
+                : Object.assign({ rsdSyncStatus: 'synced', rsdSyncedAt: new Date().toISOString(), rsdLastSyncError: null }, extraFields || {});
+
             (storageKeys || []).forEach((sKey, keyIndex) => {
                 try {
-                    const list = this.safeParseJSON(sKey, []);
-                    const idx = list.findIndex(x => x && String(x.id || x.roundId || x.reportId || '') === itemId);
-                    if (idx !== -1) {
-                        const copy = Object.assign({}, list[idx]);
-                        if (isPending) {
-                            copy._isOfflinePending = true;
+                    const rawList = this.safeParseJSON(sKey, []);
+                    const seen = new Set();
+                    const deduped = [];
+                    let found = false;
+
+                    for (const x of rawList) {
+                        if (!x || typeof x !== 'object') continue;
+                        const xId = String(x.id || x.roundId || x.reportId || '');
+                        if (xId && seen.has(xId)) continue;
+                        if (xId) seen.add(xId);
+
+                        if (xId === itemId) {
+                            found = true;
+                            const copy = Object.assign({}, x, syncMeta);
+                            if (!isPending) delete copy._isOfflinePending;
+                            deduped.push(copy);
                         } else {
-                            delete copy._isOfflinePending;
+                            deduped.push(x);
                         }
-                        list[idx] = copy;
-                        localStorage.setItem(sKey, JSON.stringify(list));
-                    } else if (isPending && keyIndex === 0) {
-                        const copy = Object.assign({}, itemObj, { _isOfflinePending: true });
-                        list.unshift(copy);
-                        localStorage.setItem(sKey, JSON.stringify(list));
                     }
+
+                    if (!found && isPending && keyIndex === 0) {
+                        const copy = Object.assign({}, itemObj, syncMeta);
+                        deduped.unshift(copy);
+                    }
+                    localStorage.setItem(sKey, JSON.stringify(deduped));
                 } catch (_) {}
             });
 
             if (stateProp && window.state && Array.isArray(window.state[stateProp])) {
-                const sIdx = window.state[stateProp].findIndex(x => x && String(x.id || x.roundId || x.reportId || '') === itemId);
-                if (sIdx !== -1 && window.state[stateProp][sIdx]) {
-                    if (isPending) {
-                        window.state[stateProp][sIdx]._isOfflinePending = true;
-                    } else {
-                        delete window.state[stateProp][sIdx]._isOfflinePending;
+                const seenState = new Set();
+                const nextStateArr = [];
+                for (const x of window.state[stateProp]) {
+                    if (!x || typeof x !== 'object') continue;
+                    const xId = String(x.id || x.roundId || x.reportId || '');
+                    if (xId && seenState.has(xId)) continue;
+                    if (xId) seenState.add(xId);
+                    if (xId === itemId) {
+                        Object.assign(x, syncMeta);
+                        if (!isPending) delete x._isOfflinePending;
                     }
+                    nextStateArr.push(x);
                 }
+                window.state[stateProp] = nextStateArr;
             }
         }
 
@@ -1030,7 +1050,9 @@
 
         pushCollectionToFirebase(nodeName, list, idKey = 'id') {
             if (this.isDemoSandboxUser()) return Promise.resolve(false);
-            if (!this.db || !Array.isArray(list)) return Promise.resolve(false);
+            if (!this.db || this.isConnected === false || (typeof navigator !== 'undefined' && navigator.onLine === false) || !Array.isArray(list)) {
+                return Promise.resolve(false);
+            }
             const payload = {};
             list.forEach(item => {
                 if (!item) return;
@@ -1047,11 +1069,19 @@
         }
 
         pushPendingLocalDataToCloud() {
-            if (this.isDemoSandboxUser()) return;
-            if (!this.db || !this.isConnected) return;
-            // رفع البيانات التي أُنشئت أثناء عدم الاتصال حصراً (_isOfflinePending === true) لمنع إعادة حقن بيانات قديمة
+            if (this.isDemoSandboxUser()) {
+                return Promise.resolve({ success: false, syncedCount: 0, failedCount: 0, demo: true });
+            }
+            if (!this.db || !this.isConnected || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+                return Promise.resolve({ success: false, syncedCount: 0, failedCount: 0, offline: true });
+            }
+            if (this._pushPendingInFlight) {
+                return this._pushPendingInFlight;
+            }
+
+            // رفع البيانات التي أُنشئت أثناء عدم الاتصال حصراً (_isOfflinePending === true) مع منع السباق أو التكرار
             const collections = [
-                { keys: ['ksumc_safety_rounds', 'ksumc_field_rounds', 'ksumc_rounds_registry'], stateProp: 'rounds', node: 'rounds' },
+                { keys: ['ksumc_safety_rounds', 'ksumc_field_rounds', 'ksumc_rounds_registry', 'ksumc_rounds'], stateProp: 'rounds', node: 'rounds' },
                 { keys: ['ksumc_quality_shift_inspection_logs'], stateProp: null, node: 'shift_inspection_logs' },
                 { keys: ['ksumc_safety_dept_reports'], stateProp: 'safetyDeptReports', node: 'safety_dept_reports' },
                 { keys: ['ksumc_compliance_registry'], stateProp: 'complianceRegistry', node: 'compliance_registry' },
@@ -1061,21 +1091,56 @@
                 { keys: ['ksumc_shift_incidents'], stateProp: 'shiftIncidents', node: 'shift_incidents' },
                 { keys: ['ksumc_safety_violations'], stateProp: 'safetyViolations', node: 'safety_violations' },
                 { keys: ['ksumc_smoking_violations'], stateProp: 'smokingViolations', node: 'smoking_violations' },
-                { keys: ['ksumc_capa_registry', 'ksumc_capa_records'], stateProp: 'capa', node: 'capa_records' },
+                { keys: ['ksumc_capa_records', 'ksumc_capa_registry'], stateProp: 'capa', node: 'capa_records' },
                 { keys: ['ksumc_notifications'], stateProp: 'notifications', node: 'notifications' }
             ];
 
-            collections.forEach(({ keys, stateProp, node }) => {
-                const local = this.safeParseJSON(keys[0], []);
-                const offlineOnly = local.filter(item => item && item._isOfflinePending === true);
-                if (offlineOnly.length > 0) {
-                    this.pushCollectionToFirebase(node, offlineOnly, 'id').then((ok) => {
-                        if (ok) {
-                            offlineOnly.forEach(item => this.markLocalPendingState(keys, stateProp, item, false));
+            this._pushPendingInFlight = (async () => {
+                let syncedCount = 0;
+                let failedCount = 0;
+
+                for (const { keys, stateProp, node } of collections) {
+                    const mergedById = new Map();
+                    for (const k of keys) {
+                        const arr = this.safeParseJSON(k, []);
+                        for (const item of arr) {
+                            if (!item || typeof item !== 'object') continue;
+                            const id = String(item.id || item.roundId || item.reportId || '');
+                            if (!id) continue;
+                            if (!mergedById.has(id) || item._isOfflinePending === true) {
+                                mergedById.set(id, item);
+                            }
                         }
-                    });
+                    }
+                    const offlineOnly = Array.from(mergedById.values()).filter(item => item && item._isOfflinePending === true);
+                    for (const item of offlineOnly) {
+                        const cleanData = this.normalizeCloudPayload(node, item);
+                        if (!cleanData) continue;
+                        const fbKey = this.sanitizeFirebaseKey(cleanData.id || cleanData.roundId || cleanData.reportId);
+                        try {
+                            await this.db.ref(`${node}/${fbKey}`).set(cleanData);
+                            this.markLocalPendingState(keys, stateProp, cleanData, false);
+                            syncedCount++;
+                        } catch (err) {
+                            failedCount++;
+                            this.markLocalPendingState(keys, stateProp, item, true, {
+                                rsdSyncStatus: 'sync_failed',
+                                rsdLastSyncError: String((err && err.message) || 'RTDB_WRITE_FAILED')
+                            });
+                        }
+                    }
                 }
+
+                return {
+                    success: failedCount === 0,
+                    syncedCount,
+                    failedCount
+                };
+            })().finally(() => {
+                this._pushPendingInFlight = null;
             });
+
+            return this._pushPendingInFlight;
         }
 
         refreshAllWorkflowUIs() {
@@ -1280,9 +1345,11 @@
         syncRound(roundData) {
             if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!roundData) return Promise.resolve(false);
-            const roundKeys = ['ksumc_safety_rounds', 'ksumc_field_rounds', 'ksumc_rounds_registry'];
+            const roundKeys = ['ksumc_safety_rounds', 'ksumc_field_rounds', 'ksumc_rounds_registry', 'ksumc_rounds'];
             this.markLocalPendingState(roundKeys, 'rounds', roundData, true);
-            if (!this.db) return Promise.resolve(false);
+            if (!this.db || this.isConnected === false || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+                return Promise.resolve(false);
+            }
 
             const cleanData = this.normalizeCloudPayload('rounds', roundData);
             const key = this.sanitizeFirebaseKey(cleanData.id);
@@ -1309,6 +1376,10 @@
                 return true;
             }).catch(err => {
                 console.warn('[KSU-Firebase] تعذر مزامنة الجولة (محفوظة محلياً وسيعاد الرفع تلقائياً):', err);
+                this.markLocalPendingState(roundKeys, 'rounds', roundData, true, {
+                    rsdSyncStatus: 'sync_failed',
+                    rsdLastSyncError: String((err && err.message) || 'RTDB_ROUND_WRITE_FAILED')
+                });
                 return false;
             });
         }
@@ -1589,9 +1660,11 @@
         syncCAPARecord(capaObj) {
             if (this.isDemoSandboxUser()) return Promise.resolve(false);
             if (!capaObj) return Promise.resolve(false);
-            const capaKeys = ['ksumc_capa_registry', 'ksumc_capa_records'];
+            const capaKeys = ['ksumc_capa_records', 'ksumc_capa_registry'];
             this.markLocalPendingState(capaKeys, 'capa', capaObj, true);
-            if (!this.db) return Promise.resolve(false);
+            if (!this.db || this.isConnected === false || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+                return Promise.resolve(false);
+            }
 
             const cleanData = this.normalizeCloudPayload('capa_records', capaObj);
             const key = this.sanitizeFirebaseKey(cleanData.id);
@@ -1601,6 +1674,10 @@
                 return true;
             }).catch(err => {
                 console.warn('[KSU-Firebase] تعذر مزامنة سجل CAPA:', err);
+                this.markLocalPendingState(capaKeys, 'capa', capaObj, true, {
+                    rsdSyncStatus: 'sync_failed',
+                    rsdLastSyncError: String((err && err.message) || 'RTDB_CAPA_WRITE_FAILED')
+                });
                 return false;
             });
         }
@@ -1783,12 +1860,17 @@
         notifySystemUpdate(actionName) {
             if (this.isDemoSandboxUser()) return;
             if (!this.db) return;
-            this.db.ref('system_status/lastUpdate').set({
-                action: actionName,
-                deviceId: this.deviceId,
-                timestamp: firebase.database.ServerValue.TIMESTAMP,
-                updatedBy: (window.state && window.state.currentUser) ? window.state.currentUser.username : 'system'
-            }).catch(() => {});
+            try {
+                const serverTs = (typeof firebase !== 'undefined' && firebase && firebase.database && firebase.database.ServerValue)
+                    ? firebase.database.ServerValue.TIMESTAMP
+                    : Date.now();
+                this.db.ref('system_status/lastUpdate').set({
+                    action: actionName,
+                    deviceId: this.deviceId,
+                    timestamp: serverTs,
+                    updatedBy: (window.state && window.state.currentUser) ? window.state.currentUser.username : 'system'
+                }).catch(() => {});
+            } catch (_) {}
         }
 
         // 14. مزامنة البلاغات الميدانية

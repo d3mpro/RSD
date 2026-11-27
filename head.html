@@ -1463,16 +1463,11 @@
         <textarea id="verified-close-notes" rows="2" class="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#004B87]">تمت المعالجة الميدانية والتأكد من استيفاء اشتراطات السلامة</textarea>
       </div>
 
-      <details class="text-xs bg-amber-50/60 border border-amber-200 rounded-xl p-2.5">
-        <summary class="font-bold text-amber-900 cursor-pointer">استثناء إداري طارئ (عند تعذر التصوير في مناطق العزل الطبي)</summary>
-        <input type="text" id="verified-close-override-reason" placeholder="اذكر سبب الإعفاء الرسمي ليُحفظ في سجل التدقيق..." class="mt-2 w-full p-2 rounded-lg border border-amber-300 bg-white text-xs font-semibold" />
-      </details>
-
       <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
         <button type="button" onclick="closeVerifiedCAPAClosureModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">إلغاء</button>
         <button type="button" id="btn-submit-verified-capa-close" onclick="submitVerifiedCAPAClosure()" class="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-1.5 shadow-xs cursor-pointer">
           <span class="material-symbols-outlined text-sm">task_alt</span>
-          <span>تحقق واعتماد الإغلاق النهائي</span>
+          <span>حفظ واعتماد مشرف مخوّل</span>
         </button>
       </div>
     </div>
@@ -3497,9 +3492,12 @@
         }
 
         // Status badge
+        const isPendingReview = item.status === 'pending_supervisor_review';
         const statusBadge = isResolved
           ? '<span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-black text-[11px] border border-emerald-300 flex items-center justify-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>معالج ومغلق</span>'
-          : '<span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-black text-[11px] border border-amber-300 flex items-center justify-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>قيد المعالجة</span>';
+          : (isPendingReview
+            ? '<span class="px-2.5 py-1 rounded-full bg-blue-100 text-[#004B87] font-black text-[11px] border border-blue-300 flex items-center justify-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>بانتظار مراجعة المشرف</span>'
+            : '<span class="px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 font-black text-[11px] border border-amber-300 flex items-center justify-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>قيد المعالجة</span>');
 
         const remindersCount = (item.remindersSent && item.remindersSent.length) || item.reminderCount || 0;
 
@@ -3752,11 +3750,15 @@
       const fileInp = document.getElementById('verified-close-after-file');
       if (fileInp) fileInp.value = '';
       const prevImg = document.getElementById('verified-close-after-preview');
-      if (prevImg) { prevImg.src = ''; prevImg.classList.add('hidden'); }
+      if (capa.afterImage) {
+        activeVerifiedAfterDataUrl = String(capa.afterImage);
+        if (prevImg) { prevImg.src = activeVerifiedAfterDataUrl; prevImg.classList.remove('hidden'); }
+      } else if (prevImg) {
+        prevImg.src = '';
+        prevImg.classList.add('hidden');
+      }
       const fb = document.getElementById('verified-close-ai-feedback');
       if (fb) { fb.innerHTML = ''; fb.classList.add('hidden'); }
-      const ov = document.getElementById('verified-close-override-reason');
-      if (ov) ov.value = '';
       document.getElementById('modal-close-capa-verified').classList.remove('hidden');
     }
 
@@ -3789,22 +3791,20 @@
       const btn = document.getElementById('btn-submit-verified-capa-close');
       const fb = document.getElementById('verified-close-ai-feedback');
       const notes = (document.getElementById('verified-close-notes')?.value || '').trim();
-      const emergencyOverrideReason = (document.getElementById('verified-close-override-reason')?.value || '').trim();
       const loggedUser = window.KSUAuth ? window.KSUAuth.getUser() : null;
 
       if (btn) btn.disabled = true;
       if (fb) {
         fb.className = 'p-2.5 rounded-xl text-xs font-bold bg-blue-50 text-[#004B87] border border-blue-200';
-        fb.textContent = 'جاري التحقق البصري وتوثيق الإغلاق...';
+        fb.textContent = 'جاري حفظ الدليل البصري والتحقق من صلاحية الاعتماد...';
         fb.classList.remove('hidden');
       }
 
       const res = (window.KSUOps && typeof window.KSUOps.validateAndCloseCAPA === 'function')
         ? await window.KSUOps.validateAndCloseCAPA(capa, {
             notes,
-            afterImage: activeVerifiedAfterDataUrl,
-            closedBy: loggedUser ? loggedUser.name : 'رئيس القسم',
-            emergencyOverrideReason
+            afterImage: activeVerifiedAfterDataUrl || capa.afterImage || '',
+            closedBy: loggedUser ? loggedUser.name : ''
           })
         : { success: false, error: 'تعذر الوصول لمحرك التوثيق.' };
 
@@ -3824,7 +3824,13 @@
         window.KSUOps.renderCampusHeatmap('ksumc-interactive-heatmap');
       }
       if (typeof KSUNav !== 'undefined' && KSUNav.showToast) {
-        KSUNav.showToast(`تم التحقق البصري وإغلاق الإجراء ${capa.id} رسمياً ✓`, 'success');
+        if (res.closed && res.rsdSyncConfirmed) {
+          KSUNav.showToast(`تم تأكيد حفظ الخادم واعتماد المشرف لإغلاق الإجراء ${capa.id} وتوثيقه في سجل التدقيق ✓`, 'success');
+        } else if (res.closed) {
+          KSUNav.showToast(`تم توثيق اعتماد المشرف للإجراء ${capa.id} محلياً وهو بانتظار تأكيد الإرسال للخادم`, 'info');
+        } else {
+          KSUNav.showToast(`تم حفظ دليل الإصلاح — السجل ${capa.id} بانتظار مراجعة المشرف المخوّل`, 'info');
+        }
       }
     }
 
@@ -3840,9 +3846,12 @@
       const content = document.getElementById('view-capa-content');
       const actionBox = document.getElementById('view-capa-action-buttons');
       const isResolved = capa.status === 'resolved';
+      const isPendingReview = capa.status === 'pending_supervisor_review';
       const remDays = typeof capa.remainingBusinessDays === 'number' ? capa.remainingBusinessDays : 0;
 
       const reminders = capa.remindersSent || [];
+      const aiVer = capa.aiClosureVerification || null;
+      const aiUnavailable = !aiVer || aiVer.available === false || aiVer.verified === null || typeof aiVer.verified === 'undefined';
 
       if (content) {
         content.innerHTML = `
@@ -3854,7 +3863,7 @@
             </div>
             <div>
               <span class="text-[10px] text-slate-500 block">الحالة:</span>
-              <span class="font-bold text-xs ${isResolved ? 'text-emerald-700' : 'text-amber-700'}">${isResolved ? 'تم الإغلاق والمعالجة' : 'قيد المعالجة المفتوحة'}</span>
+              <span class="font-bold text-xs ${isResolved ? 'text-emerald-700' : (isPendingReview ? 'text-[#004B87]' : 'text-amber-700')}">${isResolved ? 'تم الاعتماد والإغلاق' : (isPendingReview ? 'بانتظار مراجعة المشرف' : 'قيد المعالجة المفتوحة')}</span>
             </div>
             <div>
               <span class="text-[10px] text-slate-500 block">تاريخ الرصد:</span>
@@ -3907,13 +3916,16 @@
                 <p class="text-amber-950 font-medium leading-relaxed">${capa.actionRequired}</p>
               </div>
             ` : ''}
-            ${capa.resolutionNotes ? `
-              <div class="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200">
-                <span class="text-[11px] font-black text-emerald-900 block mb-1">ملاحظات الإغلاق والمعالجة المنفذة:</span>
-                <p class="text-emerald-950 font-medium leading-relaxed">${capa.resolutionNotes}</p>
-                ${capa.aiClosureVerification ? `<div class="mt-2 px-2.5 py-1.5 rounded-xl bg-white border border-emerald-300 text-emerald-900 font-bold text-[11px]">✓ التحقق البصري (AI): ${capa.aiClosureVerification.summary || 'مطابق'}</div>` : ''}
-                ${capa.afterImage ? `<img src="${capa.afterImage}" alt="بعد الإصلاح" class="mt-2 max-h-40 rounded-xl border border-emerald-300 object-cover" />` : ''}
-                <span class="text-[10px] text-emerald-700 mt-1 block">تاريخ الإغلاق: ${capa.resolvedAt || ''}</span>
+            ${(capa.resolutionNotes || capa.afterImage || aiVer) ? `
+              <div class="p-3.5 rounded-2xl ${isResolved ? 'bg-emerald-50/70 border-emerald-200' : 'bg-blue-50/60 border-blue-200'} border">
+                <span class="text-[11px] font-black ${isResolved ? 'text-emerald-900' : 'text-[#082B49]'} block mb-1">${isResolved ? 'توثيق المعالجة واعتماد المشرف:' : 'توثيق المعالجة (بانتظار مراجعة المشرف):'}</span>
+                ${capa.resolutionNotes ? `<p class="text-slate-900 font-medium leading-relaxed">${capa.resolutionNotes}</p>` : ''}
+                ${aiVer ? (aiUnavailable
+                  ? `<div class="mt-2 px-2.5 py-1.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 font-bold text-[11px]">رأي استشاري (AI): لم تتوفر نتيجة التحليل الآلي — يعتمد القرار على مراجعة المشرف المخوّل</div>`
+                  : `<div class="mt-2 px-2.5 py-1.5 rounded-xl bg-white border border-slate-300 text-slate-800 font-bold text-[11px]">رأي استشاري (AI — لا يغني عن اعتماد المشرف): ${aiVer.summary || ''}</div>`
+                ) : ''}
+                ${capa.afterImage ? `<img src="${capa.afterImage}" alt="بعد الإصلاح" class="mt-2 max-h-40 rounded-xl border border-slate-300 object-cover" />` : ''}
+                ${isResolved && capa.approvedBy ? `<span class="text-[10px] text-emerald-800 font-bold mt-1.5 block">المشرف المعتمد: ${capa.approvedBy} • وقت الاعتماد: ${capa.approvedAt || capa.resolvedAt || ''}</span>` : ''}
               </div>
             ` : ''}
           </div>
