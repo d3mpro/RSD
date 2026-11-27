@@ -8166,16 +8166,24 @@ function loadState() {
   const realFACP = (typeof KSU_FACP_ASSETS !== 'undefined' && Array.isArray(KSU_FACP_ASSETS)) ? KSU_FACP_ASSETS : [];
   const otherAssets = INITIAL_ASSETS.filter(a => a.category !== 'طفايات الحريق' && !a.id.startsWith('FE-') && !a.id.startsWith('EXT-') && !(a.category && a.category.includes('FM-200')) && !(a.category && a.category.includes('صناديق') && a.id && a.id.startsWith('PL')) && !(a.id && a.id.startsWith('FACP-')));
 
-  if (assetsVersion !== OFFICIAL_ASSETS_VERSION || !storedAssets || (storedAssets && JSON.parse(storedAssets).length < 1800)) {
-    // Purge previous extinguishers and adopt official 1,587 registry + FACP registry
+  if (!storedAssets) {
+    state.assets = [...realExtinguishers, ...otherAssets, ...realFM200, ...realFHC, ...realFACP];
+    if (realExtinguishers.length > 0) {
+      localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(state.assets));
+      localStorage.setItem('ksumc_assets_version', OFFICIAL_ASSETS_VERSION);
+    }
+  } else if (realExtinguishers.length > 0 && (assetsVersion !== OFFICIAL_ASSETS_VERSION || JSON.parse(storedAssets).length < 1800)) {
+    // Purge previous extinguishers and adopt official 1,587 registry + FACP registry once loaded
     state.assets = [...realExtinguishers, ...otherAssets, ...realFM200, ...realFHC, ...realFACP];
     localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(state.assets));
     localStorage.setItem('ksumc_assets_version', OFFICIAL_ASSETS_VERSION);
   } else {
     state.assets = JSON.parse(storedAssets);
-    // Guarantee that all previous extinguisher records are replaced with the official 1,587 registry
-    const nonExtinguisherAssets = state.assets.filter(a => a.category !== 'طفايات الحريق' && !a.id.startsWith('FE-') && !a.id.startsWith('EXT-'));
-    state.assets = [...realExtinguishers, ...nonExtinguisherAssets];
+    if (realExtinguishers.length > 0) {
+      // Guarantee that all previous extinguisher records are replaced with the official 1,587 registry
+      const nonExtinguisherAssets = state.assets.filter(a => a.category !== 'طفايات الحريق' && !a.id.startsWith('FE-') && !a.id.startsWith('EXT-'));
+      state.assets = [...realExtinguishers, ...nonExtinguisherAssets];
+    }
     
     // Ensure all official exits, FM-200 systems, FHC cabinets & FACP panels are present even in cached state
     const currentAssetIds = new Set(state.assets.map(a => a.id));
@@ -8195,9 +8203,38 @@ function loadState() {
         state.assets.push(facp);
       }
     });
-    localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(state.assets));
-    localStorage.setItem('ksumc_assets_version', OFFICIAL_ASSETS_VERSION);
+    if (realExtinguishers.length > 0) {
+      localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(state.assets));
+      localStorage.setItem('ksumc_assets_version', OFFICIAL_ASSETS_VERSION);
+    }
   }
+
+  window.rehydrateOfficialAssets = function() {
+    const ext = (typeof window.KSU_REAL_EXTINGUISHERS !== 'undefined' && Array.isArray(window.KSU_REAL_EXTINGUISHERS)) ? window.KSU_REAL_EXTINGUISHERS : [];
+    const fm = (typeof window.KSU_FM200_ASSETS !== 'undefined' && Array.isArray(window.KSU_FM200_ASSETS)) ? window.KSU_FM200_ASSETS : [];
+    const fhc = (typeof window.KSU_FHC_ASSETS !== 'undefined' && Array.isArray(window.KSU_FHC_ASSETS)) ? window.KSU_FHC_ASSETS : [];
+    const facp = (typeof window.KSU_FACP_ASSETS !== 'undefined' && Array.isArray(window.KSU_FACP_ASSETS)) ? window.KSU_FACP_ASSETS : [];
+    const plant = (typeof window.KSU_PLANT_ROOM_ASSETS !== 'undefined' && Array.isArray(window.KSU_PLANT_ROOM_ASSETS)) ? window.KSU_PLANT_ROOM_ASSETS : [];
+    const wet = (typeof window.KSU_WET_CHEM_ASSETS !== 'undefined' && Array.isArray(window.KSU_WET_CHEM_ASSETS)) ? window.KSU_WET_CHEM_ASSETS : [];
+    const baseNonExt = (state.assets || []).filter(a => a && a.category !== 'طفايات الحريق' && !(a.id && (a.id.startsWith('FE-') || a.id.startsWith('EXT-'))));
+    const merged = ext.length > 0 ? [...ext, ...baseNonExt] : [...baseNonExt];
+    const seenIds = new Set(merged.map(a => a && a.id).filter(Boolean));
+    [...otherAssets, ...fm, ...fhc, ...facp, ...plant, ...wet].forEach(item => {
+      if (item && item.id && !seenIds.has(item.id)) {
+        merged.push(item);
+        seenIds.add(item.id);
+      }
+    });
+    state.assets = merged;
+    const isDemo = Boolean(window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser());
+    if (!isDemo && ext.length > 0) {
+      try {
+        localStorage.setItem(STORAGE_KEY_ASSETS, JSON.stringify(state.assets));
+        localStorage.setItem('ksumc_assets_version', OFFICIAL_ASSETS_VERSION);
+      } catch (_) {}
+    }
+    return state.assets.length;
+  };
 
   const storedQualitySchedule = localStorage.getItem(STORAGE_KEY_QUALITY_SCHEDULE);
   state.qualitySchedule = storedQualitySchedule ? JSON.parse(storedQualitySchedule) : JSON.parse(JSON.stringify(INITIAL_QUALITY_SCHEDULES));
@@ -13729,6 +13766,7 @@ function renderPermitsList() {
           <span>محفوظ في السجل الرسمي + SharePoint</span>
         </span>
       </div>
+      ${typeof window !== 'undefined' && window.KSUOps && typeof window.KSUOps.renderPermitFireWatchSnippet === 'function' ? window.KSUOps.renderPermitFireWatchSnippet(p) : ''}
     </div>
   `;
   }).join('');

@@ -100,7 +100,7 @@
   <script src="assets/js/auth-guard.js?v=8.0.0"></script>
   <script src="assets/js/ksumc-data-bridge.js?v=8.1.0"></script>
   <script src="assets/js/ksu-firebase-config.js?v=8.2.0"></script>
-  <script src="assets/js/ksu-firebase-realtime.js?v=8.0.0"></script>
+  <script src="assets/js/ksu-firebase-realtime.js?v=8.3.0"></script>
   <script src="assets/js/ksu-nav-component.js?v=5.15"></script>
   <script>
     KSUAuth.protect('field');
@@ -211,6 +211,9 @@
       </div>
     </div>
   </header>
+
+  <!-- Offline & Pending Cloud Sync Status Banner -->
+  <div id="ksu-offline-sync-banner" class="hidden no-print" role="status" aria-live="polite"></div>
 
   <!-- Real-Time Notifications & Executive Directives Modal Sheet -->
   <div id="field-notifications-sheet" class="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm hidden items-end sm:items-center justify-center p-0 sm:p-4" onclick="toggleFieldNotificationsMenu()">
@@ -793,6 +796,9 @@
               <!-- Populated dynamically via renderInspectorWorkflowTracker() -->
             </div>
           </div>
+
+          <!-- Monthly Uninspected Assets Coverage Tracker (CBAHI / Civil Defense) -->
+          <div id="monthly-asset-coverage-panel" class="no-print"></div>
 
           <!-- Rounds List Section -->
           <div class="flex flex-col gap-space-sm">
@@ -4482,18 +4488,15 @@
   <script src="assets/js/jsqr.min.js" charset="UTF-8"></script>
   <script src="assets/js/ksu-cloud-sync.js?v=6.0" charset="UTF-8"></script>
   <script src="assets/js/production-reset.js?v=6.0" charset="UTF-8"></script>
-  <script src="assets/js/real_extinguishers_data.js" charset="UTF-8"></script>
-  <script src="assets/js/ksu-fm200-assets.js?v=5.5" charset="UTF-8"></script>
-  <script src="assets/js/ksu-fhc-assets.js?v=1.0" charset="UTF-8"></script>
-  <script src="assets/js/ksu-plant-rooms-assets.js?v=1.0" charset="UTF-8"></script>
-  <script src="assets/js/ksu-wet-chemical-assets.js?v=1.0" charset="UTF-8"></script>
   <script src="assets/js/ksu-facp-assets.js?v=2.0" charset="UTF-8"></script>
+  <script src="assets/js/ksu-asset-loader.js?v=8.3.0" charset="UTF-8"></script>
   <script src="assets/js/qr-scanner.js?v=5.5" charset="UTF-8"></script>
   <script src="assets/js/ksu-official-card.js?v=8.1.0" charset="UTF-8"></script>
-  <script src="assets/js/app.js?v=8.2.5" charset="UTF-8"></script>
-  <script src="assets/js/ksu-integrations.js?v=6.0" charset="UTF-8"></script>
+  <script src="assets/js/app.js?v=8.3.0" charset="UTF-8"></script>
+  <script src="assets/js/ksu-integrations.js?v=8.3.0" charset="UTF-8"></script>
   <script src="assets/js/vision-reticle-helper.js?v=7.2.2" charset="UTF-8"></script>
-  <script src="assets/js/ksu-ai-client.js?v=8.2.0" charset="UTF-8"></script>
+  <script src="assets/js/ksu-ai-client.js?v=8.3.0" charset="UTF-8"></script>
+  <script src="assets/js/ksu-ops-enhancements.js?v=8.3.0" charset="UTF-8"></script>
 
   <!-- Enhanced Live Camera Stream, Reticle Viewfinder & Inspection Flow Control -->
   <script>

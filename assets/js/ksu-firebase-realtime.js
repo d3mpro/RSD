@@ -202,6 +202,10 @@
                                 if (typeof user.getIdTokenResult === 'function') {
                                     user.getIdTokenResult().then((tokenResult) => {
                                         this.currentUserClaims = (tokenResult && tokenResult.claims) ? tokenResult.claims : {};
+                                        this.syncAuthTokenToServiceWorker(user, tokenResult ? tokenResult.token : '');
+                                        if (!user.isAnonymous && !this.isDemoSandboxUser()) {
+                                            this.registerFCMWebPush(user).catch(() => {});
+                                        }
                                         try {
                                             window.dispatchEvent(new CustomEvent('ksumc_firebase_claims_updated', {
                                                 detail: {
@@ -215,8 +219,22 @@
                                 }
                             } else {
                                 this.currentUserClaims = null;
+                                this.syncAuthTokenToServiceWorker(null, '');
                             }
                         });
+                        if (typeof auth.onIdTokenChanged === 'function') {
+                            auth.onIdTokenChanged((u) => {
+                                if (!u || this.isDemoSandboxUser()) {
+                                    this.syncAuthTokenToServiceWorker(null, '');
+                                    return;
+                                }
+                                if (typeof u.getIdToken === 'function') {
+                                    u.getIdToken(false).then((tok) => {
+                                        this.syncAuthTokenToServiceWorker(u, tok);
+                                    }).catch(() => {});
+                                }
+                            });
+                        }
                     } catch (e) {
                         console.warn('[KSU-Firebase-Security] تنبيه تهيئة المصادقة:', e);
                     }
@@ -229,6 +247,11 @@
                 connectedRef.on('value', (snap) => {
                     this.isConnected = (snap.val() === true);
                     this.updateCloudBadge(this.isConnected);
+                    try {
+                        window.dispatchEvent(new CustomEvent('ksumc_cloud_connection_changed', {
+                            detail: { connected: this.isConnected }
+                        }));
+                    } catch (_) {}
                     if (this.isConnected) {
                         this.checkAndExecuteCloudTrialPurge().then(() => {
                             this.pushPendingLocalDataToCloud();
@@ -241,6 +264,87 @@
                 this.setupOperationalListeners();
             } catch (err) {
                 console.error('[KSU-Firebase] خطأ في الاتصال بقاعدة البيانات:', err);
+            }
+        }
+
+        syncAuthTokenToServiceWorker(user, explicitToken = '') {
+            try {
+                if (typeof navigator === 'undefined' || !navigator.serviceWorker) return;
+                const isDemo = this.isDemoSandboxUser();
+                const postToSW = (msg) => {
+                    if (navigator.serviceWorker.controller) {
+                        navigator.serviceWorker.controller.postMessage(msg);
+                    } else if (navigator.serviceWorker.ready && typeof navigator.serviceWorker.ready.then === 'function') {
+                        navigator.serviceWorker.ready.then((reg) => {
+                            if (reg && reg.active) reg.active.postMessage(msg);
+                        }).catch(() => {});
+                    }
+                };
+                if (!user || isDemo) {
+                    postToSW({ type: 'CLEAR_AUTH_TOKEN' });
+                    return;
+                }
+                const activeLocalUser = (typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.getUser === 'function')
+                    ? window.KSUAuth.getUser()
+                    : null;
+                const role = (this.currentUserClaims && this.currentUserClaims.role) || (activeLocalUser && activeLocalUser.roleCategory) || '';
+                const shift = (activeLocalUser && (activeLocalUser.shift || activeLocalUser.shiftNumber)) || '';
+                const sendToken = (tok) => {
+                    if (!tok) return;
+                    postToSW({
+                        type: 'SYNC_AUTH_TOKEN',
+                        idToken: tok,
+                        uid: user.uid || '',
+                        role,
+                        shift: String(shift || ''),
+                        isDemo: false
+                    });
+                };
+                if (explicitToken) {
+                    sendToken(explicitToken);
+                } else if (typeof user.getIdToken === 'function') {
+                    user.getIdToken(false).then(sendToken).catch(() => {});
+                }
+            } catch (_) {}
+        }
+
+        async registerFCMWebPush(user) {
+            if (!user || user.isAnonymous || this.isDemoSandboxUser()) return null;
+            if (typeof window === 'undefined' || typeof navigator === 'undefined' || !('Notification' in window) || !navigator.serviceWorker) {
+                return null;
+            }
+            if (Notification.permission !== 'granted') return null;
+            if (this._fcmRegisteredUid === user.uid) return this._fcmToken || null;
+            try {
+                if (typeof firebase !== 'undefined' && typeof firebase.messaging !== 'function') {
+                    await new Promise((resolve) => {
+                        const s = document.createElement('script');
+                        s.src = 'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js';
+                        s.async = true;
+                        s.onload = resolve;
+                        s.onerror = resolve;
+                        document.head.appendChild(s);
+                    });
+                }
+                if (typeof firebase === 'undefined' || typeof firebase.messaging !== 'function') return null;
+                const reg = await navigator.serviceWorker.ready;
+                const messaging = firebase.messaging();
+                const vapidKey = (window.PROD_FIREBASE_CONFIG && window.PROD_FIREBASE_CONFIG.fcmVapidKey) || undefined;
+                const opts = reg ? (vapidKey ? { serviceWorkerRegistration: reg, vapidKey } : { serviceWorkerRegistration: reg }) : undefined;
+                const fcmToken = await messaging.getToken(opts).catch(() => null);
+                if (fcmToken && this.db) {
+                    this._fcmRegisteredUid = user.uid;
+                    this._fcmToken = fcmToken;
+                    this.db.ref(`users/${user.uid}`).update({
+                        id: user.uid,
+                        name: (window.KSUAuth && window.KSUAuth.getUser && window.KSUAuth.getUser()?.name) || user.email || user.uid,
+                        fcmToken,
+                        fcmUpdatedAt: new Date().toISOString()
+                    }).catch(() => {});
+                }
+                return fcmToken;
+            } catch (_) {
+                return null;
             }
         }
 

@@ -98,11 +98,13 @@
   <script src="assets/js/auth-guard.js?v=8.0.0"></script>
   <script src="assets/js/ksumc-data-bridge.js?v=8.1.0"></script>
   <script src="assets/js/ksu-firebase-config.js?v=8.2.0"></script>
-  <script src="assets/js/ksu-firebase-realtime.js?v=8.0.0"></script>
+  <script src="assets/js/ksu-firebase-realtime.js?v=8.3.0"></script>
   <script src="assets/js/ksu-nav-component.js?v=5.15"></script>
+  <script src="assets/js/ksu-integrations.js?v=8.3.0"></script>
   <script src="assets/js/vision-reticle-helper.js"></script>
-  <script src="assets/js/ksu-ai-client.js?v=8.2.0"></script>
+  <script src="assets/js/ksu-ai-client.js?v=8.3.0"></script>
   <script src="assets/js/production-reset.js?v=6.0"></script>
+  <script src="assets/js/ksu-ops-enhancements.js?v=8.3.0"></script>
   <script>
     KSUAuth.protect('head', ['developer', 'admin', 'executive', 'head']);
   </script>
@@ -647,6 +649,9 @@
       </div>
 
     </section>
+
+    <!-- Interactive KSUMC Master Plan Risk Heatmap -->
+    <div id="ksumc-interactive-heatmap" class="no-print"></div>
     </div>
 
 
@@ -1420,6 +1425,55 @@
           <!-- Dynamically injected action buttons -->
         </div>
         <button type="button" onclick="closeViewCAPAModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">إغلاق</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: VERIFIED BEFORE/AFTER CAPA CLOSURE (التوثيق البصري قبل / بعد الإغلاق) -->
+  <!-- ========================================================================= -->
+  <div id="modal-close-capa-verified" class="fixed inset-0 z-50 hidden bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 no-print">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3.5">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-[#082B49] text-[#F9F1DC] flex items-center justify-center">
+            <span class="material-symbols-outlined text-xl">verified</span>
+          </div>
+          <div>
+            <h3 class="text-sm sm:text-base font-black text-[#082B49]">إغلاق موثق بالصور (قبل / بعد الإصلاح)</h3>
+            <p id="verified-close-capa-subtitle" class="text-[11px] text-slate-500 font-semibold">التحقق البصري الذكي لإغلاق الإجراءات التصحيحية (CBAHI)</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeVerifiedCAPAClosureModal()" class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center cursor-pointer">
+          <span class="material-symbols-outlined text-base">close</span>
+        </button>
+      </div>
+
+      <div id="verified-close-capa-brief" class="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1"></div>
+
+      <div class="space-y-2">
+        <label class="block text-xs font-black text-[#082B49]">صورة الموقع بعد إتمام الإصلاح والمعالجة <span id="verified-close-req-star" class="text-rose-600">*</span></label>
+        <input type="file" id="verified-close-after-file" accept="image/*" capture="environment" onchange="handleVerifiedCAPAAfterImage(this)" class="w-full text-xs file:ml-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-[#004B87] file:text-white hover:file:bg-[#082B49] border border-slate-300 rounded-xl p-1.5 bg-slate-50 cursor-pointer" />
+        <img id="verified-close-after-preview" alt="معاينة ما بعد الإصلاح" class="hidden w-full max-h-44 object-cover rounded-2xl border border-emerald-300 mt-2" />
+        <div id="verified-close-ai-feedback" class="hidden p-2.5 rounded-xl text-xs font-bold"></div>
+      </div>
+
+      <div class="space-y-1.5">
+        <label class="block text-xs font-black text-[#082B49]">ملاحظات الإغلاق والإجراء التصحيحي المنفذ:</label>
+        <textarea id="verified-close-notes" rows="2" class="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#004B87]">تمت المعالجة الميدانية والتأكد من استيفاء اشتراطات السلامة</textarea>
+      </div>
+
+      <details class="text-xs bg-amber-50/60 border border-amber-200 rounded-xl p-2.5">
+        <summary class="font-bold text-amber-900 cursor-pointer">استثناء إداري طارئ (عند تعذر التصوير في مناطق العزل الطبي)</summary>
+        <input type="text" id="verified-close-override-reason" placeholder="اذكر سبب الإعفاء الرسمي ليُحفظ في سجل التدقيق..." class="mt-2 w-full p-2 rounded-lg border border-amber-300 bg-white text-xs font-semibold" />
+      </details>
+
+      <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+        <button type="button" onclick="closeVerifiedCAPAClosureModal()" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer">إلغاء</button>
+        <button type="button" id="btn-submit-verified-capa-close" onclick="submitVerifiedCAPAClosure()" class="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-black flex items-center gap-1.5 shadow-xs cursor-pointer">
+          <span class="material-symbols-outlined text-sm">task_alt</span>
+          <span>تحقق واعتماد الإغلاق النهائي</span>
+        </button>
       </div>
     </div>
   </div>
@@ -3657,21 +3711,120 @@
       }
     }
 
-    // Quick Close CAPA
+    // Verified Before/After CAPA Closure Flow
+    let activeVerifiedCloseCAPAId = null;
+    let activeVerifiedAfterDataUrl = '';
+
     function quickCloseCAPA(capaId) {
       if (!window.KSUDataBridge) return;
+      const capa = window.KSUDataBridge.getCAPARecords().find(c => String(c.id) === String(capaId));
+      const modal = document.getElementById('modal-close-capa-verified');
+      if (capa && modal) {
+        openVerifiedCAPAClosureModal(capa);
+        return;
+      }
       const notes = prompt('يرجى كتابة ملاحظة الإغلاق أو الإجراء التصحيحي المنفذ (اختياري):', 'تمت المعالجة الميدانية والتأكد من استيفاء اشتراطات السلامة');
-      if (notes === null) return; // user cancelled
-
+      if (notes === null) return;
       window.KSUDataBridge.updateCAPARecord(capaId, {
         status: 'resolved',
         resolutionNotes: notes,
         resolvedAt: new Date().toISOString()
       });
-
       renderCAPARegistry();
       if (typeof KSUNav !== 'undefined' && KSUNav.showToast) {
         KSUNav.showToast(`تم إغلاق الإجراء ${capaId} بنجاح واعتباره مستوفياً.`, 'success');
+      }
+    }
+
+    function openVerifiedCAPAClosureModal(capa) {
+      activeVerifiedCloseCAPAId = capa.id;
+      activeVerifiedAfterDataUrl = '';
+      const mustPhoto = Boolean(window.KSUOps && typeof window.KSUOps.requiresVisualClosure === 'function' && window.KSUOps.requiresVisualClosure(capa));
+      const starEl = document.getElementById('verified-close-req-star');
+      if (starEl) starEl.textContent = mustPhoto ? '* (إلزامي للملاحظات الحرجة/العالية)' : '(اختياري للتوثيق)';
+      const brief = document.getElementById('verified-close-capa-brief');
+      if (brief) {
+        brief.innerHTML = `
+          <div class="font-black text-[#082B49]">${capa.id} — ${capa.title || 'ملاحظة سلامة'}</div>
+          <div class="text-[11px] text-slate-600">${capa.building || ''} (${capa.floor || ''}) • المهلة: ${capa.businessDaysAllowed || 5} أيام عمل</div>
+        `;
+      }
+      const fileInp = document.getElementById('verified-close-after-file');
+      if (fileInp) fileInp.value = '';
+      const prevImg = document.getElementById('verified-close-after-preview');
+      if (prevImg) { prevImg.src = ''; prevImg.classList.add('hidden'); }
+      const fb = document.getElementById('verified-close-ai-feedback');
+      if (fb) { fb.innerHTML = ''; fb.classList.add('hidden'); }
+      const ov = document.getElementById('verified-close-override-reason');
+      if (ov) ov.value = '';
+      document.getElementById('modal-close-capa-verified').classList.remove('hidden');
+    }
+
+    function closeVerifiedCAPAClosureModal() {
+      const m = document.getElementById('modal-close-capa-verified');
+      if (m) m.classList.add('hidden');
+      activeVerifiedCloseCAPAId = null;
+      activeVerifiedAfterDataUrl = '';
+    }
+
+    function handleVerifiedCAPAAfterImage(input) {
+      const file = input && input.files && input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        activeVerifiedAfterDataUrl = String(ev.target.result || '');
+        const prevImg = document.getElementById('verified-close-after-preview');
+        if (prevImg && activeVerifiedAfterDataUrl) {
+          prevImg.src = activeVerifiedAfterDataUrl;
+          prevImg.classList.remove('hidden');
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function submitVerifiedCAPAClosure() {
+      if (!window.KSUDataBridge || !activeVerifiedCloseCAPAId) return;
+      const capa = window.KSUDataBridge.getCAPARecords().find(c => String(c.id) === String(activeVerifiedCloseCAPAId));
+      if (!capa) return;
+      const btn = document.getElementById('btn-submit-verified-capa-close');
+      const fb = document.getElementById('verified-close-ai-feedback');
+      const notes = (document.getElementById('verified-close-notes')?.value || '').trim();
+      const emergencyOverrideReason = (document.getElementById('verified-close-override-reason')?.value || '').trim();
+      const loggedUser = window.KSUAuth ? window.KSUAuth.getUser() : null;
+
+      if (btn) btn.disabled = true;
+      if (fb) {
+        fb.className = 'p-2.5 rounded-xl text-xs font-bold bg-blue-50 text-[#004B87] border border-blue-200';
+        fb.textContent = 'جاري التحقق البصري وتوثيق الإغلاق...';
+        fb.classList.remove('hidden');
+      }
+
+      const res = (window.KSUOps && typeof window.KSUOps.validateAndCloseCAPA === 'function')
+        ? await window.KSUOps.validateAndCloseCAPA(capa, {
+            notes,
+            afterImage: activeVerifiedAfterDataUrl,
+            closedBy: loggedUser ? loggedUser.name : 'رئيس القسم',
+            emergencyOverrideReason
+          })
+        : { success: false, error: 'تعذر الوصول لمحرك التوثيق.' };
+
+      if (btn) btn.disabled = false;
+      if (!res.success) {
+        if (fb) {
+          fb.className = 'p-2.5 rounded-xl text-xs font-bold bg-rose-50 text-rose-800 border border-rose-200';
+          fb.textContent = res.error || 'تعذر اعتماد الإغلاق.';
+          fb.classList.remove('hidden');
+        }
+        return;
+      }
+
+      closeVerifiedCAPAClosureModal();
+      renderCAPARegistry();
+      if (window.KSUOps && typeof window.KSUOps.renderCampusHeatmap === 'function') {
+        window.KSUOps.renderCampusHeatmap('ksumc-interactive-heatmap');
+      }
+      if (typeof KSUNav !== 'undefined' && KSUNav.showToast) {
+        KSUNav.showToast(`تم التحقق البصري وإغلاق الإجراء ${capa.id} رسمياً ✓`, 'success');
       }
     }
 
@@ -3758,6 +3911,8 @@
               <div class="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200">
                 <span class="text-[11px] font-black text-emerald-900 block mb-1">ملاحظات الإغلاق والمعالجة المنفذة:</span>
                 <p class="text-emerald-950 font-medium leading-relaxed">${capa.resolutionNotes}</p>
+                ${capa.aiClosureVerification ? `<div class="mt-2 px-2.5 py-1.5 rounded-xl bg-white border border-emerald-300 text-emerald-900 font-bold text-[11px]">✓ التحقق البصري (AI): ${capa.aiClosureVerification.summary || 'مطابق'}</div>` : ''}
+                ${capa.afterImage ? `<img src="${capa.afterImage}" alt="بعد الإصلاح" class="mt-2 max-h-40 rounded-xl border border-emerald-300 object-cover" />` : ''}
                 <span class="text-[10px] text-emerald-700 mt-1 block">تاريخ الإغلاق: ${capa.resolvedAt || ''}</span>
               </div>
             ` : ''}

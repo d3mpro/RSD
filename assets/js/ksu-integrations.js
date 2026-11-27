@@ -396,6 +396,164 @@
       printWin.document.open();
       printWin.document.write(dossierHTML);
       printWin.document.close();
+    },
+
+    /**
+     * 5. تقييم حالة مهلة الإصلاح (SLA Breach Evaluator - 24h Critical / 48h High / 7d Medium / 14d Low)
+     */
+    evaluateSLABreach: function(item, nowMs = Date.now()) {
+      if (!item || typeof item !== 'object') {
+        return { slaHours: 168, slaLabel: 'خلال 7 أيام عمل', elapsedHours: 0, remainingHours: 168, overdueHours: 0, isBreached: false, isWarning: false, isResolved: false };
+      }
+      const st = String(item.status || '').toLowerCase().trim();
+      const isResolved = st === 'closed' || st === 'resolved' || st === 'completed' || st === 'مغلق' || st === 'تم الإغلاق' || st === 'مكتمل';
+
+      const sevRaw = String(item.severity || '');
+      const prioRaw = String(item.priority || '').toLowerCase();
+      let matchedCfg = this.SLA_CONFIG['متوسط (Medium)'];
+      if (sevRaw.includes('حرج') || /critical/i.test(sevRaw) || prioRaw === 'critical') {
+        matchedCfg = this.SLA_CONFIG['حرج (Critical)'];
+      } else if (sevRaw.includes('عالي') || /high/i.test(sevRaw) || prioRaw === 'high') {
+        matchedCfg = this.SLA_CONFIG['عالي (High)'];
+      } else if (sevRaw.includes('منخفض') || /low/i.test(sevRaw) || prioRaw === 'low') {
+        matchedCfg = this.SLA_CONFIG['منخفض (Low)'];
+      }
+
+      const createdRaw = item.createdAt || item.timestamp || item.date || '';
+      let createdMs = typeof createdRaw === 'number' ? createdRaw : Date.parse(String(createdRaw));
+      if (Number.isNaN(createdMs) || createdMs <= 0) {
+        createdMs = nowMs;
+      }
+
+      const slaHours = matchedCfg.hours;
+      const elapsedHours = Math.max(0, Math.round(((nowMs - createdMs) / 3600000) * 10) / 10);
+      const remainingHours = Math.round((slaHours - elapsedHours) * 10) / 10;
+      const overdueHours = remainingHours < 0 ? Math.round(Math.abs(remainingHours) * 10) / 10 : 0;
+      const isBreached = !isResolved && elapsedHours > slaHours;
+      const isWarning = !isResolved && !isBreached && elapsedHours >= slaHours * 0.75;
+
+      return {
+        slaHours,
+        slaLabel: matchedCfg.label,
+        color: matchedCfg.color,
+        elapsedHours,
+        remainingHours,
+        overdueHours,
+        isBreached,
+        isWarning,
+        isResolved
+      };
+    },
+
+    /**
+     * 6. التصعيد الآلي لتجاوز مهل الإصلاح (SLA Auto-Escalation Engine) مع منع التكرار وعزل الحساب التجريبي
+     */
+    runSLAAutoEscalation: function({ items = null, nowMs = Date.now(), onEscalate = null } = {}) {
+      const isDemo = Boolean(
+        (typeof window !== 'undefined' && window.KSUAuth && typeof window.KSUAuth.isDemoUser === 'function' && window.KSUAuth.isDemoUser()) ||
+        (function() {
+          try {
+            if (typeof sessionStorage !== 'undefined') {
+              const raw = sessionStorage.getItem('ksu_active_user');
+              if (raw) {
+                const u = JSON.parse(raw);
+                return Boolean(u && (u.isDemoAccount === true || String(u.username || '').toLowerCase() === 'demo'));
+              }
+            }
+          } catch (_) {}
+          return false;
+        })()
+      );
+
+      let sourceItems = Array.isArray(items) ? items : null;
+      if (!sourceItems) {
+        sourceItems = [];
+        try {
+          if (typeof localStorage !== 'undefined') {
+            const c1 = JSON.parse(localStorage.getItem('ksumc_capa_registry') || '[]');
+            const c2 = JSON.parse(localStorage.getItem('ksumc_safety_violations') || '[]');
+            if (Array.isArray(c1)) sourceItems.push(...c1);
+            if (Array.isArray(c2)) sourceItems.push(...c2);
+          }
+        } catch (_) {}
+      }
+
+      if (!this._escalatedSlaIds) {
+        this._escalatedSlaIds = new Set();
+        try {
+          if (!isDemo && typeof localStorage !== 'undefined') {
+            const saved = JSON.parse(localStorage.getItem('ksumc_sla_escalated_ids') || '[]');
+            if (Array.isArray(saved)) saved.forEach(id => this._escalatedSlaIds.add(String(id)));
+          }
+        } catch (_) {}
+      }
+
+      const breachedItems = [];
+      const newlyEscalated = [];
+
+      for (const item of sourceItems) {
+        if (!item || !item.id || item.status === 'deleted' || item.archived === true || item.isArchived === true) continue;
+        const ev = this.evaluateSLABreach(item, nowMs);
+        if (!ev.isBreached) continue;
+
+        breachedItems.push({ item, evaluation: ev });
+        if (isDemo) continue;
+
+        const itemKey = String(item.id);
+        if (this._escalatedSlaIds.has(itemKey)) continue;
+
+        this._escalatedSlaIds.add(itemKey);
+        const notif = {
+          id: `SLA-ESC-${itemKey}`,
+          itemId: itemKey,
+          type: 'sla_escalation',
+          priority: 'critical',
+          severity: 'critical',
+          targetRole: 'head',
+          targetShift: 'all',
+          sender: 'محرك التصعيد الآلي (SLA)',
+          title: `🚨 تصعيد تجاوز مهلة الإصلاح (${ev.slaLabel})`,
+          message: `البند (${item.title || itemKey}) في (${item.building || 'المدينة الطبية'}) تجاوز المهلة المحددة بمقدار ${ev.overdueHours} ساعة دون إغلاق.`,
+          createdAt: new Date(nowMs).toISOString(),
+          timestamp: nowMs
+        };
+
+        newlyEscalated.push(notif);
+        this.recordAuditTrail('SLA_AUTO_ESCALATED', {
+          itemId: itemKey,
+          overdueHours: ev.overdueHours,
+          slaHours: ev.slaHours
+        });
+
+        if (typeof onEscalate === 'function') {
+          try { onEscalate(notif); } catch (_) {}
+        }
+      }
+
+      if (!isDemo && newlyEscalated.length > 0) {
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('ksumc_sla_escalated_ids', JSON.stringify(Array.from(this._escalatedSlaIds)));
+            const existingNotifs = JSON.parse(localStorage.getItem('ksumc_notifications') || '[]');
+            const map = new Map((Array.isArray(existingNotifs) ? existingNotifs : []).map(n => [String(n.id), n]));
+            newlyEscalated.forEach(n => map.set(String(n.id), n));
+            localStorage.setItem('ksumc_notifications', JSON.stringify(Array.from(map.values())));
+          }
+          if (typeof window !== 'undefined' && window.ksuFirebaseSync && window.ksuFirebaseSync.isConnected && window.ksuFirebaseSync.db) {
+            newlyEscalated.forEach(n => {
+              window.ksuFirebaseSync.db.ref(`notifications/${n.id}`).set(n).catch(() => {});
+            });
+          }
+        } catch (_) {}
+      }
+
+      return {
+        breachedCount: breachedItems.length,
+        newlyEscalatedCount: newlyEscalated.length,
+        breachedItems,
+        newlyEscalated,
+        demoIsolated: isDemo
+      };
     }
   };
 

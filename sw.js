@@ -3,8 +3,18 @@
  * المدينة الطبية بجامعة الملك سعود - محرك العمل دون اتصال
  */
 
-const CACHE_NAME = 'rsd-ksu-cache-v3.5.3-paid-ai-upgrade';
+const CACHE_NAME = 'rsd-ksu-cache-v3.6.0-ops-platform-upgrade';
 const FIREBASE_NOTIFS_URL = 'https://rsd-ksu-default-rtdb.firebaseio.com/notifications.json';
+
+// سياق المصادقة المؤقت بالذاكرة لتمرير ?auth=<idToken> ومنع طلبات 401 غير المصرحة أو تسرب الحساب التجريبي
+let swAuthContext = {
+  idToken: '',
+  uid: '',
+  role: '',
+  shift: '',
+  isDemo: false,
+  updatedAt: 0
+};
 
 // سجل الإشعارات التي تم عرضها عبر Service Worker لمنع التكرار
 const swShownNotifIds = new Set();
@@ -18,6 +28,7 @@ const ASSETS_TO_PRECACHE = [
   './assets/css/core-theme.css',
   './assets/css/styles.css',
   './assets/js/auth-guard.js',
+  './assets/js/ksu-asset-loader.js',
   './assets/js/ksumc-data-bridge.js',
   './assets/images/app-icon.png',
   './assets/images/ksu_official_logo.png'
@@ -110,17 +121,49 @@ self.addEventListener('message', (event) => {
   const data = event.data;
   if (!data || !data.type) return;
 
+  if (data.type === 'SYNC_AUTH_TOKEN') {
+    const isDemo = Boolean(data.isDemo);
+    swAuthContext = {
+      idToken: isDemo ? '' : String(data.idToken || '').trim(),
+      uid: isDemo ? '' : String(data.uid || ''),
+      role: isDemo ? '' : String(data.role || ''),
+      shift: isDemo ? '' : String(data.shift || ''),
+      isDemo,
+      updatedAt: Date.now()
+    };
+    return;
+  }
+
+  if (data.type === 'CLEAR_AUTH_TOKEN') {
+    swAuthContext = { idToken: '', uid: '', role: '', shift: '', isDemo: false, updatedAt: 0 };
+    return;
+  }
+
   if (data.type === 'SHOW_LOCKSCREEN_NOTIFICATION' && data.notification) {
-    event.waitUntil(displayLockScreenNotification(data.notification));
+    if (swAuthContext.isDemo) return;
+    if (typeof event.waitUntil === 'function') {
+      event.waitUntil(displayLockScreenNotification(data.notification));
+    } else {
+      displayLockScreenNotification(data.notification);
+    }
   } else if (data.type === 'CHECK_FIREBASE_NOTIFICATIONS') {
-    event.waitUntil(checkFirebaseNotificationsInBackground(data.lastSeenTimestamp || 0));
+    if (data.idToken && !data.isDemo) {
+      swAuthContext.idToken = String(data.idToken).trim();
+      swAuthContext.updatedAt = Date.now();
+    }
+    if (typeof event.waitUntil === 'function') {
+      event.waitUntil(checkFirebaseNotificationsInBackground(data.lastSeenTimestamp || 0));
+    } else {
+      checkFirebaseNotificationsInBackground(data.lastSeenTimestamp || 0);
+    }
   }
 });
 
 /**
- * دعم Web Push API القياسي عند وصول إشعار الدفع السحابي والهاتف مغلق
+ * دعم Web Push API / Firebase Cloud Messaging (FCM) القياسي عند وصول إشعار الدفع السحابي والهاتف مغلق
  */
 self.addEventListener('push', (event) => {
+  if (swAuthContext.isDemo) return;
   let payload = {
     id: 'push-' + Date.now(),
     title: '📢 توجيه تنفيذي فوري - سلامة KSUMC',
@@ -131,7 +174,12 @@ self.addEventListener('push', (event) => {
   if (event.data) {
     try {
       const parsed = event.data.json();
-      payload = Object.assign(payload, parsed.notification || parsed.data || parsed);
+      const notifBlock = parsed.notification || {};
+      const dataBlock = parsed.data || {};
+      payload = Object.assign(payload, dataBlock, notifBlock, {
+        message: notifBlock.body || dataBlock.message || dataBlock.body || payload.message,
+        url: (parsed.fcmOptions && parsed.fcmOptions.link) || dataBlock.url || './field.html'
+      });
     } catch (e) {
       payload.message = event.data.text();
     }
@@ -181,12 +229,20 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 /**
- * فحص سحابة Firebase في الخلفية عند استيقاظ Service Worker (Periodic Sync / Sync)
+ * فحص سحابة Firebase في الخلفية عند استيقاظ Service Worker (Periodic Sync / Sync) باستخدام ?auth=<idToken>
  */
 async function checkFirebaseNotificationsInBackground(sinceTimestamp = 0) {
   try {
-    const res = await fetch(FIREBASE_NOTIFS_URL, { cache: 'no-store' }).catch(() => null);
-    if (!res || !res.ok) return;
+    if (swAuthContext.isDemo || !swAuthContext.idToken) return;
+
+    const authedUrl = `${FIREBASE_NOTIFS_URL}?auth=${encodeURIComponent(swAuthContext.idToken)}`;
+    const res = await fetch(authedUrl, { cache: 'no-store' }).catch(() => null);
+    if (!res) return;
+    if (res.status === 401 || res.status === 403) {
+      swAuthContext.idToken = '';
+      return;
+    }
+    if (!res.ok) return;
     const raw = await res.json();
     if (!raw || typeof raw !== 'object') return;
 
@@ -195,8 +251,19 @@ async function checkFirebaseNotificationsInBackground(sinceTimestamp = 0) {
 
     for (const item of list) {
       if (!item || item._deleted || item.status === 'مغلق') continue;
+      if (item.targetRole && item.targetRole !== 'all' && swAuthContext.role && item.targetRole !== swAuthContext.role) {
+        if (!(swAuthContext.role === 'developer' || swAuthContext.role === 'admin' || swAuthContext.role === 'head')) {
+          continue;
+        }
+      }
+      if (item.targetShift && item.targetShift !== 'all' && swAuthContext.shift && String(item.targetShift) !== String(swAuthContext.shift)) {
+        if (!(swAuthContext.role === 'developer' || swAuthContext.role === 'admin' || swAuthContext.role === 'head' || swAuthContext.role === 'quality')) {
+          continue;
+        }
+      }
       const itemId = String(item.id || '');
-      const createdMs = item.createdAt ? new Date(item.createdAt).getTime() : 0;
+      const createdRaw = item.createdAt || item.timestamp || 0;
+      const createdMs = typeof createdRaw === 'number' ? createdRaw : (createdRaw ? new Date(createdRaw).getTime() : 0);
       if (createdMs >= cutoff && !swShownNotifIds.has(itemId)) {
         await displayLockScreenNotification(item);
       }
