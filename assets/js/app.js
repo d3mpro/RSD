@@ -8402,6 +8402,13 @@ function saveDoors(targetDoor) {
 function saveCAPA(targetCAPA) {
   const isDemo = isDemoSandboxSession();
   if (!state.capa) state.capa = [];
+  if (window.KSUDataBridge && typeof window.KSUDataBridge.enforceCAPAClosurePolicy === 'function') {
+    state.capa = state.capa.map(c => {
+      if (!c || typeof c !== 'object') return c;
+      if (targetCAPA && String(c.id) !== String(targetCAPA.id)) return c;
+      return window.KSUDataBridge.enforceCAPAClosurePolicy(null, c);
+    });
+  }
   const serializedCapa = JSON.stringify(state.capa);
   if (!isDemo && window.KSUBridge && typeof window.KSUBridge.writeList === 'function') {
     window.KSUBridge.writeList('ksumc_capa_registry', state.capa);
@@ -12508,6 +12515,7 @@ function renderRoundsTables() {
               ${r.hospital}
             </span>
             ${workflowBadge}
+            ${typeof window !== 'undefined' && window.KSUOps && typeof window.KSUOps.renderRecordSyncBadges === 'function' ? window.KSUOps.renderRecordSyncBadges(r) : ''}
           </div>
           <span class="font-body-sm text-on-surface-variant mt-1">${r.floor}</span>
           <div class="flex items-center gap-space-md mt-2 text-label-sm text-on-surface-variant flex-wrap">
@@ -13121,7 +13129,13 @@ function saveNewInspectionRound() {
       ]
     };
 
-    state.rounds.unshift(newRound);
+    const isOnlineAtSave = typeof navigator === 'undefined' || navigator.onLine !== false;
+    const isRtdbReadyAtSave = Boolean(window.ksuFirebaseSync && window.ksuFirebaseSync.isConnected);
+    newRound._isOfflinePending = true;
+    newRound.rsdSyncStatus = 'pending_sync';
+    newRound.sharepointArchiveStatus = 'pending_archive';
+
+    state.rounds = [newRound, ...(state.rounds || []).filter(r => r && String(r.id) !== String(newRound.id))];
     try { saveRounds(newRound); } catch (e) { console.warn('saveRounds error:', e); }
 
     // Direct LocalStorage / Demo SessionStorage fallback guarantee across all round mirror keys
@@ -13172,6 +13186,8 @@ function saveNewInspectionRound() {
           updatedAt: nowIso,
           updatedAtMs: Date.now(),
           _isOfflinePending: true,
+          rsdSyncStatus: 'pending_sync',
+          sharepointArchiveStatus: 'pending_archive',
           targetDate: new Date(Date.now() + 3*24*60*60*1000).toISOString().split('T')[0],
           resolutionNotes: '',
           closedAt: null
@@ -13194,6 +13210,9 @@ function saveNewInspectionRound() {
     if (typeof renderHomeRecentRounds === 'function') {
       try { renderHomeRecentRounds(); } catch (e) { console.warn('renderHomeRecentRounds error:', e); }
     }
+    if (window.KSUOps && typeof window.KSUOps.renderOfflineSyncBanner === 'function') {
+      try { window.KSUOps.renderOfflineSyncBanner(); } catch (_) {}
+    }
     window.lastSavedRound = newRound;
 
     // Immediately open the Official Inspection Card Modal (كرت محضر التفتيش الميداني الشهري المعتمد)
@@ -13205,15 +13224,17 @@ function saveNewInspectionRound() {
       }
     }
 
-    if (isSupervisor) {
-      showToast('تم حفظ ' + formTitle + ' واعتماده وتصديره بنجاح ومزامنة الملاحظات مع سجل الإجراءات التصحيحية (CAPA) ✓', 'success');
+    if (!isOnlineAtSave || !isRtdbReadyAtSave) {
+      showToast('تم حفظ ' + formTitle + ' محلياً بحالة «بانتظار الإرسال» — سيُرفع ويؤكد تلقائياً فور عودة الاتصال بالشبكة.', 'warning');
+    } else if (isSupervisor) {
+      showToast('تم تسجيل ' + formTitle + ' وجاري تأكيد الحفظ في خادم رصد وأرشيف SharePoint.', 'info');
     } else {
-      showToast('تم حفظ ' + formTitle + ' ورفعه للمشرف بنجاح ومزامنة الملاحظات مع سجل الإجراءات التصحيحية (CAPA) ✓', 'success');
+      showToast('تم تسجيل ' + formTitle + ' وجاري إرساله للمشرف وتأكيد الحفظ السحابي.', 'info');
     }
   } catch (fatalErr) {
     console.error('Fatal error in saveNewInspectionRound:', fatalErr);
     try { closeNewRoundModal(); } catch (_) {}
-    showToast('تم حفظ التفتيش بنجاح واعتماد المحضر في سجلات النظام ✓', 'success');
+    showToast('تعذر إتمام حفظ أو إرسال الجولة — يرجى مراجعة السجل والمحاولة مرة أخرى.', 'error');
   }
 }
 window.saveNewInspectionRound = saveNewInspectionRound;

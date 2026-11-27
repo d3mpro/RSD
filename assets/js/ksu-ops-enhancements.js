@@ -167,59 +167,114 @@
     return false;
   }
 
-  async function validateAndCloseCAPA(capa, { notes = '', afterImage = '', closedBy = '', emergencyOverrideReason = '' } = {}) {
+  async function validateAndCloseCAPA(capa, { notes = '', afterImage = '', closedBy = '' } = {}) {
     if (!capa || !capa.id) {
       return { success: false, error: 'لم يتم العثور على معرف الإجراء التصحيحي.' };
     }
-    const cleanAfter = String(afterImage || '').trim();
-    const cleanOverride = String(emergencyOverrideReason || '').trim();
+    const cleanAfter = String(afterImage || capa.afterImage || '').trim();
     const mandatoryPhoto = requiresVisualClosure(capa);
 
-    if (mandatoryPhoto && !cleanAfter && !cleanOverride) {
+    // للملاحظات الحرجة والعالية: دليل صورة «بعد الإصلاح» إلزامي بدون أي تجاوز
+    if (mandatoryPhoto && !cleanAfter) {
       return {
         success: false,
+        closed: false,
         requiresAfterImage: true,
-        error: 'الملاحظات الحرجة والعالية تتطلب إرفاق صورة (بعد الإصلاح) للتحقق البصري قبل الإغلاق الرسمي.'
+        error: 'الملاحظات الحرجة والعالية تتطلب إرفاق وحفظ صورة (بعد الإصلاح) كدليل إلزامي.'
       };
     }
 
+    // تحليل الذكاء الاصطناعي استشاري فقط؛ عند الفشل أو عدم التوفر لا يُعطى تحقق إيجابي ولا درجة ثقة
     let verification = null;
     if (cleanAfter && window.KSUAI && typeof window.KSUAI.verifyCapaClosureImage === 'function') {
       try {
-        verification = await window.KSUAI.verifyCapaClosureImage({
+        const rawVer = await window.KSUAI.verifyCapaClosureImage({
           beforeImage: capa.beforeImage || capa.image || capa.photo || '',
           afterImage: cleanAfter,
           title: capa.title || '',
           description: capa.description || capa.actionRequired || '',
           location: `${capa.building || ''} - ${capa.floor || ''}`
         });
-      } catch (_) {}
+        if (!rawVer || rawVer.available === false || rawVer.success === false || rawVer.verified === null || typeof rawVer.verified === 'undefined') {
+          verification = {
+            success: false,
+            available: false,
+            advisoryOnly: true,
+            verified: null,
+            confidence: null,
+            summary: (rawVer && rawVer.summary) || 'بانتظار مراجعة المشرف — لم تتوفر نتيجة التحليل الآلي الاستشاري.'
+          };
+        } else {
+          verification = {
+            success: true,
+            available: true,
+            advisoryOnly: true,
+            verified: Boolean(rawVer.verified),
+            confidence: typeof rawVer.confidence === 'number' && Number.isFinite(rawVer.confidence) ? rawVer.confidence : null,
+            summary: rawVer.summary || 'رأي استشاري آلي بانتظار اعتماد المشرف المخوّل.'
+          };
+        }
+      } catch (_) {
+        verification = {
+          success: false,
+          available: false,
+          advisoryOnly: true,
+          verified: null,
+          confidence: null,
+          summary: 'بانتظار مراجعة المشرف — تعذر الوصول لخدمة التحليل الاستشاري.'
+        };
+      }
     }
 
-    if (verification && verification.verified === false && !cleanOverride) {
-      return {
-        success: false,
-        verification,
-        error: verification.summary || 'أشار التدقيق البصري إلى عدم اكتمال إزالة الخطر في الصورة المرفقة.'
-      };
-    }
+    const activeUser = (window.KSUAuth && typeof window.KSUAuth.getUser === 'function') ? window.KSUAuth.getUser() : null;
+    const canSupervisorApprove = (window.KSUDataBridge && typeof window.KSUDataBridge.canUserApproveCAPAClosure === 'function')
+      ? Boolean(window.KSUDataBridge.canUserApproveCAPAClosure(capa, activeUser))
+      : false;
+
+    const targetStatus = canSupervisorApprove ? 'resolved' : 'pending_supervisor_review';
+    const nowIso = new Date().toISOString();
+    const actorName = (activeUser && activeUser.name) || closedBy || '';
 
     const patch = {
-      status: 'resolved',
-      resolutionNotes: String(notes || 'تمت المعالجة الميدانية والتحقق من استيفاء اشتراطات السلامة').trim(),
-      resolvedAt: new Date().toISOString(),
-      closedBy: closedBy || (window.KSUAuth && window.KSUAuth.getUser && window.KSUAuth.getUser()?.name) || 'مشرف السلامة',
+      status: targetStatus,
+      resolutionNotes: String(notes || 'تم توثيق المعالجة الميدانية وإرفاق الدليل البصري').trim(),
+      resolvedAt: canSupervisorApprove ? nowIso : null,
+      closedAt: canSupervisorApprove ? nowIso : null,
+      ...(canSupervisorApprove ? {
+        closedBy: actorName || 'مشرف مخوّل',
+        approvedBy: actorName || 'مشرف مخوّل',
+        approvedAt: nowIso
+      } : {
+        submittedForReviewBy: actorName || 'مفتش السلامة',
+        submittedForReviewAt: nowIso
+      }),
       ...(cleanAfter ? { afterImage: cleanAfter } : {}),
-      ...(verification ? { aiClosureVerification: verification } : {}),
-      ...(cleanOverride ? { emergencyOverrideReason: cleanOverride } : {})
+      ...(verification ? { aiClosureVerification: verification } : {})
     };
 
+    let persistedStatus = targetStatus;
+    let rsdSyncConfirmed = false;
     if (window.KSUDataBridge && typeof window.KSUDataBridge.updateCAPARecord === 'function') {
-      window.KSUDataBridge.updateCAPARecord(capa.id, patch);
+      const updateRes = window.KSUDataBridge.updateCAPARecord(capa.id, patch);
+      if (updateRes && updateRes._syncPromise && typeof updateRes._syncPromise.then === 'function') {
+        await updateRes._syncPromise;
+      }
+      if (typeof window.KSUDataBridge.getCAPARecords === 'function') {
+        const updatedRec = window.KSUDataBridge.getCAPARecords().find(c => String(c.id) === String(capa.id));
+        if (updatedRec) {
+          if (updatedRec.status) persistedStatus = updatedRec.status;
+          rsdSyncConfirmed = updatedRec.rsdSyncStatus === 'synced';
+        }
+      }
     }
 
+    const isClosed = persistedStatus === 'resolved';
     return {
       success: true,
+      closed: isClosed,
+      pendingSupervisorReview: !isClosed,
+      rsdSyncConfirmed,
+      status: persistedStatus,
       patch,
       verification
     };
@@ -369,8 +424,16 @@
   }
 
   // ===========================================================================
-  // 3. Hot Work Permit Fire-Watch Timer (NFPA 51B: 30m & 60m Post-Work Checks)
+  // 3. Hot Work Permit Fire-Watch Timer (Strict Timing & KSUMC SOP Gate)
   // ===========================================================================
+  const KSUMC_HOT_WORK_SOP_CONFIG = {
+    // تمنع علامة الامتثال الكامل ما لم يُعتمد إجراء المدينة الطبية الرسمي ويُختبر تنبيه شاشة القفل على جهاز فعلي
+    sopVerified: false,
+    lockScreenAlertVerifiedOnDevice: false,
+    onTimeGraceMinutes: 10,
+    provisionalCheckMinutes: [30, 60]
+  };
+
   function parsePermitWorkEndMs(permit) {
     if (!permit) return 0;
     const raw = permit.workEndedAt || permit.validUntil || permit.expiryTimestamp || '';
@@ -385,100 +448,233 @@
     return 0;
   }
 
-  function evaluatePermitFireWatch(permit, nowMs = Date.now()) {
+  function isMilestoneValidlyChecked(permit, endMs, targetMin) {
+    if (!permit || !endMs) return false;
+    const tsRaw = permit[`fireWatch${targetMin}mCheckedAt`];
+    if (!tsRaw) return false;
+    const tsMs = Date.parse(String(tsRaw));
+    if (Number.isNaN(tsMs) || tsMs <= 0) return false;
+    // الفحص المبكر قبل حلول الموعد المستهدف لا يُحقق الفحص المطلوب
+    return tsMs >= (endMs + targetMin * 60000);
+  }
+
+  function evaluatePermitFireWatch(permit, nowMs = Date.now(), customSopConfig = null) {
+    const sopCfg = Object.assign({}, KSUMC_HOT_WORK_SOP_CONFIG, customSopConfig || {});
     if (!permit || typeof permit !== 'object') {
-      return { stage: 'not_applicable', isOverdue: false, label: 'غير خاضع للمراقبة اللاحقة' };
+      return { stage: 'not_applicable', isComplete: false, isOverdue: false, label: 'غير خاضع للمراقبة اللاحقة' };
     }
     const wt = String(permit.workType || 'أعمال ساخنة');
     const isHotWork = wt.includes('ساخن') || wt.includes('لحام') || wt.includes('قص') || wt.includes('شرار') || wt.toLowerCase().includes('hot');
     if (!isHotWork) {
-      return { stage: 'not_applicable', isOverdue: false, label: 'تصريح عمل بارد / عام' };
+      return { stage: 'not_applicable', isComplete: false, isOverdue: false, label: 'تصريح عمل بارد / عام' };
     }
 
-    if (permit.fireWatch30mCheckedAt && permit.fireWatch60mCheckedAt) {
-      return {
-        stage: 'completed',
-        isOverdue: false,
-        checked30m: true,
-        checked60m: true,
-        label: 'مكتمل ومؤمن ✓ (تم توثيق فحصي 30د و 60د - NFPA 51B)'
-      };
-    }
+    const reqMilestones = Array.isArray(sopCfg.requiredCheckMinutes) && sopCfg.requiredCheckMinutes.length > 0
+      ? sopCfg.requiredCheckMinutes
+      : sopCfg.provisionalCheckMinutes;
+    const complianceBlocked = !sopCfg.sopVerified || !sopCfg.lockScreenAlertVerifiedOnDevice;
+    const complianceStatus = complianceBlocked ? 'blocked_pending_ksumc_sop' : 'sop_verified';
 
     const endMs = parsePermitWorkEndMs(permit);
     if (!endMs || nowMs < endMs) {
       return {
         stage: 'active_work',
+        isComplete: false,
         isOverdue: false,
-        checked30m: Boolean(permit.fireWatch30mCheckedAt),
-        checked60m: Boolean(permit.fireWatch60mCheckedAt),
-        label: 'العمل الساخن جاري — تبدأ رقابة الحريق اللاحقة (30د / 60د) فور انتهاء العمل'
+        complianceBlocked,
+        complianceStatus,
+        checked30m: false,
+        checked60m: false,
+        label: 'العمل الساخن جاري — تبدأ المراقبة اللاحقة بعد توثيق انتهاء العمل الفعلي'
       };
     }
 
     const elapsedMin = Math.floor((nowMs - endMs) / 60000);
-    if (!permit.fireWatch30mCheckedAt) {
-      if (nowMs >= endMs + 30 * 60 * 1000) {
+    const milestoneStates = reqMilestones.map(m => ({
+      minutes: m,
+      stageKey: `${m}m`,
+      checked: isMilestoneValidlyChecked(permit, endMs, m),
+      checkedAt: permit[`fireWatch${m}mCheckedAt`] || null,
+      timing: permit[`fireWatch${m}mTiming`] || null,
+      delayMinutes: Number(permit[`fireWatch${m}mDelayMinutes`] || 0)
+    }));
+
+    const missingStages = milestoneStates.filter(ms => !ms.checked).map(ms => ms.stageKey);
+
+    // إذا سُجل فحص لاحق بينما فحص سابق مطلوب مفقود -> تمنع اكتمال الرقابة صراحةً دون ملء تلقائي
+    let highestCheckedIdx = -1;
+    milestoneStates.forEach((ms, i) => { if (ms.checked) highestCheckedIdx = i; });
+    const skippedEarlier = milestoneStates.some((ms, i) => !ms.checked && i < highestCheckedIdx);
+    if (skippedEarlier) {
+      return {
+        stage: 'incomplete_missing_checks',
+        isComplete: false,
+        isOverdue: true,
+        elapsedMin,
+        missingStages,
+        complianceBlocked,
+        complianceStatus: 'non_compliant_missing_check',
+        checked30m: isMilestoneValidlyChecked(permit, endMs, 30),
+        checked60m: isMilestoneValidlyChecked(permit, endMs, 60),
+        label: `⚠️ رقابة غير مكتملة: يوجد فحص مطلوب مفقود (${missingStages.join('، ')}) — لا يُغلق التصريح`
+      };
+    }
+
+    // جميع الفحوص المجدولة مستوفاة في وقتها أو متأخرة (وليس مبكراً)
+    if (missingStages.length === 0) {
+      const hasLate = milestoneStates.some(ms => ms.timing === 'late');
+      if (complianceBlocked) {
         return {
-          stage: 'overdue_30m',
-          isOverdue: true,
-          elapsedMin,
-          checked30m: false,
-          checked60m: false,
-          label: `🚨 حان وتجاوز موعد فحص 30 دقيقة (مضى ${elapsedMin} د من انتهاء العمل - NFPA 51B)`
+          stage: 'pending_sop_verification',
+          isComplete: false,
+          isOverdue: false,
+          allProvisionalChecksLogged: true,
+          hasLateChecks: hasLate,
+          complianceBlocked: true,
+          complianceStatus: 'blocked_pending_ksumc_sop',
+          checked30m: isMilestoneValidlyChecked(permit, endMs, 30),
+          checked60m: isMilestoneValidlyChecked(permit, endMs, 60),
+          label: `تم توثيق الفحوص المسجلة (${hasLate ? 'يتضمن فحصاً متأخراً' : 'في الموعد'}) — بانتظار اعتماد إجراء المدينة الطبية الرسمي`
         };
       }
       return {
-        stage: 'awaiting_30m',
+        stage: 'completed',
+        isComplete: true,
         isOverdue: false,
-        minutesRemaining: Math.max(1, 30 - elapsedMin),
-        checked30m: false,
-        checked60m: false,
-        label: `رقابة حريق نشطة: متبقي ${Math.max(1, 30 - elapsedMin)} د لفحص الـ 30 دقيقة الأول`
+        hasLateChecks: hasLate,
+        complianceBlocked: false,
+        complianceStatus: 'compliant',
+        checked30m: isMilestoneValidlyChecked(permit, endMs, 30),
+        checked60m: isMilestoneValidlyChecked(permit, endMs, 60),
+        label: `رقابة مكتملة (${hasLate ? 'توثيق متأخر مسجل' : 'في الموعد المعتمد'}) ✓`
       };
     }
 
-    if (nowMs >= endMs + 60 * 60 * 1000) {
+    // تحديد أول فحص مطلوب لم يُستوفَ بعد
+    const nextPending = milestoneStates.find(ms => !ms.checked);
+    const targetMin = nextPending.minutes;
+    if (nowMs >= endMs + targetMin * 60000) {
       return {
-        stage: 'overdue_60m',
+        stage: `overdue_${targetMin}m`,
+        isComplete: false,
         isOverdue: true,
         elapsedMin,
-        checked30m: true,
-        checked60m: false,
-        label: `🚨 حان وتجاوز موعد الفحص النهائي 60 دقيقة (مضى ${elapsedMin} د - NFPA 51B)`
+        missingStages,
+        complianceBlocked,
+        complianceStatus,
+        checked30m: isMilestoneValidlyChecked(permit, endMs, 30),
+        checked60m: isMilestoneValidlyChecked(permit, endMs, 60),
+        label: `🚨 متأخر: حان وتجاوز موعد فحص ${targetMin} دقيقة (مضى ${elapsedMin} د من انتهاء العمل)`
       };
     }
 
+    const rem = Math.max(1, targetMin - elapsedMin);
     return {
-      stage: 'awaiting_60m',
+      stage: `awaiting_${targetMin}m`,
+      isComplete: false,
       isOverdue: false,
-      minutesRemaining: Math.max(1, 60 - elapsedMin),
-      checked30m: true,
-      checked60m: false,
-      label: `تم فحص 30د ✓ • متبقي ${Math.max(1, 60 - elapsedMin)} د للفحص النهائي (60 دقيقة)`
+      minutesRemaining: rem,
+      missingStages,
+      complianceBlocked,
+      complianceStatus,
+      checked30m: isMilestoneValidlyChecked(permit, endMs, 30),
+      checked60m: isMilestoneValidlyChecked(permit, endMs, 60),
+      label: `رقابة حريق نشطة: متبقي ${rem} د لموعد فحص ${targetMin} دقيقة`
     };
   }
 
-  function recordPermitFireWatchCheck(permit, stage, inspectorName = '', nowMs = Date.now()) {
-    if (!permit) return null;
-    const iso = new Date(nowMs).toISOString();
-    const who = inspectorName || (window.KSUAuth && window.KSUAuth.getUser && window.KSUAuth.getUser()?.name) || 'مفتش السلامة المناوب';
-    if (stage === 'start_watch') {
-      permit.workEndedAt = iso;
-    } else if (stage === '30m') {
-      if (!permit.workEndedAt) permit.workEndedAt = new Date(nowMs - 30 * 60 * 1000).toISOString();
-      permit.fireWatch30mCheckedAt = iso;
-      permit.fireWatch30mInspector = who;
-    } else if (stage === '60m') {
-      if (!permit.fireWatch30mCheckedAt) {
-        permit.fireWatch30mCheckedAt = iso;
-        permit.fireWatch30mInspector = who;
-      }
-      permit.fireWatch60mCheckedAt = iso;
-      permit.fireWatch60mInspector = who;
-      permit.fireWatchStatus = 'completed_nfpa51b';
+  function recordPermitFireWatchCheck(permit, stage, inspectorName = '', nowMs = Date.now(), customSopConfig = null) {
+    if (!permit || typeof permit !== 'object') {
+      return { accepted: false, reason: 'invalid_permit', isComplete: false };
     }
-    return evaluatePermitFireWatch(permit, nowMs);
+    const sopCfg = Object.assign({}, KSUMC_HOT_WORK_SOP_CONFIG, customSopConfig || {});
+    const actualIso = new Date(nowMs).toISOString();
+    const who = inspectorName || (window.KSUAuth && window.KSUAuth.getUser && window.KSUAuth.getUser()?.name) || 'مفتش السلامة المناوب';
+
+    if (stage === 'start_watch') {
+      permit.workEndedAt = actualIso;
+      const evStart = evaluatePermitFireWatch(permit, nowMs, sopCfg);
+      return Object.assign({ accepted: true, timingStatus: 'started', actualCheckedAt: actualIso }, evStart);
+    }
+
+    // منع الملء التلقائي لوقت انتهاء العمل المفقود
+    if (!permit.workEndedAt) {
+      return {
+        accepted: false,
+        reason: 'missing_work_end_time',
+        isComplete: false,
+        message: 'لا يمكن تسجيل فحص المراقبة اللاحقة قبل تسجيل وقت انتهاء العمل الفعلي (workEndedAt).'
+      };
+    }
+
+    const endMs = Date.parse(String(permit.workEndedAt));
+    if (Number.isNaN(endMs) || endMs <= 0) {
+      return {
+        accepted: false,
+        reason: 'invalid_work_end_time',
+        isComplete: false
+      };
+    }
+
+    const mMatch = String(stage || '').match(/^(\d+)m$/i);
+    if (!mMatch) {
+      return { accepted: false, reason: 'unsupported_stage', isComplete: false };
+    }
+    const targetMinutes = Number(mMatch[1]);
+    const targetMs = endMs + targetMinutes * 60000;
+    const graceMs = (Number(sopCfg.onTimeGraceMinutes) || 10) * 60000;
+
+    if (!Array.isArray(permit.fireWatchChecks)) {
+      permit.fireWatchChecks = [];
+    }
+
+    // الفحص المبكر: يُسجل كمحاولة مبكرة بالوقت الفعلي ولا يُعتد به لإتمام المرحلة
+    if (nowMs < targetMs) {
+      permit.fireWatchChecks.push({
+        stage: `${targetMinutes}m`,
+        targetMinutes,
+        actualCheckedAt: actualIso,
+        inspector: who,
+        timingStatus: 'early',
+        delayMinutes: 0
+      });
+      const evEarly = evaluatePermitFireWatch(permit, nowMs, sopCfg);
+      return Object.assign({
+        accepted: false,
+        reason: 'early_check_rejected',
+        timingStatus: 'early',
+        delayMinutes: 0,
+        actualCheckedAt: actualIso
+      }, evEarly, { isComplete: false });
+    }
+
+    const isLate = nowMs > (targetMs + graceMs);
+    const timingStatus = isLate ? 'late' : 'on_time';
+    const delayMinutes = isLate ? Math.floor((nowMs - targetMs) / 60000) : 0;
+
+    // تسجيل المرحلة المحددة فقط بالوقت الفعلي دون ملء أي فحص سابق مفقود تلقائياً
+    permit[`fireWatch${targetMinutes}mCheckedAt`] = actualIso;
+    permit[`fireWatch${targetMinutes}mInspector`] = who;
+    permit[`fireWatch${targetMinutes}mTiming`] = timingStatus;
+    permit[`fireWatch${targetMinutes}mDelayMinutes`] = delayMinutes;
+
+    permit.fireWatchChecks.push({
+      stage: `${targetMinutes}m`,
+      targetMinutes,
+      actualCheckedAt: actualIso,
+      inspector: who,
+      timingStatus,
+      delayMinutes
+    });
+
+    const evAfter = evaluatePermitFireWatch(permit, nowMs, sopCfg);
+    permit.fireWatchStatus = evAfter.stage;
+    return Object.assign({
+      accepted: true,
+      timingStatus,
+      delayMinutes,
+      actualCheckedAt: actualIso
+    }, evAfter);
   }
 
   // ===========================================================================
@@ -671,28 +867,97 @@
   // ===========================================================================
   function getOfflineQueueStatus() {
     if (isDemoSession()) {
-      return { isDemo: true, online: true, cloudConnected: false, pendingCount: 0, showBanner: false };
+      return {
+        isDemo: true,
+        online: true,
+        cloudConnected: false,
+        pendingCount: 0,
+        pendingRsdCount: 0,
+        failedRsdCount: 0,
+        pendingSharePointCount: 0,
+        showBanner: false
+      };
     }
     const online = typeof navigator !== 'undefined' && navigator.onLine !== false;
     const cloudConnected = Boolean(window.ksuFirebaseSync && window.ksuFirebaseSync.isConnected);
-    let pendingCount = 0;
+    const pendingRsdIds = new Set();
+    const failedRsdIds = new Set();
+    const pendingSpIds = new Set();
+
     try {
       if (typeof localStorage !== 'undefined') {
-        const q = JSON.parse(localStorage.getItem('ksumc_offline_sync_queue') || '[]');
-        if (Array.isArray(q)) pendingCount += q.length;
-        const rounds = JSON.parse(localStorage.getItem('ksumc_rounds') || '[]');
-        if (Array.isArray(rounds)) {
-          pendingCount += rounds.filter(r => r && r._pendingCloudSync === true).length;
+        const rsdStorageKeys = [
+          'ksumc_safety_rounds',
+          'ksumc_capa_records',
+          'ksumc_safety_permits',
+          'ksumc_safety_doors',
+          'ksumc_safety_alarms',
+          'ksumc_safety_violations',
+          'ksumc_smoking_violations'
+        ];
+        for (const sk of rsdStorageKeys) {
+          const arr = JSON.parse(localStorage.getItem(sk) || '[]');
+          if (!Array.isArray(arr)) continue;
+          for (const rec of arr) {
+            if (!rec || typeof rec !== 'object') continue;
+            const rid = `${sk}:${rec.id || rec.roundId || ''}`;
+            if (rec._isOfflinePending === true || rec._pendingCloudSync === true || rec.rsdSyncStatus === 'pending_sync' || rec.rsdSyncStatus === 'sync_failed') {
+              pendingRsdIds.add(rid);
+              if (rec.rsdSyncStatus === 'sync_failed') failedRsdIds.add(rid);
+            }
+            if ((sk === 'ksumc_safety_rounds' || sk === 'ksumc_capa_records') && (rec.sharepointArchiveStatus === 'pending_archive' || rec.sharepointArchiveStatus === 'archive_failed')) {
+              pendingSpIds.add(`${sk}:${rec.id || ''}`);
+            }
+          }
+        }
+
+        const customQ = JSON.parse(localStorage.getItem('ksumc_offline_sync_queue') || '[]');
+        if (Array.isArray(customQ)) {
+          customQ.forEach((qItem, idx) => pendingRsdIds.add(`q:${(qItem && qItem.id) || idx}`));
+        }
+
+        const spQ = JSON.parse(localStorage.getItem('ksumc_sharepoint_retry_queue') || '[]');
+        if (Array.isArray(spQ)) {
+          spQ.forEach((spItem, idx) => pendingSpIds.add(`sp:${(spItem && spItem.recordId) || idx}`));
         }
       }
     } catch (_) {}
+
+    const pendingRsdCount = pendingRsdIds.size;
+    const failedRsdCount = failedRsdIds.size;
+    const pendingSharePointCount = pendingSpIds.size;
+    const pendingCount = pendingRsdCount + pendingSharePointCount;
+
     return {
       isDemo: false,
       online,
       cloudConnected,
       pendingCount,
-      showBanner: !online || pendingCount > 0
+      pendingRsdCount,
+      failedRsdCount,
+      pendingSharePointCount,
+      showBanner: !online || pendingRsdCount > 0 || pendingSharePointCount > 0
     };
+  }
+
+  function renderRecordSyncBadges(record) {
+    if (!record || typeof record !== 'object' || isDemoSession()) return '';
+    const rsdPending = record._isOfflinePending === true || record.rsdSyncStatus === 'pending_sync';
+    const rsdFailed = record.rsdSyncStatus === 'sync_failed';
+    const rsdLabel = rsdFailed
+      ? '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300 text-[10px] font-bold">رصد: تعذر الحفظ — بانتظار المحاولة</span>'
+      : (rsdPending
+          ? '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-bold">رصد: بانتظار الإرسال</span>'
+          : '<span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">رصد: محفوظ ✓</span>');
+
+    const spSt = record.sharepointArchiveStatus || '';
+    const spLabel = spSt === 'archived'
+      ? '<span class="px-2 py-0.5 rounded-full bg-blue-50 text-[#004B87] border border-blue-200 text-[10px] font-bold">SharePoint: مؤرشف ✓</span>'
+      : (spSt === 'archive_failed'
+          ? '<span class="px-2 py-0.5 rounded-full bg-rose-50 text-rose-800 border border-rose-200 text-[10px] font-bold">SharePoint: تعذرت الأرشفة (مجدول)</span>'
+          : '<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-300 text-[10px] font-bold">SharePoint: بانتظار الأرشفة</span>');
+
+    return `${rsdLabel} ${spLabel}`;
   }
 
   function renderOfflineSyncBanner() {
@@ -706,39 +971,102 @@
       return;
     }
     banner.classList.remove('hidden');
-    const bgClass = !st.online
+    const bgClass = (!st.online || st.failedRsdCount > 0)
       ? 'bg-amber-950 text-amber-50 border-amber-500/60'
       : 'bg-[#082B49] text-white border-[#C59B27]/60';
-    banner.className = `w-full px-4 py-2.5 border-b text-xs font-bold flex items-center justify-between gap-3 transition-all ${bgClass}`;
+    banner.className = `w-full px-4 py-2.5 border-b text-xs font-bold flex items-center justify-between gap-3 flex-wrap transition-all ${bgClass}`;
+
+    const rsdPart = st.pendingRsdCount > 0
+      ? `حالة رصد: (${st.pendingRsdCount}) سجل بانتظار الإرسال${st.failedRsdCount > 0 ? ' (تعذر الحفظ — سيعاد الإرسال)' : ''}`
+      : 'حالة رصد: محفوظ ومؤكد ✓';
+    const spPart = st.pendingSharePointCount > 0
+      ? `أرشيف SharePoint: (${st.pendingSharePointCount}) سجل بانتظار الأرشفة`
+      : 'أرشيف SharePoint: مكتمل ✓';
+
     banner.innerHTML = `
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
         <span class="material-symbols-outlined text-base text-amber-400">${!st.online ? 'cloud_off' : 'cloud_sync'}</span>
-        <span>${!st.online
-          ? `وضع العمل دون اتصال نشط (الأقبية / ضعف الشبكة) — بياناتك محفوظة محلياً بأمان${st.pendingCount > 0 ? ` (${st.pendingCount} معاملة بانتظار المزامنة)` : ''}`
-          : `يوجد (${st.pendingCount}) معاملات ميدانية محفوظة محلياً وجاهزة للمزامنة السحابية`}</span>
+        <span>${!st.online ? 'وضع العمل دون اتصال — السجلات بانتظار الإرسال:' : 'متابعة المزامنة والأرشفة:'}</span>
+        <span class="px-2 py-0.5 rounded bg-black/25 text-[11px]">${rsdPart}</span>
+        <span class="px-2 py-0.5 rounded bg-black/25 text-[11px]">${spPart}</span>
       </div>
       ${st.online ? `
         <button type="button" onclick="window.KSUOps && window.KSUOps.flushOfflineQueueNow()" class="px-3 py-1 rounded-lg bg-[#C59B27] hover:bg-amber-500 text-[#082B49] font-black text-[11px] shrink-0 cursor-pointer">
-          مزامنة الآن
+          إعادة المحاولة الآن
         </button>
-      ` : '<span class="px-2 py-0.5 rounded bg-amber-900/80 text-amber-200 text-[10px]">حفظ تلقائي محلي</span>'}
+      ` : '<span class="px-2 py-0.5 rounded bg-amber-900/80 text-amber-200 text-[10px]">بانتظار عودة الشبكة</span>'}
     `;
   }
 
-  function flushOfflineQueueNow() {
-    if (isDemoSession()) return;
-    try {
-      if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.pushPendingLocalDataToCloud === 'function') {
-        window.ksuFirebaseSync.pushPendingLocalDataToCloud();
-      }
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem('ksumc_offline_sync_queue');
-      }
+  async function flushOfflineQueueNow() {
+    if (isDemoSession()) {
+      return { rsdSynced: false, sharePointPending: 0, demo: true };
+    }
+    const initialSt = getOfflineQueueStatus();
+    if (!initialSt.online) {
       renderOfflineSyncBanner();
       if (typeof window.showToast === 'function') {
-        window.showToast('تمت مزامنة السجلات المحفوظة مع سحابة رصد بنجاح ✓', 'success');
+        window.showToast('الشبكة غير متصلة حالياً — تبقى السجلات في قائمة الانتظار لحين عودة الاتصال.', 'warning');
+      }
+      return { rsdSynced: false, rsdPending: initialSt.pendingRsdCount, sharePointPending: initialSt.pendingSharePointCount, offline: true };
+    }
+
+    let rsdPushResult = { success: false, syncedCount: 0, failedCount: initialSt.pendingRsdCount };
+    try {
+      if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.pushPendingLocalDataToCloud === 'function') {
+        const res = await window.ksuFirebaseSync.pushPendingLocalDataToCloud();
+        if (res && typeof res === 'object') {
+          rsdPushResult = res;
+        }
+      }
+    } catch (_) {
+      rsdPushResult = { success: false, syncedCount: 0, failedCount: Math.max(1, initialSt.pendingRsdCount) };
+    }
+
+    let spFlushResult = { flushed: 0, remaining: initialSt.pendingSharePointCount };
+    try {
+      if (window.KSUDataBridge && typeof window.KSUDataBridge.flushSharePointQueue === 'function') {
+        spFlushResult = await window.KSUDataBridge.flushSharePointQueue();
       }
     } catch (_) {}
+
+    // لا يُمسح طابور الانتظار المحلي إلا بعد تأكيد الخادم حفظ كافة سجلات رصد المعلقة فعلياً
+    const midCheck = getOfflineQueueStatus();
+    const rsdFullyConfirmed = Boolean(rsdPushResult.success && rsdPushResult.failedCount === 0 && midCheck.failedRsdCount === 0);
+    if (rsdFullyConfirmed && typeof localStorage !== 'undefined') {
+      const remainingOtherRsd = midCheck.pendingRsdCount - (
+        (() => {
+          try {
+            const q = JSON.parse(localStorage.getItem('ksumc_offline_sync_queue') || '[]');
+            return Array.isArray(q) ? q.length : 0;
+          } catch (_) { return 0; }
+        })()
+      );
+      if (remainingOtherRsd <= 0) {
+        try { localStorage.removeItem('ksumc_offline_sync_queue'); } catch (_) {}
+      }
+    }
+
+    const finalSt = getOfflineQueueStatus();
+    renderOfflineSyncBanner();
+
+    const rsdSynced = Boolean(rsdFullyConfirmed && finalSt.pendingRsdCount === 0);
+    if (typeof window.showToast === 'function') {
+      if (!rsdSynced) {
+        window.showToast('تعذر تأكيد حفظ بعض السجلات في خادم رصد — بقيت بانتظار الإرسال لإعادة المحاولة.', 'error');
+      } else if (finalSt.pendingSharePointCount > 0) {
+        window.showToast(`تم تأكيد الحفظ في خادم رصد ✓ | بقي (${finalSt.pendingSharePointCount}) سجل بانتظار أرشفة SharePoint.`, 'warning');
+      } else {
+        window.showToast('تم تأكيد حفظ السجلات في خادم رصد وأرشفتها في SharePoint بنجاح ✓', 'success');
+      }
+    }
+
+    return {
+      rsdSynced,
+      rsdPending: finalSt.pendingRsdCount,
+      sharePointPending: finalSt.pendingSharePointCount,
+      sharePointFlushed: spFlushResult.flushed || 0
+    };
   }
 
   function renderMonthlyCoveragePanels() {
@@ -1023,8 +1351,8 @@
     return `
       <div class="mt-1 p-2.5 rounded-xl border ${pillTone} flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
         <div class="flex items-center gap-1.5 font-bold">
-          <span class="material-symbols-outlined text-base">${fw.stage === 'completed' ? 'verified' : 'timer'}</span>
-          <span>رقابة NFPA 51B: ${escHtml(fw.label)}</span>
+          <span class="material-symbols-outlined text-base">${fw.isComplete ? 'verified' : 'timer'}</span>
+          <span>رقابة العمل الساخن: ${escHtml(fw.label)}</span>
         </div>
         <div class="flex items-center gap-1.5 shrink-0">${actionBtns}</div>
       </div>
@@ -1035,14 +1363,22 @@
     if (!window.state || !Array.isArray(window.state.permits)) return;
     const target = window.state.permits.find(p => String(p.id) === String(permitId));
     if (!target) return;
-    recordPermitFireWatchCheck(target, stage);
+    const res = recordPermitFireWatchCheck(target, stage);
     if (typeof window.savePermits === 'function') {
       window.savePermits(target);
     } else if (typeof window.renderPermitsList === 'function') {
       window.renderPermitsList();
     }
     if (typeof window.showToast === 'function') {
-      window.showToast('تم تحديث سجل الرقابة اللاحقة للعمل الساخن (NFPA 51B) ✓', 'success');
+      if (!res || res.accepted === false) {
+        const msg = res && res.timingStatus === 'early'
+          ? 'الفحص مبكر عن موعده المقرر — تم توثيق وقت المحاولة ولا يُعتد به لإتمام المرحلة.'
+          : ((res && res.message) || 'تعذر اعتماد الفحص قبل توثيق انتهاء العمل الفعلي.');
+        window.showToast(msg, 'warning');
+      } else {
+        const timingNote = res.timingStatus === 'late' ? ` (متأخر بـ ${res.delayMinutes} دقيقة)` : ' (في الموعد)';
+        window.showToast(`تم تسجيل وقت الفحص الفعلي${stage === 'start_watch' ? '' : timingNote}`, 'info');
+      }
     }
   }
 
@@ -1057,7 +1393,7 @@
         if (!notifiedFireWatchStages.has(key)) {
           notifiedFireWatchStages.add(key);
           if (typeof window.showToast === 'function') {
-            window.showToast(`🚨 تنبيه NFPA 51B للتصريح (${p.id}): ${fw.label}`, 'error');
+            window.showToast(`🚨 تنبيه رقابة العمل الساخن للتصريح (${p.id}): ${fw.label}`, 'error');
           }
         }
       }
@@ -1083,6 +1419,7 @@
       window.addEventListener('online', renderOfflineSyncBanner);
       window.addEventListener('offline', renderOfflineSyncBanner);
       window.addEventListener('ksumc_cloud_connection_changed', renderOfflineSyncBanner);
+      window.addEventListener('ksumc_data_updated', renderOfflineSyncBanner);
     }
 
     if (typeof setInterval === 'function') {
@@ -1098,6 +1435,7 @@
   const KSUOps = {
     CAMPUS_BUILDINGS,
     ASSET_SYSTEMS,
+    KSUMC_HOT_WORK_SOP_CONFIG,
     resolveBuildingCode,
     normalizeFloorCode,
     requiresVisualClosure,
@@ -1108,6 +1446,7 @@
     computeCampusRiskHeatmap,
     analyzeFACPAlarms,
     getOfflineQueueStatus,
+    renderRecordSyncBadges,
     renderOfflineSyncBanner,
     flushOfflineQueueNow,
     renderMonthlyCoveragePanels,

@@ -274,6 +274,100 @@
     return role === 'head' || role === 'admin' || role === 'developer' || role === 'executive';
   }
 
+  function isCriticalOrHighCAPA(capa) {
+    if (!capa || typeof capa !== 'object') return false;
+    const sev = String(capa.severity || '').toLowerCase();
+    const prio = String(capa.priority || '').toLowerCase();
+    if (sev.includes('حرج') || sev.includes('critical') || sev.includes('عالي') || sev.includes('high')) return true;
+    if (prio === 'critical' || prio === 'high') return true;
+    const days = Number(capa.businessDaysAllowed || capa.slaDays || 0);
+    if (days > 0 && days <= 5) return true;
+    return false;
+  }
+
+  function canUserApproveCAPAClosure(capa, user) {
+    const u = user === undefined ? getCurrentActiveUser() : user;
+    if (!u || typeof u !== 'object') return false;
+    const role = getNormalizedUserRole(u);
+    if (role === 'head' || role === 'admin' || role === 'developer' || role === 'executive') return true;
+    if (role === 'shift_supervisor') {
+      const supShift = normalizeShiftTag(u.shift || u.empId || u.username);
+      const capaShift = normalizeShiftTag(capa && (capa.reporterShift || capa.shift));
+      if (!capaShift) return Boolean(supShift);
+      return Boolean(supShift && supShift === capaShift);
+    }
+    return false;
+  }
+
+  function sanitizeCapaAdvisoryVerification(aiObj) {
+    if (!aiObj || typeof aiObj !== 'object') return null;
+    if (aiObj.success === false || aiObj.available === false) {
+      return {
+        success: false,
+        available: false,
+        advisoryOnly: true,
+        verified: null,
+        confidence: null,
+        safetyStatus: 'بانتظار مراجعة المشرف',
+        summary: String(aiObj.summary || 'تعذر توفر نتيجة التحليل الآلي — يبقى السجل بانتظار مراجعة المشرف المختص.')
+      };
+    }
+    return Object.assign({}, aiObj, {
+      advisoryOnly: true,
+      verified: typeof aiObj.verified === 'boolean' ? aiObj.verified : null,
+      confidence: Number.isFinite(Number(aiObj.confidence)) ? Number(aiObj.confidence) : null
+    });
+  }
+
+  function markRecordArchiveStatus(type, recordId, statusValue, extra = {}) {
+    if (!recordId) return;
+    const targetId = String(recordId);
+    const updateInArray = (arr) => {
+      if (!Array.isArray(arr)) return false;
+      let changed = false;
+      for (let i = 0; i < arr.length; i++) {
+        const it = arr[i];
+        if (!it || typeof it !== 'object') continue;
+        const itKey = String(it.code || it.id || it.roundId || '');
+        if (itKey === targetId || String(it.id || '') === targetId) {
+          arr[i] = Object.assign({}, it, { sharepointArchiveStatus: statusValue }, extra);
+          changed = true;
+        }
+      }
+      return changed;
+    };
+
+    if (type === 'inspection') {
+      const keysToUpdate = [KEYS.ROUNDS, 'ksumc_field_rounds', 'ksumc_rounds_registry', 'ksumc_rounds'];
+      keysToUpdate.forEach((k, idx) => {
+        try {
+          const list = idx === 0 ? getFromStorage(k, []) : JSON.parse((!isDemoModeActive() && typeof localStorage !== 'undefined' && localStorage.getItem(k)) || '[]');
+          if (updateInArray(list)) {
+            if (idx === 0) setToStorage(k, list);
+            else if (!isDemoModeActive() && typeof localStorage !== 'undefined') localStorage.setItem(k, JSON.stringify(list));
+          }
+        } catch (_) {}
+      });
+      if (typeof window !== 'undefined' && window.state && Array.isArray(window.state.rounds)) {
+        updateInArray(window.state.rounds);
+      }
+    } else if (type === 'capa') {
+      const capaKeys = [KEYS.CAPA, 'ksumc_capa_registry'];
+      capaKeys.forEach((k, idx) => {
+        try {
+          const list = idx === 0 ? getFromStorage(k, []) : JSON.parse((!isDemoModeActive() && typeof localStorage !== 'undefined' && localStorage.getItem(k)) || '[]');
+          if (updateInArray(list)) {
+            if (idx === 0) setToStorage(k, list);
+            else if (!isDemoModeActive() && typeof localStorage !== 'undefined') localStorage.setItem(k, JSON.stringify(list));
+          }
+        } catch (_) {}
+      });
+      if (typeof window !== 'undefined' && window.state && Array.isArray(window.state.capa)) {
+        updateInArray(window.state.capa);
+      }
+    }
+  }
+
   function isViolationArchived(v) {
     return Boolean(v && typeof v === 'object' && (v.archived === true || v.isArchived === true || v.status === 'archived' || v.status === 'مؤرشف'));
   }
@@ -511,36 +605,45 @@
     },
 
     saveRound: function(round) {
-      const rounds = this.getRounds();
+      const rawRounds = this.getRounds();
       const userObj = window.KSUAuth ? window.KSUAuth.getUser() : null;
       const nowIso = new Date().toISOString();
+      const roundId = (round && round.id) || ('RND-' + Date.now());
       const newRound = {
-        id: round.id || 'RND-' + Date.now(),
-        date: round.date || nowIso.split('T')[0],
-        time: round.time || new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
-        timestamp: round.timestamp || nowIso,
-        facility: round.facility || round.hospital || 'مستشفى الملك خالد الجامعي (KKUH)',
-        shift: round.shift || (userObj && userObj.shift) || 'الوردية 1 (صباحي)',
+        id: roundId,
+        date: (round && round.date) || nowIso.split('T')[0],
+        time: (round && round.time) || new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: (round && round.timestamp) || nowIso,
+        facility: (round && (round.facility || round.hospital)) || 'مستشفى الملك خالد الجامعي (KKUH)',
+        shift: (round && round.shift) || (userObj && userObj.shift) || 'الوردية 1 (صباحي)',
         routedTo: 'Q1',
-        workflowStatus: round.workflowStatus || 'pending_quality',
-        status: round.status || 'مكتملة',
+        workflowStatus: (round && round.workflowStatus) || 'pending_quality',
+        status: (round && round.status) || 'مكتملة',
+        ...(round || {}),
         _isOfflinePending: true,
-        ...round
+        rsdSyncStatus: 'pending_sync',
+        sharepointArchiveStatus: (round && round.sharepointArchiveStatus) || 'pending_archive'
       };
       if (!newRound.timestamp) newRound.timestamp = nowIso;
-      rounds.unshift(newRound);
+      const rounds = [newRound, ...(Array.isArray(rawRounds) ? rawRounds.filter(r => r && String(r.id) !== String(roundId)) : [])];
       setToStorage(KEYS.ROUNDS, rounds);
       if (!isDemoModeActive()) {
         try {
-          localStorage.setItem('ksumc_field_rounds', JSON.stringify(rounds));
-          localStorage.setItem('ksumc_rounds_registry', JSON.stringify(rounds));
+          const ser = JSON.stringify(rounds);
+          localStorage.setItem('ksumc_field_rounds', ser);
+          localStorage.setItem('ksumc_rounds_registry', ser);
+          localStorage.setItem('ksumc_rounds', ser);
         } catch (_) {}
+      }
+      if (window.state && Array.isArray(window.state.rounds)) {
+        window.state.rounds = [newRound, ...window.state.rounds.filter(r => r && String(r.id) !== String(roundId))];
       }
       if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncRound === 'function') {
         window.ksuFirebaseSync.syncRound(newRound);
       }
       this.syncToSharePoint(newRound, 'inspection');
-      return newRound;
+      const fresh = this.getRounds().find(r => r && String(r.id) === String(roundId));
+      return fresh || newRound;
     },
 
     /**
@@ -614,6 +717,9 @@
     getCurrentActiveUser: getCurrentActiveUser,
     getNormalizedUserRole: getNormalizedUserRole,
     isHeadOrAdminUser: isHeadOrAdminUser,
+    isCriticalOrHighCAPA: isCriticalOrHighCAPA,
+    canUserApproveCAPAClosure: canUserApproveCAPAClosure,
+    sanitizeCapaAdvisoryVerification: sanitizeCapaAdvisoryVerification,
     isViolationArchived: isViolationArchived,
     isViolationDeleted: isViolationDeleted,
     isViolationOwner: isViolationOwner,
@@ -1638,74 +1744,199 @@
       return capaList;
     },
 
+    isCriticalOrHighCAPA: isCriticalOrHighCAPA,
+    canUserApproveCAPAClosure: canUserApproveCAPAClosure,
+
+    enforceCAPAClosurePolicy: function(existingRecord, candidateRecord) {
+      const rec = Object.assign({}, candidateRecord || {});
+      if (rec.aiClosureVerification !== undefined) {
+        rec.aiClosureVerification = sanitizeCapaAdvisoryVerification(rec.aiClosureVerification);
+      }
+
+      const closingSet = new Set(['resolved', 'closed', 'completed', 'مغلق', 'تم الإغلاق', 'مكتمل']);
+      const targetStatus = String(rec.status || '').toLowerCase().trim();
+      const prevStatus = existingRecord ? String(existingRecord.status || '').toLowerCase().trim() : '';
+
+      if (!closingSet.has(targetStatus)) {
+        return rec;
+      }
+
+      // Preserve already legitimately approved & closed record on metadata-only updates
+      if (existingRecord && closingSet.has(prevStatus) && existingRecord.approvedBy && existingRecord.approvedAt) {
+        rec.approvedBy = existingRecord.approvedBy;
+        rec.approvedAt = existingRecord.approvedAt;
+        rec.approvedByRole = existingRecord.approvedByRole || '';
+        return rec;
+      }
+
+      const needsPhoto = isCriticalOrHighCAPA(rec);
+      const hasAfterPhoto = Boolean(String(rec.afterImage || '').trim());
+
+      // Rule 1: Critical/High CAPA cannot close without afterImage evidence
+      if (needsPhoto && !hasAfterPhoto) {
+        rec.status = (existingRecord && existingRecord.status === 'pending_supervisor_review') ? 'pending_supervisor_review' : 'open';
+        rec.closedAt = null;
+        rec.resolvedAt = null;
+        rec.closedBy = null;
+        rec.approvedBy = null;
+        rec.approvedAt = null;
+        rec._closureBlockedReason = 'missing_after_image';
+        return rec;
+      }
+
+      // Rule 2: Cannot close unless active operator is an authorized supervisor
+      const activeUser = getCurrentActiveUser();
+      if (!canUserApproveCAPAClosure(rec, activeUser)) {
+        rec.status = 'pending_supervisor_review';
+        rec.statusLabel = 'بانتظار مراجعة المشرف';
+        rec.closedAt = null;
+        rec.resolvedAt = null;
+        rec.closedBy = null;
+        rec.approvedBy = null;
+        rec.approvedAt = null;
+        rec._closureBlockedReason = 'supervisor_approval_required';
+        return rec;
+      }
+
+      // Authorized supervisor approving valid closure -> stamp approver & log immutable audit entry
+      const approvedAt = new Date().toISOString();
+      const approvedBy = String((activeUser && (activeUser.name || activeUser.username || activeUser.empId)) || 'مشرف معتمد');
+      const approvedByRole = getNormalizedUserRole(activeUser);
+
+      rec.status = 'resolved';
+      rec.statusLabel = 'تم الإغلاق باعتماد المشرف';
+      rec.approvedBy = approvedBy;
+      rec.approvedById = String((activeUser && (activeUser.id || activeUser.empId || activeUser.username)) || '');
+      rec.approvedByRole = approvedByRole;
+      rec.approvedAt = approvedAt;
+      rec.closedBy = approvedBy;
+      rec.closedAt = approvedAt;
+      rec.resolvedAt = approvedAt;
+      delete rec._closureBlockedReason;
+
+      this.appendAuditLog('CAPA_CLOSURE_APPROVED', {
+        capaId: String(rec.id || ''),
+        title: String(rec.title || rec.sourceTitle || ''),
+        severity: String(rec.severity || ''),
+        building: String(rec.building || ''),
+        hasAfterImage: hasAfterPhoto,
+        approvedBy,
+        approvedByRole,
+        approvedAt,
+        aiAdvisoryAvailable: Boolean(rec.aiClosureVerification && rec.aiClosureVerification.available !== false)
+      }, activeUser);
+
+      return rec;
+    },
+
     saveCAPARecord: function(capa) {
       if (!capa) return null;
       const list = getFromStorage(KEYS.CAPA, []);
       const nowIso = new Date().toISOString();
       const reportDate = capa.date || nowIso.split('T')[0];
-      const slaDays = Number(capa.slaDays) === 10 ? 10 : 5;
+      const slaDays = Number(capa.businessDaysAllowed || capa.slaDays) === 10 ? 10 : 5;
       const dueDate = capa.dueDate || this.addSaudiBusinessDays(reportDate, slaDays);
+      const targetId = capa.id || ('CAPA-' + Date.now().toString().slice(-6));
+      const idx = list.findIndex(c => c && String(c.id) === String(targetId));
+      const existing = idx !== -1 ? list[idx] : null;
 
-      const newRecord = {
-        id: capa.id || ('CAPA-' + Date.now().toString().slice(-6)),
-        sourceType: capa.sourceType || 'manual',
-        sourceId: capa.sourceId || '',
-        sourceTitle: capa.sourceTitle || 'إجراء تصحيحي ووقائي ميداني',
-        facility: capa.facility || 'مستشفى الملك خالد الجامعي (KKUH)',
-        building: capa.building || 'المبنى الرئيسي (A)',
-        floor: capa.floor || 'الدور الأرضي',
-        locationDetails: capa.locationDetails || '',
-        itemDescription: capa.itemDescription || capa.description || '',
-        severity: capa.severity || 'medium',
-        reportedBy: capa.reportedBy || 'مفتش السلامة',
-        reporterEmpId: capa.reporterEmpId || '',
-        reporterShift: capa.reporterShift || '1',
-        reportedAt: capa.reportedAt || `${reportDate} ${new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}`,
+      const candidate = Object.assign({}, existing || {}, capa, {
+        id: targetId,
+        title: capa.title || capa.sourceTitle || (existing && existing.title) || 'إجراء تصحيحي ووقائي ميداني',
+        sourceType: capa.sourceType || capa.source || (existing && existing.sourceType) || 'manual',
+        sourceId: capa.sourceId || (existing && existing.sourceId) || '',
+        sourceTitle: capa.sourceTitle || capa.title || (existing && existing.sourceTitle) || 'إجراء تصحيحي ووقائي ميداني',
+        facility: capa.facility || (existing && existing.facility) || 'مستشفى الملك خالد الجامعي (KKUH)',
+        building: capa.building || (existing && existing.building) || 'المبنى الرئيسي (A)',
+        floor: capa.floor || (existing && existing.floor) || 'الدور الأرضي',
+        locationDetails: capa.locationDetails || (existing && existing.locationDetails) || '',
+        description: capa.description || capa.itemDescription || (existing && existing.description) || '',
+        itemDescription: capa.itemDescription || capa.description || (existing && existing.itemDescription) || '',
+        severity: capa.severity || (existing && existing.severity) || 'medium',
+        priority: capa.priority || (existing && existing.priority) || (slaDays <= 5 ? 'high' : 'medium'),
+        reportedBy: capa.reportedBy || capa.reporter || (existing && existing.reportedBy) || 'مفتش السلامة',
+        reporter: capa.reporter || capa.reportedBy || (existing && existing.reporter) || 'مفتش السلامة',
+        reporterEmpId: capa.reporterEmpId || (existing && existing.reporterEmpId) || '',
+        reporterShift: capa.reporterShift || capa.shift || (existing && existing.reporterShift) || '1',
+        reportedAt: capa.reportedAt || (existing && existing.reportedAt) || `${reportDate} ${new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}`,
         slaDays: slaDays,
+        businessDaysAllowed: Number(capa.businessDaysAllowed) || slaDays,
         dueDate: dueDate,
-        status: capa.status || 'open',
-        correctiveAction: capa.correctiveAction || '',
-        assignedDepartment: capa.assignedDepartment || 'الإدارة العامة للأمن والسلامة - إدارة السلامة',
-        followupReminders: Array.isArray(capa.followupReminders) ? capa.followupReminders : [],
-        reminderCount: Number(capa.reminderCount) || 0,
-        lastReminderAt: capa.lastReminderAt || null,
-        closureNotes: capa.closureNotes || '',
-        closedBy: capa.closedBy || null,
-        closedAt: capa.closedAt || null,
-        createdAt: capa.createdAt || nowIso,
-        updatedAt: nowIso
-      };
+        status: capa.status || (existing && existing.status) || 'open',
+        correctiveAction: capa.correctiveAction || capa.actionRequired || (existing && existing.correctiveAction) || '',
+        assignedDepartment: capa.assignedDepartment || (existing && existing.assignedDepartment) || 'الإدارة العامة للأمن والسلامة - إدارة السلامة',
+        followupReminders: Array.isArray(capa.followupReminders) ? capa.followupReminders : ((existing && existing.followupReminders) || []),
+        reminderCount: Number(capa.reminderCount ?? (existing && existing.reminderCount)) || 0,
+        lastReminderAt: capa.lastReminderAt || (existing && existing.lastReminderAt) || null,
+        closureNotes: capa.closureNotes || capa.resolutionNotes || (existing && existing.closureNotes) || '',
+        resolutionNotes: capa.resolutionNotes || capa.closureNotes || (existing && existing.resolutionNotes) || '',
+        createdAt: capa.createdAt || (existing && existing.createdAt) || nowIso,
+        timestamp: capa.timestamp || (existing && existing.timestamp) || nowIso,
+        updatedAt: nowIso,
+        _isOfflinePending: true,
+        rsdSyncStatus: 'pending_sync',
+        sharepointArchiveStatus: capa.sharepointArchiveStatus || (existing && existing.sharepointArchiveStatus) || 'pending_archive'
+      });
 
-      const idx = list.findIndex(c => String(c.id) === String(newRecord.id));
-      if (idx !== -1) {
-        list[idx] = Object.assign({}, list[idx], newRecord);
-      } else {
-        list.unshift(newRecord);
-      }
+      const enforcedRecord = this.enforceCAPAClosurePolicy(existing, candidate);
+      const dedupedList = [enforcedRecord, ...list.filter(c => c && String(c.id) !== String(targetId))];
 
-      setToStorage(KEYS.CAPA, list);
-      if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncCAPARecord === 'function') {
-        window.ksuFirebaseSync.syncCAPARecord(newRecord);
+      setToStorage(KEYS.CAPA, dedupedList);
+      if (!isDemoModeActive() && typeof localStorage !== 'undefined') {
+        try { localStorage.setItem('ksumc_capa_registry', JSON.stringify(dedupedList)); } catch (_) {}
       }
-      this.syncToSharePoint(newRecord, 'capa');
-      window.dispatchEvent(new CustomEvent('ksumc_capa_updated', { detail: { record: newRecord, list } }));
-      return newRecord;
+      const rsdPromise = (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncCAPARecord === 'function')
+        ? Promise.resolve(window.ksuFirebaseSync.syncCAPARecord(enforcedRecord)).catch(() => false)
+        : Promise.resolve(false);
+      const spPromise = Promise.resolve(this.syncToSharePoint(enforcedRecord, 'capa')).catch(() => ({ success: false }));
+      const latest = getFromStorage(KEYS.CAPA, []).find(c => c && String(c.id) === String(targetId)) || enforcedRecord;
+      if (latest && typeof latest === 'object') {
+        Object.defineProperty(latest, '_syncPromise', {
+          value: Promise.allSettled([rsdPromise, spPromise]),
+          enumerable: false,
+          configurable: true
+        });
+      }
+      window.dispatchEvent(new CustomEvent('ksumc_capa_updated', { detail: { record: latest, list: getFromStorage(KEYS.CAPA, []) } }));
+      return latest;
     },
 
     updateCAPARecord: function(id, updates) {
       if (!id || !updates) return null;
       const list = getFromStorage(KEYS.CAPA, []);
-      const idx = list.findIndex(c => String(c.id) === String(id));
+      const idx = list.findIndex(c => c && String(c.id) === String(id));
       if (idx === -1) return null;
 
-      list[idx] = Object.assign({}, list[idx], updates, { updatedAt: new Date().toISOString() });
-      setToStorage(KEYS.CAPA, list);
+      const existing = list[idx];
+      const merged = Object.assign({}, existing, updates, {
+        updatedAt: new Date().toISOString(),
+        timestamp: existing.timestamp || existing.createdAt || new Date().toISOString(),
+        _isOfflinePending: true,
+        rsdSyncStatus: 'pending_sync',
+        sharepointArchiveStatus: 'pending_archive'
+      });
 
-      if (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncCAPARecord === 'function') {
-        window.ksuFirebaseSync.syncCAPARecord(list[idx]);
+      const enforced = this.enforceCAPAClosurePolicy(existing, merged);
+      list[idx] = enforced;
+      setToStorage(KEYS.CAPA, list);
+      if (!isDemoModeActive() && typeof localStorage !== 'undefined') {
+        try { localStorage.setItem('ksumc_capa_registry', JSON.stringify(list)); } catch (_) {}
       }
-      window.dispatchEvent(new CustomEvent('ksumc_capa_updated', { detail: { record: list[idx], list } }));
-      return list[idx];
+
+      const rsdPromise = (window.ksuFirebaseSync && typeof window.ksuFirebaseSync.syncCAPARecord === 'function')
+        ? Promise.resolve(window.ksuFirebaseSync.syncCAPARecord(list[idx])).catch(() => false)
+        : Promise.resolve(false);
+      const spPromise = Promise.resolve(this.syncToSharePoint(list[idx], 'capa')).catch(() => ({ success: false }));
+      const latest = getFromStorage(KEYS.CAPA, []).find(c => c && String(c.id) === String(id)) || list[idx];
+      if (latest && typeof latest === 'object') {
+        Object.defineProperty(latest, '_syncPromise', {
+          value: Promise.allSettled([rsdPromise, spPromise]),
+          enumerable: false,
+          configurable: true
+        });
+      }
+      window.dispatchEvent(new CustomEvent('ksumc_capa_updated', { detail: { record: latest, list: getFromStorage(KEYS.CAPA, []) } }));
+      return latest;
     },
 
     deleteCAPARecord: function(id) {
@@ -1779,6 +2010,7 @@
       return {
         success: true,
         notification: notif,
+        reporter: inspectorName,
         reminderCount: capa.reminderCount,
         lastReminderAt: nowIso,
         message: `تم إرسال تنبيه المتابعة بنجاح إلى المفتش (${inspectorName}) وبثه عبر Firebase`
@@ -1844,6 +2076,7 @@
         const rawStatus = String(record.status || '').toLowerCase();
         const statusLabel = type === 'capa'
           ? (rawStatus === 'closed' || rawStatus === 'resolved' ? 'مغلقة ومطابقة'
+            : rawStatus === 'pending_supervisor_review' ? 'بانتظار مراجعة المشرف'
             : rawStatus === 'in_progress' ? 'قيد المعالجة'
             : rawStatus === 'open' ? 'مفتوحة'
             : (record.status || 'مفتوحة'))
@@ -1988,6 +2221,8 @@
           notes: notesText
         };
 
+        markRecordArchiveStatus(type, recordKey, 'pending_archive');
+
         const postPayload = async (bodyObj) => {
           const controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
           const timer = controller ? setTimeout(() => controller.abort(), 15000) : null;
@@ -2008,6 +2243,10 @@
 
         const enqueueRetry = (targetPayload, reason) => {
           if (isDemoModeActive() || typeof localStorage === 'undefined') return false;
+          const isNetOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+          markRecordArchiveStatus(type, targetPayload.recordId, isNetOffline ? 'pending_archive' : 'archive_failed', {
+            sharepointLastError: String(reason || 'network')
+          });
           try {
             const qKey = 'ksumc_sharepoint_retry_queue';
             const existing = JSON.parse(localStorage.getItem(qKey) || '[]');
@@ -2032,9 +2271,18 @@
 
         const fallbackCompactPayload = Object.assign({}, payload, { reportHtml: compactReportHtml });
 
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+          enqueueRetry(fallbackCompactPayload, 'offline');
+          return { success: false, queued: true, offline: true };
+        }
+
         try {
           const response = await postPayload(payload);
           if (response && (response.ok || response.status === 202)) {
+            markRecordArchiveStatus(type, recordKey, 'archived', {
+              sharepointArchivedAt: new Date().toISOString(),
+              sharepointLastError: null
+            });
             if (!record._fromSharePointQueue && typeof this.flushSharePointQueue === 'function') {
               setTimeout(() => { try { this.flushSharePointQueue(); } catch (_) {} }, 50);
             }
@@ -2046,6 +2294,10 @@
             try {
               const retryRes = await postPayload(fallbackCompactPayload);
               if (retryRes && (retryRes.ok || retryRes.status === 202)) {
+                markRecordArchiveStatus(type, recordKey, 'archived', {
+                  sharepointArchivedAt: new Date().toISOString(),
+                  sharepointLastError: null
+                });
                 return { success: true, payload: fallbackCompactPayload, fallbackUsed: true };
               }
               const failStatus = retryRes ? retryRes.status : (response ? response.status : 0);
@@ -2086,10 +2338,20 @@
         return { flushed: 0, remaining: 0 };
       }
 
-      let flushed = 0;
-      const remaining = [];
+      // Deduplicate queue entries by type:recordId before flushing
+      const seenDedup = new Set();
+      const uniqueQueue = [];
       for (const entry of queue) {
         if (!entry || !entry.payload) continue;
+        const dk = `${entry.type || 'inspection'}:${entry.recordId || entry.Title || ''}`;
+        if (seenDedup.has(dk)) continue;
+        seenDedup.add(dk);
+        uniqueQueue.push(entry);
+      }
+
+      let flushed = 0;
+      const remaining = [];
+      for (const entry of uniqueQueue) {
         try {
           const resp = await fetch(SHAREPOINT_CONFIG.WEBHOOK_URL, {
             method: 'POST',
@@ -2098,13 +2360,23 @@
           });
           if (resp && (resp.ok || resp.status === 202)) {
             flushed++;
+            markRecordArchiveStatus(entry.type || 'inspection', entry.recordId, 'archived', {
+              sharepointArchivedAt: new Date().toISOString(),
+              sharepointLastError: null
+            });
           } else {
             entry.attempts = (entry.attempts || 1) + 1;
-            if (entry.attempts <= 5) remaining.push(entry);
+            markRecordArchiveStatus(entry.type || 'inspection', entry.recordId, 'archive_failed', {
+              sharepointLastError: `HTTP_${resp ? resp.status : 0}`
+            });
+            remaining.push(entry);
           }
-        } catch (_) {
+        } catch (err) {
           entry.attempts = (entry.attempts || 1) + 1;
-          if (entry.attempts <= 5) remaining.push(entry);
+          markRecordArchiveStatus(entry.type || 'inspection', entry.recordId, 'archive_failed', {
+            sharepointLastError: String((err && err.message) || 'network')
+          });
+          remaining.push(entry);
         }
       }
       try {
